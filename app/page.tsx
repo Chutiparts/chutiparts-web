@@ -1,5 +1,6 @@
-import { createClient } from '@/utils/supabase/server'
+  import { createClient } from '@/utils/supabase/server'
 import Image from 'next/image'
+import Link from 'next/link'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -48,10 +49,10 @@ export default async function Home() {
                 💬 Line: mr.chuti5988
               </a>
               <a 
-                href="tel:0812345988"
+                href="tel:0818285855"
                 className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition text-center"
               >
-                📞 081-234-5988
+                📞 081-828-5855
               </a>
             </div>
           </div>
@@ -62,103 +63,95 @@ export default async function Home() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {products?.map((product) => (
-            <article 
+            <Link
               key={product.id}
-              className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col"
+              href={`/products/${product.slug}`}
+              className="group block"
             >
-              {/* Image */}
-              <div className="relative aspect-square bg-gray-100 overflow-hidden">
-                {product.image_url ? (
-                  <img 
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400">
-                    <span className="text-6xl">🚗</span>
-                  </div>
-                )}
-                {/* Stock badge */}
-                {product.stock <= 1 && (
-                  <span className="absolute top-2 right-2 px-2 py-1 bg-red-500 text-white text-xs font-bold rounded">
-                    เหลือชิ้นสุดท้าย!
-                  </span>
-                )}
-              </div>
-
-              {/* Content */}
-              <div className="p-5 flex flex-col flex-grow">
-                {/* Category Tag */}
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium">
-                    {product.category}
-                  </span>
-                  <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded font-medium">
-                    {product.condition === 'used-good' ? 'มือสอง สภาพดี' : 
-                     product.condition === 'oem' ? 'OEM แท้' :
-                     product.condition === 'aftermarket' ? 'Aftermarket' : 
-                     product.condition}
-                  </span>
+              <article 
+                className="bg-white rounded-xl shadow-sm group-hover:shadow-2xl group-hover:-translate-y-1 transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-full cursor-pointer"
+              >
+                {/* Image */}
+                <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                  {product.image_url ? (
+                    <img 
+                      src={product.image_url}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <span className="text-6xl">🚗</span>
+                    </div>
+                  )}
+                  {/* Stock badge */}
+                  {product.stock <= 1 && (
+                    <span className="absolute top-2 right-2 px-2 py-1 bg-red-500 text-white text-xs font-bold rounded">
+                      เหลือชิ้นสุดท้าย!
+                    </span>
+                  )}
                 </div>
 
-                {/* Title */}
-                <h2 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">
-                  {product.name}
-                </h2>
-
-                {/* Description */}
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2 flex-grow">
-                  {product.description}
-                </p>
-
-                {/* Compatible Models */}
-                {product.compatible_models?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    <span className="text-xs text-gray-500 mr-1">รองรับ:</span>
-                    {product.compatible_models.map((model: string) => (
-                      <span 
-                        key={model} 
-                        className="text-xs px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded font-medium"
-                      >
-                        {model}
-                      </span>
-                    ))}
+                {/* Content */}
+                <div className="p-5 flex flex-col flex-grow">
+                  {/* Category Tag */}
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium">
+                      {product.category}
+                    </span>
+                    <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded font-medium">
+                      {product.condition === 'used-good' ? 'มือสอง สภาพดี' : 
+                       product.condition === 'oem' ? 'OEM แท้' :
+                       product.condition === 'aftermarket' ? 'Aftermarket' : 
+                       product.condition}
+                    </span>
                   </div>
-                )}
 
-                {/* Price */}
-                <div className="flex items-end justify-between mb-4 pt-3 border-t border-gray-100">
-                  <div>
-                    <p className="text-xs text-gray-500">ราคา</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      ฿{product.price.toLocaleString()}
-                    </p>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    มี {product.stock} ชิ้น
+                  {/* Title */}
+                  <h2 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-green-600 transition-colors">
+                    {product.name}
+                  </h2>
+
+                  {/* Description */}
+                  <p className="text-sm text-gray-600 mb-3 line-clamp-2 flex-grow">
+                    {product.description}
                   </p>
-                </div>
 
-                {/* Contact Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  <a 
-                    href="https://line.me/ti/p/~mr.chuti5988"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded text-center transition"
-                  >
-                    💬 Line
-                  </a>
-                  <a 
-                    href="tel:0812345988"
-                    className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded text-center transition"
-                  >
-                    📞 โทร
-                  </a>
+                  {/* Compatible Models */}
+                  {product.compatible_models?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      <span className="text-xs text-gray-500 mr-1">รองรับ:</span>
+                      {product.compatible_models.map((model: string) => (
+                        <span 
+                          key={model} 
+                          className="text-xs px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded font-medium"
+                        >
+                          {model}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Price + View Detail Hint */}
+                  <div className="flex items-end justify-between pt-3 border-t border-gray-100">
+                    <div>
+                      <p className="text-xs text-gray-500">ราคา</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        ฿{product.price.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-500 mb-1">
+                        มี {product.stock} ชิ้น
+                      </p>
+                      <p className="text-xs text-green-600 font-semibold group-hover:text-green-700 transition-colors">
+                        ดูรายละเอียด →
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </article>
+              </article>
+            </Link>
           ))}
         </div>
       </main>
@@ -178,7 +171,6 @@ export default async function Home() {
               <h3 className="text-lg font-bold text-white mb-3">ติดต่อเรา</h3>
               <ul className="space-y-2 text-sm">
                 <li>💬 Line: mr.chuti5988</li>
-                <li>📞 081-234-5988</li>
                 <li>📞 081-828-5855</li>
                 <li>🚚 จัดส่งทั่วประเทศ</li>
               </ul>
