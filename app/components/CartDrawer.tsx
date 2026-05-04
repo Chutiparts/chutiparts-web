@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { useCart } from "../context/CartContext"
+import SendToLineButton from "./SendToLineButton"
 
 type CartDrawerProps = {
   isOpen: boolean
@@ -105,7 +106,6 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         {/* Body */}
         <div className="flex-1 overflow-y-auto">
           {items.length === 0 ? (
-            // Empty state
             <div className="flex flex-col items-center justify-center h-full p-8 text-center">
               <div className="text-7xl mb-4 opacity-40">🛒</div>
               <h3 className="text-lg font-semibold text-gray-700 mb-2">
@@ -122,11 +122,9 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               </button>
             </div>
           ) : (
-            // Items list
             <ul className="divide-y divide-gray-100">
               {items.map((item) => (
                 <li key={item.id} className="p-4 flex gap-3">
-                  {/* Image */}
                   <div className="relative w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
                     {item.image_url ? (
                       <img
@@ -141,7 +139,6 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                     )}
                   </div>
 
-                  {/* Details */}
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-gray-900 text-sm line-clamp-2 mb-1">
                       {item.name}
@@ -150,7 +147,6 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       ฿{item.price.toLocaleString()}
                     </p>
 
-                    {/* Qty Controls */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
                         <button
@@ -195,7 +191,6 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                       </button>
                     </div>
 
-                    {/* Stock warning */}
                     {item.quantity >= item.stock && (
                       <p className="text-xs text-amber-600 mt-1">
                         ⚠️ ถึงจำนวนคงเหลือสูงสุดแล้ว
@@ -219,15 +214,8 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               </span>
             </div>
 
-            {/* Send to Line button (Phase 5 จะทำให้ใช้งานได้จริง) */}
-            <button
-              disabled
-              className="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-xl transition shadow-md disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              <span>💬</span>
-              ส่งรายการไป Line
-              <span className="text-xs font-normal opacity-80">(Phase 5)</span>
-            </button>
+            {/* Send to Line button (Phase 5 - active!) */}
+            <SendToLineButton />
 
             {/* Clear cart */}
             <button
@@ -246,4 +234,3 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     </>
   )
 }
-
