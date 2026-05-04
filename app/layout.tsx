@@ -15,10 +15,51 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChutiParts - คลังอะไหล่ Mercedes-Benz มือสองคุณภาพดี",
-  description: "อะไหล่ Mercedes-Benz มือสอง OEM แท้ 100% รับประกัน 15 วัน ส่งทั่วไทย",
+  metadataBase: new URL("https://chutiparts-web.vercel.app"),
+  title: {
+    default: "ChutiParts ⭐ | คลังอะไหล่ Mercedes-Benz มือสอง OEM แท้",
+    template: "%s | ChutiParts",
+  },
+  description:
+    "คลังอะไหล่ Mercedes-Benz มือสองคุณภาพดี OEM แท้ 100% รับประกัน 15 วัน ส่งทั่วไทย หัวเกียร์ AMG, ไฟท้าย W124, Vacuum Pump W140 ติดต่อ Line: mr.chuti5988",
+  keywords: [
+    "อะไหล่เบนซ์",
+    "อะไหล่ Mercedes-Benz",
+    "อะไหล่มือสอง",
+    "อะไหล่ Benz มือสอง",
+    "W124",
+    "W140",
+    "W212",
+    "W213",
+    "AMG",
+    "OEM แท้",
+    "อะไหล่รถยนต์",
+    "ChutiParts",
+    "ไฟท้าย Mercedes-Benz",
+    "หัวเกียร์ AMG",
+  ],
+  authors: [{ name: "ChutiParts" }],
+  creator: "ChutiParts",
+  publisher: "ChutiParts",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  formatDetection: {
+    telephone: true,
+    email: true,
+    address: true,
+  },
+  alternates: {
+    canonical: "https://chutiparts-web.vercel.app",
+  },
 };
-
 export default function RootLayout({
   children,
 }: Readonly<{
