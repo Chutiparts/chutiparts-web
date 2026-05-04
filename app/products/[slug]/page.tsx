@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import AddToCartButton from '../../components/AddToCartButton'
 
 export default async function ProductDetail({ 
   params 
@@ -82,7 +83,7 @@ export default async function ProductDetail({
                   <span className="text-9xl">🚗</span>
                 </div>
               )}
-              {product.stock <= 1 && (
+              {product.stock <= 1 && product.stock > 0 && (
                 <span className="absolute top-4 right-4 px-3 py-1.5 bg-red-500 text-white text-sm font-bold rounded">
                   เหลือชิ้นสุดท้าย!
                 </span>
@@ -150,6 +151,11 @@ export default async function ProductDetail({
                     มี {product.stock} ชิ้น
                   </p>
                 </div>
+              </div>
+
+              {/* Add to Cart Section */}
+              <div className="mb-6">
+                <AddToCartButton product={product} />
               </div>
 
               {/* Contact Buttons */}
@@ -239,3 +245,4 @@ export default async function ProductDetail({
     </div>
   )
 }
+
