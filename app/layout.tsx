@@ -57,6 +57,9 @@ export const metadata: Metadata = {
     email: true,
     address: true,
   },
+  verification: {
+    google: "wnRBO1fGy6YJPXBKmm5bS5mhTiOF45wEEbJ53d3N97Q",
+  },
   alternates: {
     canonical: "https://chutiparts-web.vercel.app",
   },
