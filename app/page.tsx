@@ -1,13 +1,7 @@
-// app/page.tsx — Homepage with Search + Filter (Day 8)
-// REPLACES the existing app/page.tsx
-//
-// Server component: fetches products from Supabase, passes to client.
-// Filtering happens client-side via HomeClient.
-
 import { createClient } from '@/utils/supabase/server'
 import HomeClient from './HomeClient'
 
-export const revalidate = 300 // re-fetch every 5 minutes
+export const revalidate = 300
 
 export default async function Home() {
   const supabase = await createClient()
