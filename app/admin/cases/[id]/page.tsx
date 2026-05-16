@@ -7,7 +7,8 @@ import { INTAKE_TYPES } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CaseDetailPage({ params }: { params: { id: string } }) {
+export default async function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createClient()
 
   const { data: caseRow, error } = await supabase
@@ -16,7 +17,7 @@ export default async function CaseDetailPage({ params }: { params: { id: string 
       *,
       vehicles ( chassis, year_from, engine_code, body_style, variant )
     `)
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (error || !caseRow) notFound()
