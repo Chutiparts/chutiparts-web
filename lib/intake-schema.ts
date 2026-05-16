@@ -90,7 +90,7 @@ export const IntakeSchema = z.object({
   contact_phone: z.string().optional(),
   contact_line_id: z.string().optional(),
   contact_province: z.string().min(1),
-  consent: z.literal(true),
+  consent: z.boolean().refine((v) => v === true, { message: 'ต้องยินยอมการใช้ข้อมูล' }),
   send_to_line: z.boolean().default(true),
 
   // Tracking
