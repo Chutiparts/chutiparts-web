@@ -120,8 +120,9 @@ export const PROVINCES = [
   'อื่นๆ',
 ] as const
 
-export const LINE_OA_ID = '@mr.chuti5988'
-export const LINE_OA_URL = `https://line.me/R/ti/p/${LINE_OA_ID}`
+const LINE_OA_BASIC_ID = '440ifncj' // without @ — actual LINE Basic ID
+export const LINE_OA_ID = `@${LINE_OA_BASIC_ID}`
+export const LINE_OA_URL = `https://line.me/R/ti/p/%40${LINE_OA_BASIC_ID}`
 export const PHONE = '081-828-5855'
 export const PHONE_TEL = 'tel:0818285855'
 
@@ -132,5 +133,5 @@ export function buildLineMessage(caseNumber: string, intakeType: string, summary
 
 export function buildLineOAMessageUrl(caseNumber: string, intakeType: string, summary: string) {
   const msg = encodeURIComponent(buildLineMessage(caseNumber, intakeType, summary))
-  return `https://line.me/R/oaMessage/${LINE_OA_ID}/?${msg}`
+  return `https://line.me/R/oaMessage/%40${LINE_OA_BASIC_ID}/?${msg}`
 }
