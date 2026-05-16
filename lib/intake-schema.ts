@@ -11,7 +11,7 @@ const parts_values = PARTS_CATEGORIES.map(p => p.value) as [string, ...string[]]
 // Step 1: Vehicle
 export const Step1Schema = z.object({
   chassis: z.enum(CHASSIS_MODELS as readonly [string, ...string[]], {
-    errorMap: () => ({ message: 'เลือกรุ่นรถ' })
+    message: 'เลือกรุ่นรถ'
   }),
   year: z.number()
     .int()
@@ -34,7 +34,7 @@ export const Step3FindPartsSchema = z.object({
 })
 
 export const Step3SymptomSchema = z.object({
-  symptom_category: z.enum(symptom_values, { errorMap: () => ({ message: 'เลือกหมวดอาการ' }) }),
+  symptom_category: z.enum(symptom_values, { message: 'เลือกหมวดอาการ' }),
   symptom_detail: z.string()
     .min(10, 'อธิบายอาการให้ละเอียดอย่างน้อย 10 ตัวอักษร')
     .max(500, 'อธิบายไม่เกิน 500 ตัวอักษร'),
