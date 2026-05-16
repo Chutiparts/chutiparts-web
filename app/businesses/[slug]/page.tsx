@@ -6,9 +6,10 @@ import { LINE_OA_URL } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const supabase = await createClient()
-  const { data } = await supabase.from('businesses').select('name, description, cover_image').eq('slug', params.slug).single()
+  const { data } = await supabase.from('businesses').select('name, description, cover_image').eq('slug', slug).single()
   if (!data) return { title: 'ไม่พบร้าน' }
   return {
     title: data.name,
@@ -19,9 +20,10 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 }
 
-export default async function BusinessDetailPage({ params }: { params: { slug: string } }) {
+export default async function BusinessDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const supabase = await createClient()
-  const { data: biz } = await supabase.from('businesses').select('*').eq('slug', params.slug).single()
+  const { data: biz } = await supabase.from('businesses').select('*').eq('slug', slug).single()
   if (!biz) notFound()
 
   // Get reviews
