@@ -55,11 +55,15 @@ export default function CaseDetailClient({ case: c, vehicle, admins }: any) {
   }
 
   const handleSendLine = () => {
+    // Copy message template to clipboard, then open LINE OA chat manager
     const summary = c.intake_type === 'find_parts'
       ? `อะไหล่: ${c.part_name}`
       : `อาการ: ${(c.symptom_detail || '').slice(0, 100)}`
-    const url = buildLineOAMessageUrl(c.case_number, intakeType.label, `รุ่น: ${vehicle?.chassis} (${vehicle?.year_from})\n${summary}`)
-    window.open(url, '_blank')
+    const message = `สวัสดีครับ ทีม ChutiParts ตอบกลับเคส ${c.case_number}\nรุ่น: ${vehicle?.chassis} (${vehicle?.year_from})\n${summary}\n\n[พิมพ์รายละเอียดต่อ]`
+    navigator.clipboard?.writeText(message).catch(() => {})
+    // Open LINE OA Chat Manager — admin sees chat list with customers
+    window.open('https://chat.line.biz/', '_blank')
+    alert('Copy message ลง clipboard แล้ว ✓\nเปิด LINE OA Chats → เลือกแชทลูกค้า → paste')
   }
 
   return (
