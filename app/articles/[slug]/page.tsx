@@ -6,22 +6,24 @@ import { LINE_OA_URL } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const supabase = await createClient()
-  const { data } = await supabase.from('content').select('title, excerpt, meta_title, meta_description, cover_image').eq('slug', params.slug).single()
+  const { data } = await supabase.from('content').select('title, excerpt, meta_title, meta_description, cover_image').eq('slug', slug).single()
   if (!data) return { title: 'ไม่พบบทความ' }
   return {
     title: data.meta_title || data.title,
-    description: data.meta_description || data.excerpt,
+    description: data.meta_description || data.excerpt,แ
     openGraph: {
       images: data.cover_image ? [data.cover_image] : undefined,
     },
   }
 }
 
-export default async function ArticleDetailPage({ params }: { params: { slug: string } }) {
+export default async function ArticleDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const supabase = await createClient()
-  const { data: article } = await supabase.from('content').select('*').eq('slug', params.slug).eq('is_published', true).single()
+  const { data: article } = await supabase.from('content').select('*').eq('slug', slug).eq('is_published', true).single()
   if (!article) notFound()
 
   // Increment view count (fire and forget)
