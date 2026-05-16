@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!data) return { title: 'ไม่พบบทความ' }
   return {
     title: data.meta_title || data.title,
-    description: data.meta_description || data.excerpt,แ
+    description: data.meta_description || data.excerpt,
     openGraph: {
       images: data.cover_image ? [data.cover_image] : undefined,
     },
@@ -98,7 +98,7 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
   )
 }
 
-// VERY simple markdown → HTML (use proper lib like `marked` or `react-markdown` in production)
+// VERY simple markdown → HTML
 function simpleMarkdownToHtml(md: string): string {
   return md
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
