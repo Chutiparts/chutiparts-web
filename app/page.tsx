@@ -1,11 +1,8 @@
-// app/page.tsx — Home (Server Component)
-// REPLACES existing page.tsx
-// (existing search/filter on homepage stays; we add new sections above)
-
+// app/page.tsx — Home (Server Component) — DARK PREMIUM SPLIT HERO
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { CHASSIS_MODELS, MODEL_INFO, LINE_OA_URL } from '@/lib/constants'
-import HomeClient from './HomeClient' // existing — keep search/filter
+import HomeClient from './HomeClient'
 
 export const revalidate = 300
 
@@ -22,51 +19,120 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* HERO */}
-      <section className="bg-gradient-to-br from-gray-900 via-gray-800 to-blue-900 text-white py-12 md:py-20">
-        <div className="container mx-auto px-4 max-w-7xl">
-          <div className="max-w-3xl">
-            <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
-              อะไหล่ <span className="text-yellow-400">Mercedes-Benz</span> มือสอง
-              <br />
-              ครบ จบ ในที่เดียว
-            </h1>
-            <p className="text-gray-300 text-lg mt-4">
-              เชี่ยวชาญ W124 · W126 · W140 · W201 · W202 · W210
-              <br />
-              OEM แท้ 100% · รับประกัน 15 วัน · ส่งทั่วไทย
+      {/* HERO — Split Layout Dark Premium */}
+      <section className="bg-[#1C1D2C] text-[#F2EDE0]">
+        <div className="container mx-auto px-4 max-w-7xl grid md:grid-cols-2 gap-8 py-12 md:py-16 items-center">
+
+          {/* LEFT: Content */}
+          <div>
+            <p className="text-[10px] md:text-xs tracking-[0.32em] text-[#C9A961] font-serif mb-5">
+              CLASSIC MERCEDES-BENZ
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 mt-8">
+            <h1 className="text-3xl md:text-5xl font-serif font-medium leading-tight tracking-tight">
+              อะไหล่ <span className="text-[#C9A961]">Mercedes-Benz</span>
+              <br />
+              คลาสสิก
+              <br />
+              <em className="text-[#B8B3A7] text-2xl md:text-4xl not-italic">จบในที่เดียว</em>
+            </h1>
+
+            {/* Chassis pills */}
+            <div className="flex flex-wrap gap-2 mt-6">
+              {CHASSIS_MODELS.map((m) => (
+                <Link
+                  key={m}
+                  href={`/search?model=${m}`}
+                  className="inline-block border border-[#C9A961] text-[#C9A961] hover:bg-[#C9A961] hover:text-[#1C1D2C] transition px-3 py-1.5 text-xs font-serif tracking-wider"
+                >
+                  {m}
+                </Link>
+              ))}
+            </div>
+
+            <p className="text-sm text-[#8E8F9E] mt-4">
+              OEM แท้ · รับประกัน 15 วัน · ส่งทั่วไทย
+            </p>
+
+            {/* CTA buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-7">
               <Link
                 href="/intake"
-                className="rounded-xl bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold px-6 py-4 text-lg text-center"
+                className="rounded-none bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium px-6 py-3.5 text-center tracking-wide transition"
               >
-                📋 ส่งอาการรถ → เราตอบกลับใน 4 ชั่วโมง
+                📋 ส่งภาพอะไหล่ให้ประเมิน
               </Link>
               <Link
                 href="/search"
-                className="rounded-xl border-2 border-white/30 hover:bg-white/10 text-white font-semibold px-6 py-4 text-lg text-center"
+                className="rounded-none border border-[#C9A961] text-[#C9A961] hover:bg-[#C9A961]/10 font-medium px-6 py-3.5 text-center tracking-wide transition"
               >
-                🔍 ค้นหาอะไหล่
+                เลือกตามรุ่นรถ →
               </Link>
+            </div>
+          </div>
+
+          {/* RIGHT: Hero image with glow */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(201,169,97,0.18)_0%,transparent_65%)] z-0"></div>
+            <div className="relative z-10 overflow-hidden border border-[#2E303F]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/hero-w140.jpg"
+                alt="Mercedes-Benz W140 S70 AMG — Mr.Chuti's collection"
+                className="w-full h-full object-cover aspect-[4/3]"
+              />
+            </div>
+            <p className="absolute bottom-3 right-3 text-[10px] text-[#C9A961] tracking-widest font-serif bg-[#1C1D2C]/80 px-2 py-1 z-20">
+              W140 · S70 AMG
+            </p>
+          </div>
+        </div>
+
+        {/* TRUST BADGES STRIP */}
+        <div className="border-t border-[#2E303F]">
+          <div className="container mx-auto px-4 max-w-7xl py-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="bg-white/[0.03] border border-[#C9A961]/25 px-5 py-3.5 flex items-start gap-3">
+                <span className="text-[#C9A961] text-lg font-serif">✓</span>
+                <div>
+                  <p className="text-xs font-medium text-[#C9A961] tracking-widest">OEM แท้ 100%</p>
+                  <p className="text-[11px] text-[#B8B3A7] mt-1">ของแท้ Mercedes-Benz · ผ่านการตรวจทุกชิ้น</p>
+                </div>
+              </div>
+              <div className="bg-white/[0.03] border border-[#C9A961]/25 px-5 py-3.5 flex items-start gap-3">
+                <span className="text-[#C9A961] text-lg font-serif">✓</span>
+                <div>
+                  <p className="text-xs font-medium text-[#C9A961] tracking-widest">ส่งทั่วไทย</p>
+                  <p className="text-[11px] text-[#B8B3A7] mt-1">EMS / Kerry / Flash · เก็บปลายทางได้</p>
+                </div>
+              </div>
+              <div className="bg-white/[0.03] border border-[#C9A961]/25 px-5 py-3.5 flex items-start gap-3">
+                <span className="text-[#C9A961] text-lg font-serif">✓</span>
+                <div>
+                  <p className="text-xs font-medium text-[#C9A961] tracking-widest">ตอบใน 4 ชั่วโมง</p>
+                  <p className="text-[11px] text-[#B8B3A7] mt-1">ทีม Mr.Chuti · เจ้าของรถ V12 ตัวจริง</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ENTRY BY MODEL */}
-      <section className="container mx-auto px-4 py-10 max-w-7xl">
-        <h2 className="text-2xl font-bold mb-4">🚗 ตามรุ่นรถ</h2>
+      {/* CATALOG — by chassis */}
+      <section className="container mx-auto px-4 py-12 max-w-7xl">
+        <div className="text-center mb-8">
+          <p className="text-[10px] tracking-[0.32em] text-[#8B7355] font-serif mb-2">PARTS CATALOG</p>
+          <h2 className="text-2xl md:text-3xl font-serif font-medium text-gray-900">เลือกตามรุ่นรถ</h2>
+        </div>
         <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
           {CHASSIS_MODELS.map((m) => (
             <Link
               key={m}
               href={`/search?model=${m}`}
-              className="rounded-xl bg-white border-2 border-gray-200 hover:border-yellow-400 p-4 text-center transition group"
+              className="rounded-md bg-white border border-gray-200 hover:border-[#C9A961] p-4 text-center transition group"
             >
-              <div className="font-bold text-lg group-hover:text-yellow-600">{m}</div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="font-serif font-medium text-lg text-gray-900 group-hover:text-[#C9A961]">{m}</div>
+              <div className="text-xs text-[#8B7355] mt-1">
                 {MODEL_INFO[m].thai_name.split(' ').slice(0, 2).join(' ')}
               </div>
             </Link>
@@ -74,27 +140,28 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* FEATURED PRODUCTS — uses existing HomeClient with search/filter */}
-      <section className="container mx-auto px-4 max-w-7xl">
-        <h2 className="text-2xl font-bold mb-4">🛒 อะไหล่พร้อมขาย</h2>
+      {/* FEATURED PRODUCTS */}
+      <section className="container mx-auto px-4 max-w-7xl pb-12">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-serif font-medium text-gray-900">🛒 อะไหล่พร้อมขาย</h2>
+          <Link href="/search" className="text-sm text-[#C9A961] hover:underline">ดูทั้งหมด →</Link>
+        </div>
         <HomeClient products={products} />
       </section>
 
-      {/* ARTICLES (if any) */}
+      {/* ARTICLES */}
       {articles.length > 0 && (
-        <section className="container mx-auto px-4 py-10 max-w-7xl">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold">📖 บทความความรู้</h2>
-            <Link href="/articles" className="text-sm text-blue-600 hover:underline">
-              ดูทั้งหมด →
-            </Link>
+        <section className="container mx-auto px-4 py-10 max-w-7xl border-t border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-serif font-medium text-gray-900">📖 บทความความรู้</h2>
+            <Link href="/articles" className="text-sm text-[#C9A961] hover:underline">ดูทั้งหมด →</Link>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {articles.map((a: any) => (
               <Link
                 key={a.id}
                 href={`/articles/${a.slug}`}
-                className="block rounded-xl bg-white border border-gray-100 hover:shadow-lg transition overflow-hidden"
+                className="block rounded-md bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
               >
                 {a.cover_image && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -103,10 +170,10 @@ export default async function HomePage() {
                 <div className="p-4">
                   <div className="flex flex-wrap gap-1 mb-2">
                     {a.related_models?.slice(0, 3).map((m: string) => (
-                      <span key={m} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">{m}</span>
+                      <span key={m} className="text-xs bg-[#C9A961]/10 text-[#8B7355] border border-[#C9A961]/30 px-2 py-0.5">{m}</span>
                     ))}
                   </div>
-                  <h3 className="font-bold text-gray-900 line-clamp-2">{a.title}</h3>
+                  <h3 className="font-serif font-medium text-gray-900 line-clamp-2">{a.title}</h3>
                   <p className="text-sm text-gray-600 mt-1 line-clamp-2">{a.excerpt}</p>
                 </div>
               </Link>
@@ -115,19 +182,20 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* CTA BANNER */}
+      {/* CTA BANNER — dark premium */}
       <section className="container mx-auto px-4 py-12 max-w-7xl">
-        <div className="rounded-2xl bg-gradient-to-r from-yellow-400 to-yellow-500 p-8 md:p-12 text-center text-gray-900">
-          <h2 className="text-2xl md:text-3xl font-bold mb-3">
+        <div className="bg-[#1C1D2C] text-[#F2EDE0] p-8 md:p-12 text-center">
+          <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-3">CAN'T FIND WHAT YOU NEED?</p>
+          <h2 className="text-2xl md:text-3xl font-serif font-medium mb-3">
             ไม่รู้จะถามใคร? ไม่รู้จะเริ่มตรงไหน?
           </h2>
-          <p className="text-lg mb-6">
-            ส่งอาการรถมาเลย — ทีมตอบกลับใน <strong>4 ชั่วโมง</strong>
+          <p className="text-base text-[#B8B3A7] mb-7">
+            ส่งอาการรถมาเลย — ทีมตอบกลับใน <strong className="text-[#C9A961]">4 ชั่วโมง</strong>
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/intake"
-              className="rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-bold px-6 py-4"
+              className="bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium px-7 py-3.5 tracking-wide transition"
             >
               📋 ส่งอาการรถ
             </Link>
@@ -135,9 +203,9 @@ export default async function HomePage() {
               href={LINE_OA_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-xl bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-4"
+              className="border border-[#C9A961] text-[#C9A961] hover:bg-[#C9A961]/10 font-medium px-7 py-3.5 tracking-wide transition"
             >
-              💬 ทักทาย Line
+              💬 ทักทาย LINE
             </a>
           </div>
         </div>
