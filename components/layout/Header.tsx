@@ -12,7 +12,6 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
   { href: '/', label: 'หน้าแรก' },
-  { href: '/vin-check', label: '🔍 เช็ค VIN ฟรี' },
   { href: '/search', label: '🔍 ค้นหา' },
   { href: '/articles', label: '📖 บทความ' },
   { href: '/garages', label: '🔨 อู่/ร้าน' },
