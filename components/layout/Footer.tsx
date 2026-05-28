@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* About */}
           <div>
-            <h3 className="text-lg font-bold text-white mb-3">ChutiParts ⭐</h3>
+            <h3 className="text-lg font-bold text-white mb-3">ChutiBenz ⭐</h3>
             <p className="text-sm leading-relaxed">
               คลังอะไหล่ Mercedes-Benz มือสองคุณภาพดี
               <br />
@@ -50,7 +50,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col md:flex-row items-center justify-between text-xs text-gray-500 gap-2">
-          <p>© 2026 ChutiParts. คลังอะไหล่เบนซ์มือสองคุณภาพดี</p>
+          <p>© 2026 ChutiBenz. คลังอะไหล่เบนซ์มือสองคุณภาพดี</p>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-gray-300">นโยบายความเป็นส่วนตัว</Link>
             <Link href="/about" className="hover:text-gray-300">เกี่ยวกับเรา</Link>

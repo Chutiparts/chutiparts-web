@@ -5,7 +5,7 @@ import { CHASSIS_MODELS } from '@/lib/constants'
 
 export const metadata = {
   title: 'อู่/ร้านอะไหล่ Mercedes-Benz',
-  description: 'รายชื่ออู่และร้านอะไหล่ Mercedes-Benz ที่ ChutiParts แนะนำ',
+  description: 'รายชื่ออู่และร้านอะไหล่ Mercedes-Benz ที่ ChutiBenz แนะนำ',
 }
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +26,7 @@ export default async function BusinessesPage({ searchParams }: { searchParams: {
     <div className="container mx-auto px-4 py-6 max-w-6xl">
       <header className="mb-6">
         <h1 className="text-3xl font-bold mb-2">🔨 อู่ / 🛒 ร้านอะไหล่</h1>
-        <p className="text-gray-600">รายชื่ออู่และร้านที่ ChutiParts แนะนำ</p>
+        <p className="text-gray-600">รายชื่ออู่และร้านที่ ChutiBenz แนะนำ</p>
       </header>
 
       {/* Type tabs */}

@@ -48,7 +48,7 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {biz.verified && <span className="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">✓ Verified by ChutiParts</span>}
+            {biz.verified && <span className="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">✓ Verified by ChutiBenz</span>}
             {biz.badges?.includes('team_recommended') && <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-3 py-1 rounded-full">⭐ แนะนำโดยทีม</span>}
           </div>
         </div>
@@ -130,7 +130,7 @@ export default async function BusinessDetailPage({ params }: { params: Promise<{
 
       {/* Disclaimer */}
       <p className="text-xs text-gray-500 mt-6 text-center">
-        * รีวิวจากลูกค้าจริง · ChutiParts ไม่รับผิดชอบบริการของพาร์ทเนอร์โดยตรง
+        * รีวิวจากลูกค้าจริง · ChutiBenz ไม่รับผิดชอบบริการของพาร์ทเนอร์โดยตรง
       </p>
     </div>
   )

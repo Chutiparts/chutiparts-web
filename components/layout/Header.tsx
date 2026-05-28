@@ -1,7 +1,7 @@
 // components/layout/Header.tsx — Quick fix (ไม่มี cart dependency)
 // 20 พ.ค. 2026
 //
-// เวอร์ชันนี้: ลบ "🚗 ChutiParts ⭐" + เปลี่ยนเป็น "ChutiBenz"
+// เวอร์ชันนี้: ลบ "🚗 ChutiBenz ⭐" + เปลี่ยนเป็น "ChutiBenz"
 // ไม่ต้องสร้าง cart components ก่อน — apply ได้เลย build ผ่าน
 // ภายหลังเมื่อทำ cart เสร็จ → ใช้ FIX-header-clean.txt แทน (มี CartButton)
 

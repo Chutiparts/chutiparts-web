@@ -37,7 +37,7 @@ export default async function ProductDetail({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <Link href="/" className="text-2xl font-bold tracking-tight hover:text-yellow-400 transition">
-              ChutiParts <span className="text-yellow-400">⭐</span>
+              ChutiBenz <span className="text-yellow-400">⭐</span>
             </Link>
             <div className="flex gap-2">
               <a 
@@ -239,7 +239,7 @@ export default async function ProductDetail({
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-300 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center text-sm">
-          <p>© 2026 ChutiParts. คลังอะไหล่เบนซ์มือสองคุณภาพดี</p>
+          <p>© 2026 ChutiBenz. คลังอะไหล่เบนซ์มือสองคุณภาพดี</p>
         </div>
       </footer>
     </div>

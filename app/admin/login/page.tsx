@@ -31,7 +31,7 @@ function AdminLoginForm() {
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm">
       <h1 className="text-2xl font-bold text-center mb-1">🔐 Admin Login</h1>
-      <p className="text-sm text-gray-500 text-center mb-6">ChutiParts Operations</p>
+      <p className="text-sm text-gray-500 text-center mb-6">ChutiBenz Operations</p>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-3 rounded mb-4">

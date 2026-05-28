@@ -3,7 +3,7 @@
  */
 
 export const SHOP_CONFIG = {
-  name: 'ChutiParts',
+  name: 'ChutiBenz',
   tagline: 'อะไหล่ Mercedes-Benz มือสอง',
   lineId: 'mr.chuti5988',
   lineUrl: {

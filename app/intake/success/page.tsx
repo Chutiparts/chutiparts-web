@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { LINE_OA_URL, PHONE_TEL } from '@/lib/constants'
 
 export const metadata = {
-  title: 'ส่งเคสสำเร็จ — ChutiParts',
+  title: 'ส่งเคสสำเร็จ — ChutiBenz',
 }
 
 export default function SuccessPage({ searchParams }: {
@@ -29,7 +29,7 @@ export default function SuccessPage({ searchParams }: {
         )}
 
         <p className="text-gray-700 mb-6">
-          ทีม ChutiParts จะติดต่อกลับภายใน <strong className="text-green-600">4 ชั่วโมง</strong>
+          ทีม ChutiBenz จะติดต่อกลับภายใน <strong className="text-green-600">4 ชั่วโมง</strong>
           <br />
           <span className="text-sm text-gray-500">(เวลาทำการ 9:00-18:00)</span>
         </p>

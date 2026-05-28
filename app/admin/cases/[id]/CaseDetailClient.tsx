@@ -59,7 +59,7 @@ export default function CaseDetailClient({ case: c, vehicle, admins }: any) {
     const summary = c.intake_type === 'find_parts'
       ? `อะไหล่: ${c.part_name}`
       : `อาการ: ${(c.symptom_detail || '').slice(0, 100)}`
-    const message = `สวัสดีครับ ทีม ChutiParts ตอบกลับเคส ${c.case_number}\nรุ่น: ${vehicle?.chassis} (${vehicle?.year_from})\n${summary}\n\n[พิมพ์รายละเอียดต่อ]`
+    const message = `สวัสดีครับ ทีม ChutiBenz ตอบกลับเคส ${c.case_number}\nรุ่น: ${vehicle?.chassis} (${vehicle?.year_from})\n${summary}\n\n[พิมพ์รายละเอียดต่อ]`
     navigator.clipboard?.writeText(message).catch(() => {})
     // Open LINE OA Chat Manager — admin sees chat list with customers
     window.open('https://chat.line.biz/', '_blank')

@@ -1,7 +1,7 @@
 // app/privacy/page.tsx — Privacy Policy (PDPA-compliant)
 export const metadata = {
   title: 'นโยบายความเป็นส่วนตัว',
-  description: 'นโยบายการเก็บและใช้ข้อมูลส่วนบุคคลของ ChutiParts',
+  description: 'นโยบายการเก็บและใช้ข้อมูลส่วนบุคคลของ ChutiBenz',
 }
 
 export default function PrivacyPage() {
@@ -11,7 +11,7 @@ export default function PrivacyPage() {
       <p className="text-sm text-gray-500">อัปเดตล่าสุด: 15 พฤษภาคม 2569</p>
 
       <h2>1. ข้อมูลที่เก็บรวบรวม</h2>
-      <p>ChutiParts (Mr.Chuti อะไหล่เบนซ์มือสอง) เก็บข้อมูลส่วนบุคคลของผู้ใช้บริการดังนี้:</p>
+      <p>ChutiBenz (Mr.Chuti อะไหล่เบนซ์มือสอง) เก็บข้อมูลส่วนบุคคลของผู้ใช้บริการดังนี้:</p>
       <ul>
         <li>ชื่อ-นามสกุล / ชื่อเล่น</li>
         <li>เบอร์โทรศัพท์</li>

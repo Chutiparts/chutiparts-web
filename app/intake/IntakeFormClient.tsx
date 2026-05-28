@@ -386,7 +386,7 @@ export default function IntakeFormClient() {
               className="h-5 w-5 mt-1"
             />
             <span className="text-sm">
-              ฉันยินยอมให้ ChutiParts เก็บข้อมูลและติดต่อกลับ
+              ฉันยินยอมให้ ChutiBenz เก็บข้อมูลและติดต่อกลับ
               (ดู <a href="/privacy" target="_blank" className="text-blue-600 underline">นโยบายความเป็นส่วนตัว</a>)
             </span>
           </label>

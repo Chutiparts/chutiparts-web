@@ -88,7 +88,7 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
       {/* CTA */}
       <section className="mt-12 rounded-2xl bg-gradient-to-r from-yellow-400 to-yellow-500 p-6 text-center">
         <h2 className="text-xl font-bold mb-2">มีคำถามหรืออาการคล้ายๆ นี้?</h2>
-        <p className="mb-4">ทีม ChutiParts ช่วยได้ — ส่งอาการมา ตอบกลับใน 4 ชั่วโมง</p>
+        <p className="mb-4">ทีม ChutiBenz ช่วยได้ — ส่งอาการมา ตอบกลับใน 4 ชั่วโมง</p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link href="/intake" className="rounded-lg bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 font-bold">📋 ส่งอาการรถ</Link>
           <a href={LINE_OA_URL} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-green-500 hover:bg-green-600 text-white px-6 py-3 font-bold">💬 ทักทาย LINE</a>

@@ -1,4 +1,4 @@
-// lib/constants.ts — ChutiParts MVP shared constants
+// lib/constants.ts — ChutiBenz MVP shared constants
 
 export const CHASSIS_MODELS = ['W124', 'W126', 'W140', 'W201', 'W202', 'W210'] as const
 export type Chassis = (typeof CHASSIS_MODELS)[number]

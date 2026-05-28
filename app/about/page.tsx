@@ -1,20 +1,20 @@
-// app/about/page.tsx — About ChutiParts
+// app/about/page.tsx — About ChutiBenz
 import Link from 'next/link'
 import { LINE_OA_URL, PHONE_TEL } from '@/lib/constants'
 
 export const metadata = {
-  title: 'เกี่ยวกับ ChutiParts',
-  description: 'ทีมงาน ChutiParts — คลังอะไหล่ Mercedes-Benz มือสอง คุณภาพดี',
+  title: 'เกี่ยวกับ ChutiBenz',
+  description: 'ทีมงาน ChutiBenz — คลังอะไหล่ Mercedes-Benz มือสอง คุณภาพดี',
 }
 
 export default function AboutPage() {
   return (
     <article className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-4">เกี่ยวกับ ChutiParts ⭐</h1>
+      <h1 className="text-4xl font-bold mb-4">เกี่ยวกับ ChutiBenz ⭐</h1>
 
       <section className="mb-8 prose prose-lg">
         <p>
-          <strong>ChutiParts</strong> (Mr.Chuti อะไหล่เบนซ์มือสอง) คือคลังอะไหล่ Mercedes-Benz รุ่นคลาสสิคที่เน้นคุณภาพ
+          <strong>ChutiBenz</strong> (Mr.Chuti อะไหล่เบนซ์มือสอง) คือคลังอะไหล่ Mercedes-Benz รุ่นคลาสสิคที่เน้นคุณภาพ
           ความน่าเชื่อถือ และการให้คำแนะนำที่ตรงประเด็น
         </p>
 
