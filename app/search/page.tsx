@@ -34,7 +34,7 @@ export default async function SearchPage({
 
   if (searchQuery) {
     productsQuery = productsQuery.or(
-      `name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,sku.ilike.%${searchQuery}%,slug.ilike.%${searchQuery}%`
+      `name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,part_number.ilike.%${searchQuery}%,oem_number.ilike.%${searchQuery}%,slug.ilike.%${searchQuery}%`
     )
   }
   if (model) {
