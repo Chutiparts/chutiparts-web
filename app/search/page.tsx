@@ -13,13 +13,14 @@ export const dynamic = 'force-dynamic'
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: { q?: string; model?: string; cat?: string; type?: string }
+  searchParams: Promise<{ q?: string; model?: string; cat?: string; type?: string }>
 }) {
+  const params = await searchParams
   const supabase = await createClient()
-  const q = (searchParams.q || '').trim()
-  const model = searchParams.model
-  const cat = searchParams.cat
-  const type = searchParams.type || 'all'
+  const q = (params.q || '').trim()
+  const model = params.model
+  const cat = params.cat
+  const type = params.type || 'all'
 
   // Resolve aliases (e.g., ปลาวาฬ → W140)
   const resolvedQuery = await resolveAliases(q, supabase)
