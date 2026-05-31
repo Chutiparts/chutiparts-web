@@ -311,7 +311,8 @@ export default function AdminVinCheckPage() {
                   📋 Copy
                 </button>
 
-                
+                <a
+                              
                   href="https://line.me/R/oaMessage/%40440ifncj/"
                   target="_blank"
                   rel="noopener noreferrer"
