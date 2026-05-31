@@ -13,6 +13,7 @@ import { useState } from 'react'
 
  const NAV_ITEMS = [
    { href: '/', label: 'หน้าแรก' },
+  { href: '/vin-check', label: '🆔 VIN Check ฟรี' },
   { href: '/search', label: '🔍 ค้นหา' },
   { href: '/articles', label: '📖 บทความ' },
   { href: '/garages', label: '🔨 อู่/ร้าน' },
