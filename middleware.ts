@@ -17,6 +17,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Phase 1 VIN Check: unlisted URL (security via obscurity)
+  // V2: replace with proper Supabase Auth admin role check
+  if (pathname.startsWith('/admin/vin-check')) {
+    return NextResponse.next()
+  }
   try {
     let response = NextResponse.next({ request })
 
