@@ -1,10 +1,10 @@
-// app/api/vin-check/route.ts — POST endpoint รับ VIN form submission
-// Phase 1 — 2026-05-31
+// app/api/vin-check/route.ts — POST endpoint V4
+// Phase 2 — 2026-05-31
+// V4: Handles multipart form data with optional Data Card image upload
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Use service role to bypass RLS (server-side only — secure)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
@@ -12,37 +12,103 @@ const supabase = createClient(
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 30
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json()
+    // V4: Parse multipart form data instead of JSON
+    const formData = await request.formData()
+
+    const name = String(formData.get('name') || '').trim()
+    const contact = String(formData.get('contact') || '').trim()
+    const vin = String(formData.get('vin') || '').toUpperCase().trim()
+    const car_model = String(formData.get('car_model') || '').trim() || null
+    const car_year_raw = formData.get('car_year')
+    const car_year = car_year_raw ? parseInt(String(car_year_raw), 10) || null : null
+    const questions = String(formData.get('questions') || '').trim() || null
+    const dataCardFile = formData.get('data_card') as File | null
 
     // Validation
-    if (!data.name || !data.contact || !data.vin) {
+    if (!name || !contact || !vin) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    if (typeof data.vin !== 'string' || data.vin.length !== 17) {
+    if (vin.length !== 17) {
       return NextResponse.json(
         { error: 'VIN must be exactly 17 characters' },
         { status: 400 }
       )
     }
 
+    // V4: Upload Data Card to Supabase Storage if provided
+    let dataCardUrl: string | null = null
+    if (dataCardFile && dataCardFile.size > 0) {
+      try {
+        // Validate size (10MB)
+        if (dataCardFile.size > 10 * 1024 * 1024) {
+          return NextResponse.json(
+            { error: 'Data Card image too large (max 10MB)' },
+            { status: 400 }
+          )
+        }
+
+        // Validate type
+        if (!dataCardFile.type.startsWith('image/')) {
+          return NextResponse.json(
+            { error: 'Data Card must be an image' },
+            { status: 400 }
+          )
+        }
+
+        // Generate unique filename
+        const timestamp = Date.now()
+        const extension = dataCardFile.name.split('.').pop() || 'jpg'
+        const filename = `${vin}-${timestamp}.${extension}`
+
+        // Upload to Storage
+        const arrayBuffer = await dataCardFile.arrayBuffer()
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
+          .from('vin-datacards')
+          .upload(filename, arrayBuffer, {
+            contentType: dataCardFile.type,
+            cacheControl: '3600',
+            upsert: false,
+          })
+
+        if (uploadError) {
+          console.error('Data Card upload error:', uploadError)
+          // Continue without datacard rather than failing entire submission
+        } else {
+          // Get public URL
+          const { data: { publicUrl } } = supabase
+            .storage
+            .from('vin-datacards')
+            .getPublicUrl(filename)
+
+          dataCardUrl = publicUrl
+        }
+      } catch (uploadErr) {
+        console.error('Data Card processing error:', uploadErr)
+        // Continue without datacard
+      }
+    }
+
     // Insert into vin_check_requests
     const { data: inserted, error } = await supabase
       .from('vin_check_requests')
       .insert({
-        name: String(data.name).trim().slice(0, 200),
-        contact: String(data.contact).trim().slice(0, 200),
-        vin: String(data.vin).toUpperCase().trim().slice(0, 17),
-        car_model: data.car_model ? String(data.car_model).slice(0, 50) : null,
-        car_year: data.car_year ? parseInt(String(data.car_year), 10) || null : null,
-        questions: data.questions ? String(data.questions).slice(0, 2000) : null,
+        name: name.slice(0, 200),
+        contact: contact.slice(0, 200),
+        vin: vin.slice(0, 17),
+        car_model: car_model?.slice(0, 50) || null,
+        car_year,
+        questions: questions?.slice(0, 2000) || null,
         status: 'pending',
+        data_card_url: dataCardUrl,
       })
       .select('id')
       .single()
@@ -58,6 +124,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       id: inserted?.id,
+      has_data_card: !!dataCardUrl,
     })
   } catch (e) {
     console.error('VIN check error:', e)
