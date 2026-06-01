@@ -260,8 +260,7 @@ export async function POST(req: NextRequest) {
   try {
     const { request_id } = await req.json();
     if (!request_id) {
-      return NextResponse.json({ error: .eq('id', request_id) }, { status: 400 });
-    }
+return NextResponse.json({ error: 'Missing request_id' }, { status: 400 });    }
 
     // 1. Get request from DB
     const { data: vinRequest, error: fetchError } = await supabase
