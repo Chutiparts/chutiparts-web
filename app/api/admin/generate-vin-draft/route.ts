@@ -21,7 +21,7 @@
 //   APIFY_API_TOKEN
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';  const CORS = {   'Access-Control-Allow-Origin': '*',   'Access-Control-Allow-Methods': 'POST, OPTIONS',   'Access-Control-Allow-Headers': 'Content-Type', };  function jsonWithCors(body: any, init?: { status?: number }) {   return jsonWithCors(body, { ...init, headers: CORS }); }  export async function OPTIONS() {   return new NextResponse(null, { status: 204, headers: CORS }); }
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,6 +31,24 @@ const supabase = createClient(
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
+
+// ════════════════════════════════════════════════════════════
+// CORS — allow HTML tool from local file:// origin
+// ════════════════════════════════════════════════════════════
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+function jsonWithCors(body: any, init?: { status?: number }) {
+  return jsonWithCors(body, { ...init, headers: CORS });
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS });
+}
 
 // ════════════════════════════════════════════════════════════
 // HARDCODED CONTACT INFO (NEVER CHANGE)
