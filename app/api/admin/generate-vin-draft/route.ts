@@ -501,7 +501,7 @@ async function decodeVIN(vin: string, lastvinUrl?: string): Promise<DecodedVin> 
 // ════════════════════════════════════════════════════════════
 
 const SYSTEM_PROMPT = `You are formatting a VIN check response for ChutiBenz (chutibenz.com),
-Thailand's leading Mercedes-Benz classic parts specialist.
+Thailand's Mercedes-Benz classic parts specialist. Do NOT mention "S70 AMG" or "1 of 27" or "10+ ปีในวงการ" anywhere in the output.
 
 ABSOLUTE RULES:
 
