@@ -1,11 +1,17 @@
-// app/api/admin/generate-vin-draft/route.ts — V4.3 + LASTVIN
+// app/api/admin/generate-vin-draft/route.ts — V4.4 MULTI-SOURCE
 // Phase 2 — 2026-06-01
-// V4.3 Changes (over V4.2):
-// - SCOPE: VIN decode ONLY (no maintenance, no pricing, no warnings)
-// - SOURCE: LastVIN.com (POST + scrape) as primary, AI fallback
-// - OUTPUT: LastVIN-style English tables + Thai footer + soft CTAs
-// - REMOVED: market prices, maintenance advice, common problems
-// - ADDED: complete option code listing (paint, interior, all factory options)
+//
+// V4.4 Architecture (per chutibenz-vin-field-list-schema-pack.md):
+// - Source classes: VIN_STANDARD (NHTSA), MB_BUILD (Apify+LastVIN cache),
+//   MB_OPTION_MASTER (vin_option_master dict), SHOP_LOGIC (Sonnet), MANUAL_REVIEW (admin)
+// - Caching: vin_vehicles + related tables (Mercedes data doesn't change)
+// - Output: English (LastVIN-style) + Thai footer
+//
+// Required Vercel env vars:
+//   NEXT_PUBLIC_SUPABASE_URL
+//   SUPABASE_SECRET_KEY
+//   ANTHROPIC_API_KEY
+//   APIFY_API_TOKEN  ← NEW
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -20,171 +26,394 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 // ════════════════════════════════════════════════════════════
-// HARDCODED CONTACT INFO (NEVER CHANGE THESE)
+// HARDCODED CONTACT INFO (NEVER CHANGE)
 // LINE ID: @mr.chuti5988
 // Phone:   081-828-5855
 // Website: chutibenz.com
-// Email:   tookjai5988@gmail.com
 // ════════════════════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════════
-// LASTVIN.COM INTEGRATION
+// TYPES (per schema pack)
 // ════════════════════════════════════════════════════════════
 
-interface LastVinData {
-  general: Record<string, string>;
-  options: Array<{ code: string; description: string }>;
-  sourceUrl: string;
+type SeriesCode = 'W201' | 'W124' | 'W126' | 'W140' | 'W202' | 'W210';
+
+interface VehicleRecord {
+  id?: string;
+  vin: string;
+  fin?: string;
+  series_code?: SeriesCode;
+  model_code?: string;
+  model_text?: string;
+  plant_name?: string;
+  country_of_origin?: string;
+  serial_number?: string;
+  model_year?: number;
+  production_date?: string;
+  delivery_date?: string;
+  approx_build_date?: string;
+  order_location?: string;
+  order_number?: string;
+  lastvin_encoded_url?: string;
 }
 
-async function fetchLastVin(vin: string): Promise<LastVinData | null> {
+interface PowertrainRecord {
+  engine_code?: string;
+  engine_number?: string;
+  engine_text?: string;
+  transmission_code?: string;
+  transmission_number?: string;
+  transmission_text?: string;
+  fuel_type?: string;
+  cylinder_count?: number;
+}
+
+interface ColorsTrimRecord {
+  paint_code_primary?: string;
+  paint_text_primary?: string;
+  interior_code?: string;
+  interior_text?: string;
+}
+
+interface OptionItem {
+  option_code: string;
+  option_seq: number;
+  option_description_en: string;
+  option_description_th?: string;
+  option_category?: string;
+}
+
+interface DecodedVin {
+  vehicle: VehicleRecord;
+  powertrain: PowertrainRecord;
+  colors: ColorsTrimRecord;
+  options: OptionItem[];
+  sources: string[];
+  confidence: number;
+  cache_hit: boolean;
+}
+
+// ════════════════════════════════════════════════════════════
+// VIN_STANDARD: NHTSA API (free, basic fields)
+// ════════════════════════════════════════════════════════════
+
+async function fetchNHTSA(vin: string): Promise<Partial<VehicleRecord>> {
   try {
-    const formData = new URLSearchParams();
-    formData.append('vin', vin);
+    const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vin}?format=json`;
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    const data = await res.json();
+    const r = data.Results?.[0] || {};
+    return {
+      plant_name: r.PlantCity || undefined,
+      country_of_origin: r.PlantCountry || undefined,
+      model_year: r.ModelYear ? parseInt(r.ModelYear) : undefined,
+    };
+  } catch (err) {
+    console.error('[NHTSA] error:', err);
+    return {};
+  }
+}
 
-    const res = await fetch('https://www.lastvin.com/', {
+// ════════════════════════════════════════════════════════════
+// MB_BUILD: Apify Universal Bypasser (FREE)
+// Only works for VINs with known encoded URL (cached or previously scraped)
+// ════════════════════════════════════════════════════════════
+
+async function fetchApifyDatacard(encodedUrl: string): Promise<string | null> {
+  try {
+    const token = process.env.APIFY_API_TOKEN;
+    if (!token) {
+      console.error('[Apify] No APIFY_API_TOKEN env var');
+      return null;
+    }
+    const apiUrl = `https://api.apify.com/v2/acts/macheta~universal-bypasser/run-sync-get-dataset-items?token=${token}&timeout=120`;
+    const res = await fetch(apiUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      body: formData.toString(),
-      redirect: 'follow',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: encodedUrl }),
     });
-
     if (!res.ok) {
-      console.error(`[LastVIN] POST failed: ${res.status}`);
+      console.error(`[Apify] POST failed: ${res.status}`);
       return null;
     }
-
-    const finalUrl = res.url;
-    if (!finalUrl.includes('/vin/')) {
-      console.error('[LastVIN] No redirect to /vin/ — VIN not in LastVIN DB');
-      return null;
-    }
-
-    const html = await res.text();
-    return parseLastVinHtml(html, finalUrl);
+    const items = await res.json();
+    return items[0]?.content || null;
   } catch (err: any) {
-    console.error(`[LastVIN] Error: ${err.message}`);
+    console.error('[Apify] error:', err.message);
     return null;
   }
 }
 
-function parseLastVinHtml(html: string, sourceUrl: string): LastVinData {
+function parseLastVinHtml(html: string): {
+  vehicle: Partial<VehicleRecord>;
+  powertrain: Partial<PowertrainRecord>;
+  colors: Partial<ColorsTrimRecord>;
+  options: OptionItem[];
+} {
   const general: Record<string, string> = {};
-  const options: Array<{ code: string; description: string }> = [];
+  const options: OptionItem[] = [];
 
   const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
   let rowMatch;
+  let seq = 0;
 
   while ((rowMatch = rowRegex.exec(html)) !== null) {
-    const rowHtml = rowMatch[1];
     const cells: string[] = [];
     const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g;
     let cellMatch;
-
-    while ((cellMatch = cellRegex.exec(rowHtml)) !== null) {
+    while ((cellMatch = cellRegex.exec(rowMatch[1])) !== null) {
       const text = cellMatch[1]
         .replace(/<[^>]+>/g, '')
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
         .trim();
       cells.push(text);
     }
-
     if (cells.length !== 2) continue;
     const [a, b] = cells;
     if (a === 'Code' && b === 'Description') continue;
-    if (a === 'General Data') continue;
-    if (!a || !b) continue;
+    if (a === 'General Data' || !a || !b) continue;
 
     if (/^\d{3,4}[A-Z]?$/.test(a)) {
-      options.push({ code: a, description: b });
+      options.push({
+        option_code: a,
+        option_seq: seq++,
+        option_description_en: b,
+      });
     } else {
       general[a] = b;
     }
   }
 
-  return { general, options, sourceUrl };
+  return {
+    vehicle: {
+      fin: general['FIN'],
+      model_text: general['Model'],
+      order_number: general['Order Number'],
+      order_location: general['Order Location'],
+      delivery_date: parseDate(general['Delivery Date']),
+      approx_build_date: parseDate(general['Approx. Build Date']),
+    },
+    powertrain: {
+      engine_number: general['Engine'],
+      transmission_number: general['Transmission'],
+    },
+    colors: {
+      paint_text_primary: general['Paint 1'],
+      interior_text: general['Interior'],
+    },
+    options,
+  };
+}
+
+function parseDate(s?: string): string | undefined {
+  if (!s) return undefined;
+  // LastVIN formats: "1992-10-02" or "1992-07"
+  const match = s.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?$/);
+  if (!match) return undefined;
+  return `${match[1]}-${match[2]}-${match[3] || '01'}`;
 }
 
 // ════════════════════════════════════════════════════════════
-// STOCK QUERY (for soft CTA)
+// MB_OPTION_MASTER: Lookup option descriptions from dictionary
 // ════════════════════════════════════════════════════════════
 
-async function getRelevantStock(chassis: string | null): Promise<any[]> {
-  if (!chassis) return [];
+async function enrichOptionsFromMaster(
+  options: OptionItem[],
+  series: SeriesCode
+): Promise<OptionItem[]> {
+  if (options.length === 0) return options;
+  const codes = options.map((o) => o.option_code);
+  const { data: master } = await supabase
+    .from('vin_option_master')
+    .select('option_code, description_en, description_th, category')
+    .eq('series_code', series)
+    .in('option_code', codes);
 
-  const variants = [chassis, chassis.toUpperCase(), chassis.toLowerCase()]
-    .filter((v, i, arr) => arr.indexOf(v) === i);
+  const masterMap = new Map((master || []).map((m) => [m.option_code, m]));
+  return options.map((o) => {
+    const m = masterMap.get(o.option_code);
+    return {
+      ...o,
+      option_description_en: m?.description_en || o.option_description_en,
+      option_description_th: m?.description_th || undefined,
+      option_category: m?.category || undefined,
+    };
+  });
+}
 
+// ════════════════════════════════════════════════════════════
+// CACHE: Check + save vin_vehicles
+// ════════════════════════════════════════════════════════════
+
+async function getCachedVehicle(vin: string): Promise<DecodedVin | null> {
+  const { data: vehicle } = await supabase
+    .from('vin_vehicles')
+    .select('*')
+    .eq('vin', vin)
+    .single();
+
+  if (!vehicle) return null;
+
+  const [powertrain, colors, optionsData] = await Promise.all([
+    supabase.from('vin_powertrains').select('*').eq('vehicle_id', vehicle.id).single(),
+    supabase.from('vin_colors_trim').select('*').eq('vehicle_id', vehicle.id).single(),
+    supabase
+      .from('vin_option_items')
+      .select('*')
+      .eq('vehicle_id', vehicle.id)
+      .order('option_seq'),
+  ]);
+
+  return {
+    vehicle,
+    powertrain: powertrain.data || {},
+    colors: colors.data || {},
+    options: optionsData.data || [],
+    sources: ['cache'],
+    confidence: vehicle.record_confidence || 0.5,
+    cache_hit: true,
+  };
+}
+
+async function saveDecodedToCache(
+  vin: string,
+  series: SeriesCode,
+  data: {
+    vehicle: Partial<VehicleRecord>;
+    powertrain: Partial<PowertrainRecord>;
+    colors: Partial<ColorsTrimRecord>;
+    options: OptionItem[];
+    sources: string[];
+  }
+): Promise<string | null> {
   try {
-    const orFilter = variants.map((v) => `chassis.cs.{${v}}`).join(',');
-    const { data } = await supabase
-      .from('products')
-      .select('part_number, name, price, stock_status, chassis')
-      .or(orFilter)
-      .limit(5);
-    return data || [];
+    const { data: inserted, error } = await supabase
+      .from('vin_vehicles')
+      .upsert(
+        {
+          vin,
+          fin: data.vehicle.fin || vin,
+          series_code: series,
+          model_code: data.vehicle.model_code,
+          model_text: data.vehicle.model_text,
+          plant_name: data.vehicle.plant_name,
+          country_of_origin: data.vehicle.country_of_origin,
+          model_year: data.vehicle.model_year,
+          delivery_date: data.vehicle.delivery_date,
+          approx_build_date: data.vehicle.approx_build_date,
+          order_location: data.vehicle.order_location,
+          order_number: data.vehicle.order_number,
+          lastvin_encoded_url: data.vehicle.lastvin_encoded_url,
+          record_confidence: 0.85,
+          review_status: 'pending',
+        },
+        { onConflict: 'vin' }
+      )
+      .select('id')
+      .single();
+
+    if (error || !inserted) {
+      console.error('[Cache] vehicle save failed:', error);
+      return null;
+    }
+
+    const vehicleId = inserted.id;
+
+    // Save powertrain
+    if (data.powertrain.engine_number || data.powertrain.transmission_number) {
+      await supabase.from('vin_powertrains').upsert(
+        {
+          vehicle_id: vehicleId,
+          ...data.powertrain,
+          source_class: 'MB_BUILD',
+          source_name: data.sources.join(','),
+        },
+        { onConflict: 'vehicle_id' }
+      );
+    }
+
+    // Save colors
+    if (data.colors.paint_text_primary || data.colors.interior_text) {
+      await supabase.from('vin_colors_trim').upsert(
+        {
+          vehicle_id: vehicleId,
+          ...data.colors,
+          source_class: 'MB_BUILD',
+          source_name: data.sources.join(','),
+        },
+        { onConflict: 'vehicle_id' }
+      );
+    }
+
+    // Save options (delete + reinsert)
+    if (data.options.length > 0) {
+      await supabase.from('vin_option_items').delete().eq('vehicle_id', vehicleId);
+      const optionRows = data.options.map((o) => ({
+        vehicle_id: vehicleId,
+        option_code: o.option_code,
+        option_seq: o.option_seq,
+        option_description_en: o.option_description_en,
+        option_description_th: o.option_description_th,
+        option_category: o.option_category,
+        source_class: 'MB_BUILD',
+        source_name: data.sources.join(','),
+        confidence: 0.85,
+      }));
+      await supabase.from('vin_option_items').insert(optionRows);
+    }
+
+    return vehicleId;
   } catch (err) {
-    console.error('[Stock] query failed:', err);
-    return [];
+    console.error('[Cache] save error:', err);
+    return null;
   }
 }
 
 // ════════════════════════════════════════════════════════════
-// SYSTEM PROMPT (V4.3)
+// SERIES DETECTION from VIN
 // ════════════════════════════════════════════════════════════
 
-const SYSTEM_PROMPT = `You are Mr.Chuti, owner of ChutiBenz (chutibenz.com).
-Thailand's leading Mercedes-Benz classic parts specialist with 10+ years experience.
-You personally own a Mercedes W140 S70 AMG (V12, 7L) — 1 of only 27 made worldwide.
-Author of "W140 Buyer Guide" (80+ pages) and "W124 M119 eBook".
+function detectSeries(vin: string): SeriesCode | null {
+  // Mercedes chassis code is at positions 4-6 of VIN
+  const chassis = vin.substring(3, 6);
+  const map: Record<string, SeriesCode> = {
+    '201': 'W201',
+    '124': 'W124',
+    '126': 'W126',
+    '140': 'W140',
+    '202': 'W202',
+    '210': 'W210',
+  };
+  return map[chassis] || null;
+}
 
-You're responding to a Mercedes enthusiast's VIN check request.
+// ════════════════════════════════════════════════════════════
+// SYSTEM PROMPT (V4.4)
+// ════════════════════════════════════════════════════════════
 
-═══════════════════════════════════════════════
-ABSOLUTE RULES (V4.3 — DO NOT VIOLATE)
-═══════════════════════════════════════════════
+const SYSTEM_PROMPT = `You are formatting a VIN check response for ChutiBenz (chutibenz.com),
+Thailand's leading Mercedes-Benz classic parts specialist.
+
+ABSOLUTE RULES:
 
 1. SCOPE = VIN DECODE ONLY (factual data)
-   ✓ Model, engine code, transmission, paint, interior, options, dates, order location
-   ✗ NEVER discuss: maintenance, common problems, biodegradable wiring, oil leaks
-   ✗ NEVER discuss: market prices, repair costs, service estimates, "what to watch for"
-   ✗ NEVER add: investment opinions, buyer advice, comparisons
+   - Display all provided data fields cleanly
+   - NEVER add maintenance advice, common problems, repair costs
+   - NEVER hallucinate fields not in the provided data
+   - If field is missing, show "—" or omit
 
-   If customer asks about problems → redirect to "ส่งอาการรถ" feature (in footer).
+2. FORMAT = LASTVIN-STYLE (English tables + Thai footer only)
+   - General Data table
+   - Option Codes table (list ALL options provided)
+   - Thai only in footer
 
-2. FORMAT = LASTVIN-STYLE
-   - Markdown tables exactly mirroring LastVIN.com structure
-   - English technical data (codes, model names, paint codes)
-   - DO NOT translate option descriptions to Thai
-   - Thai language ONLY in footer (greetings + CTAs + signature)
-
-3. DATA COMPLETENESS = CRITICAL
-   - Paint · interior · options are THE CORE VALUE (like seeing inside a house before buying)
-   - If LastVIN data available → list ALL options (every single code)
-   - Never abbreviate, never say "and more" — list everything
-
-4. HARDCODED CONTACT (NEVER CHANGE)
+3. HARDCODED CONTACT (NEVER CHANGE)
    LINE ID: @mr.chuti5988
    Phone:   081-828-5855
-   Website: chutibenz.com
 
-5. SPELLING
-   ✓ Mercedes (not BMW)
-   ✓ แชสซี / W140 / S-Class
-   ✓ Professional Thai — no slang
-
-═══════════════════════════════════════════════
-OUTPUT TEMPLATE (PRIMARY — WITH LASTVIN DATA)
-═══════════════════════════════════════════════
+4. OUTPUT TEMPLATE EXACTLY:
 
 สวัสดีครับ คุณ {customer_name}
 ขอบคุณที่ส่ง VIN มาตรวจสอบครับ
@@ -194,63 +423,159 @@ OUTPUT TEMPLATE (PRIMARY — WITH LASTVIN DATA)
 | Field | Value |
 |---|---|
 | FIN | {vin} |
-| Model | {Model from LastVIN} |
-| Engine | {Engine from LastVIN} |
-| Transmission | {Transmission from LastVIN} |
-| Order Number | {Order Number from LastVIN} |
-| Order Location | {Order Location from LastVIN} |
-| Interior | {Interior from LastVIN} |
-| Paint 1 | {Paint 1 from LastVIN} |
-| Delivery Date | {Delivery Date from LastVIN} |
-| Approx. Build Date | {Approx. Build Date from LastVIN} |
+| Model | {model_text or "—"} |
+| Series | {series_code} ({model_code if available}) |
+| Engine | {engine_number or engine_code or "—"} |
+| Transmission | {transmission_number or "—"} |
+| Order Number | {order_number or "—"} |
+| Order Location | {order_location or "—"} |
+| Interior | {interior_text or "—"} |
+| Paint 1 | {paint_text_primary or "—"} |
+| Delivery Date | {delivery_date or "—"} |
+| Build Date | {approx_build_date or "—"} |
+| Plant | {plant_name}, {country_of_origin} |
 
-## Option Codes ({total_count})
+## Option Codes ({option_count})
 
 | Code | Description |
 |---|---|
-{ALL options from LastVIN, one row each — do NOT abbreviate}
+{ALL options from data — list every single one}
 
 ---
 
 💡 บริการเพิ่มเติม
 
 🔧 อยากปรึกษาอาการรถ → "ส่งอาการรถ" (กำลังเปิดให้บริการ)
-📦 ดูอะไหล่ W140 ในสต็อก → https://chutibenz.com/products
+📦 ดูอะไหล่ ChutiBenz → https://chutibenz.com/products
 📱 LINE: @mr.chuti5988
 
 — Mr.Chuti, ChutiBenz
 Thailand's Mercedes Classic Parts Specialist
-10+ ปีในวงการ · W140 S70 AMG (1 of 27 worldwide)
-ผู้เขียน W140 Buyer Guide (80+ pages) & W124 M119 eBook
+10+ ปีในวงการ · W140 S70 AMG (1 of 27 worldwide)`;
 
-═══════════════════════════════════════════════
-FALLBACK TEMPLATE (NO LASTVIN DATA)
-═══════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// AI DRAFT GENERATION (SHOP_LOGIC)
+// ════════════════════════════════════════════════════════════
 
-If LastVIN lookup failed, use:
+async function generateAIDraft(
+  customerName: string,
+  vin: string,
+  decoded: DecodedVin
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
 
-สวัสดีครับ คุณ {customer_name}
-ขอบคุณที่ส่ง VIN มาตรวจสอบครับ
+  const userMessage = `Customer: ${customerName}
 
-⚠ ขออภัย ระบบ datacard ไม่สามารถค้น VIN นี้ได้ในขณะนี้
+DECODED DATA (use as-is, do not hallucinate):
 
-## VIN Structure (Basic Decode)
+Vehicle:
+${JSON.stringify(decoded.vehicle, null, 2)}
 
-| Field | Value |
-|---|---|
-| FIN | {vin} |
-| Manufacturer | WDB = Mercedes-Benz AG Germany |
-| Chassis Series | {chassis from pos 4-6} |
-| Body Code | {body code from pos 7-9} |
-| Plant | {pos 11 = factory letter} |
-| Serial | {pos 12-17} |
+Powertrain:
+${JSON.stringify(decoded.powertrain, null, 2)}
 
-## ต้องการข้อมูลครบ?
+Colors:
+${JSON.stringify(decoded.colors, null, 2)}
 
-📷 Upload Data Card → ผมถอด options + สี + ภายใน ครบทุก code ภายใน 10 วินาที
+Options (${decoded.options.length} total):
+${decoded.options.map((o) => `  ${o.option_code} — ${o.option_description_en}`).join('\n')}
 
-[footer same as primary template]
-`;
+Sources used: ${decoded.sources.join(', ')}
+Confidence: ${decoded.confidence}
+Cache hit: ${decoded.cache_hit}
+
+Format into the exact output template. List ALL options.`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Claude API: ${errorText}`);
+  }
+  const result = await res.json();
+  return result.content[0].text;
+}
+
+// ════════════════════════════════════════════════════════════
+// MAIN DECODER (multi-source)
+// ════════════════════════════════════════════════════════════
+
+async function decodeVIN(vin: string): Promise<DecodedVin> {
+  // Layer 1: Cache check
+  const cached = await getCachedVehicle(vin);
+  if (cached) {
+    cached.options = await enrichOptionsFromMaster(
+      cached.options,
+      cached.vehicle.series_code || detectSeries(vin) || 'W140'
+    );
+    return cached;
+  }
+
+  const series = detectSeries(vin) || 'W140';
+  const sources: string[] = [];
+
+  // Layer 2: NHTSA (VIN_STANDARD)
+  const nhtsa = await fetchNHTSA(vin);
+  if (nhtsa.plant_name) sources.push('NHTSA');
+
+  // Layer 3: Apify Bypasser (MB_BUILD) — only if we have encoded URL
+  // For NEW VINs without encoded URL, skip this layer.
+  // Mr.Chuti can manually paste encoded URL in admin to enable for future requests.
+  let mbBuildData: ReturnType<typeof parseLastVinHtml> | null = null;
+  // (Will be populated later when admin provides encoded URL)
+
+  // Combine all data
+  const combined = {
+    vehicle: {
+      vin,
+      fin: mbBuildData?.vehicle.fin || vin,
+      series_code: series,
+      model_code: `${series.slice(1)}.???`,
+      model_text: mbBuildData?.vehicle.model_text,
+      plant_name: nhtsa.plant_name,
+      country_of_origin: nhtsa.country_of_origin,
+      model_year: nhtsa.model_year,
+      delivery_date: mbBuildData?.vehicle.delivery_date,
+      approx_build_date: mbBuildData?.vehicle.approx_build_date,
+      order_location: mbBuildData?.vehicle.order_location,
+      order_number: mbBuildData?.vehicle.order_number,
+    },
+    powertrain: mbBuildData?.powertrain || {},
+    colors: mbBuildData?.colors || {},
+    options: mbBuildData?.options || [],
+    sources,
+  };
+
+  // Enrich options from dictionary
+  combined.options = await enrichOptionsFromMaster(combined.options, series);
+
+  // Save to cache for next time
+  await saveDecodedToCache(vin, series, combined);
+
+  return {
+    vehicle: combined.vehicle,
+    powertrain: combined.powertrain,
+    colors: combined.colors,
+    options: combined.options,
+    sources,
+    confidence: sources.length > 0 ? 0.7 : 0.4,
+    cache_hit: false,
+  };
+}
 
 // ════════════════════════════════════════════════════════════
 // POST HANDLER
@@ -260,9 +585,10 @@ export async function POST(req: NextRequest) {
   try {
     const { request_id } = await req.json();
     if (!request_id) {
-return NextResponse.json({ error: 'Missing request_id' }, { status: 400 });    }
+      return NextResponse.json({ error: 'Missing request_id' }, { status: 400 });
+    }
 
-    // 1. Get request from DB
+    // Get request from old vin_check_requests table (admin form)
     const { data: vinRequest, error: fetchError } = await supabase
       .from('vin_check_requests')
       .select('*')
@@ -273,96 +599,24 @@ return NextResponse.json({ error: 'Missing request_id' }, { status: 400 });    }
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
-    // 2. Fetch LastVIN data (primary source)
-    let lastVinData: LastVinData | null = null;
-    try {
-      lastVinData = await fetchLastVin(vinRequest.vin);
-    } catch (err: any) {
-      console.error('LastVIN fetch failed:', err.message);
-    }
-
-    // 3. Get stock context (for soft CTA)
-    const stock = await getRelevantStock(vinRequest.car_model);
-
-    // 4. Build user message
-    let userMessage = `Customer info:
-- Name: ${vinRequest.name}
-- Contact: ${vinRequest.contact}
-- VIN: ${vinRequest.vin}
-- Stated model: ${vinRequest.car_model || '(not provided)'}
-- Stated year: ${vinRequest.car_year || '(not provided)'}
-- Question: ${vinRequest.questions || '(none)'}
-
-`;
-
-    if (lastVinData) {
-      userMessage += `═══ LASTVIN DATACARD (USE AS PRIMARY SOURCE) ═══
-Source: ${lastVinData.sourceUrl}
-
-GENERAL DATA:
-${Object.entries(lastVinData.general)
-  .map(([k, v]) => `  ${k}: ${v}`)
-  .join('\n')}
-
-OPTION CODES (${lastVinData.options.length} total):
-${lastVinData.options.map((o) => `  ${o.code} — ${o.description}`).join('\n')}
-
-═══ END LASTVIN DATA ═══
-
-Use PRIMARY TEMPLATE. Format the data into the exact markdown tables.
-Keep all technical fields in English. Thai only in footer.
-List ALL ${lastVinData.options.length} option codes — do not abbreviate.`;
-    } else {
-      userMessage += `═══ NO LASTVIN DATA (lookup failed) ═══
-
-Use FALLBACK TEMPLATE. Decode VIN structure from your Mercedes knowledge (basic only).
-Strongly recommend Upload Data Card.`;
-    }
-
-    if (stock.length > 0) {
-      userMessage += `\n\nNOTE: ${stock.length} parts available for this chassis in our catalog. Do NOT list them in main output — the soft CTA link is sufficient.`;
-    }
-
-    // 5. Call Claude API
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'ANTHROPIC_API_KEY not configured' },
-        { status: 500 }
-      );
-    }
-
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userMessage }],
-      }),
+    // Log lookup
+    await supabase.from('vin_lookup_requests').insert({
+      vin: vinRequest.vin,
+      series_hint: vinRequest.car_model,
+      request_source: 'admin',
+      resolution_status: 'pending',
     });
 
-    if (!claudeRes.ok) {
-      const errorText = await claudeRes.text();
-      console.error('Claude API error:', errorText);
-      return NextResponse.json(
-        { error: 'AI service error', detail: errorText },
-        { status: 500 }
-      );
-    }
+    // Multi-source decode
+    const decoded = await decodeVIN(vinRequest.vin);
 
-    const result = await claudeRes.json();
-    const draft = result.content[0].text;
+    // Generate AI draft
+    const draft = await generateAIDraft(vinRequest.name, vinRequest.vin, decoded);
 
-    // 6. Save draft to DB
-    const aiModel = lastVinData
-      ? 'claude-sonnet-4-6-v4.3-lastvin'
-      : 'claude-sonnet-4-6-v4.3-fallback';
+    // Save back to vin_check_requests
+    const aiModel = decoded.cache_hit
+      ? 'claude-sonnet-4-6-v4.4-cache'
+      : `claude-sonnet-4-6-v4.4-${decoded.sources.join('+') || 'partial'}`;
 
     await supabase
       .from('vin_check_requests')
@@ -370,9 +624,7 @@ Strongly recommend Upload Data Card.`;
         ai_draft: draft,
         ai_generated_at: new Date().toISOString(),
         ai_model: aiModel,
-        external_lookup_result: lastVinData
-          ? `lastvin-ok: ${lastVinData.sourceUrl} (${lastVinData.options.length} options)`
-          : 'lastvin-failed',
+        external_lookup_result: `sources: ${decoded.sources.join(',') || 'none'} | options: ${decoded.options.length} | cache: ${decoded.cache_hit}`,
       })
       .eq('id', request_id);
 
@@ -380,8 +632,10 @@ Strongly recommend Upload Data Card.`;
       success: true,
       draft,
       model: 'claude-sonnet-4-6',
-      lastvin_used: !!lastVinData,
-      option_count: lastVinData?.options.length ?? 0,
+      sources: decoded.sources,
+      cache_hit: decoded.cache_hit,
+      option_count: decoded.options.length,
+      confidence: decoded.confidence,
     });
   } catch (err: any) {
     console.error('VIN draft generation error:', err);
