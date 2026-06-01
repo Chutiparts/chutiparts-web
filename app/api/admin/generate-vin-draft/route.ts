@@ -43,7 +43,7 @@ const CORS = {
 };
 
 function jsonWithCors(body: any, init?: { status?: number }) {
-  return jsonWithCors(body, { ...init, headers: CORS });
+  return NextResponse.json(body, { ...init, headers: CORS });
 }
 
 export async function OPTIONS() {
