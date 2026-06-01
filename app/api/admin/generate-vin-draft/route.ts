@@ -555,7 +555,7 @@ ABSOLUTE RULES:
 
 — Mr.Chuti, ChutiBenz
 Thailand's Mercedes Classic Parts Specialist
-10+ ปีในวงการ · W140 S70 AMG (1 of 27 worldwide)`;
+Thailand's Mercedes Classic Parts Specialist · W140 S70 AMG (1 of 27 worldwide)`;
 
 async function generateDraft(
   customerName: string,
