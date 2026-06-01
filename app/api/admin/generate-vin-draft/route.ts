@@ -21,7 +21,7 @@
 //   APIFY_API_TOKEN
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';  const CORS = {   'Access-Control-Allow-Origin': '*',   'Access-Control-Allow-Methods': 'POST, OPTIONS',   'Access-Control-Allow-Headers': 'Content-Type', };  function jsonWithCors(body: any, init?: { status?: number }) {   return jsonWithCors(body, { ...init, headers: CORS }); }  export async function OPTIONS() {   return new NextResponse(null, { status: 204, headers: CORS }); }
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -603,7 +603,7 @@ export async function POST(req: NextRequest) {
     const lastvinUrl: string | undefined = body.lastvin_url;
 
     if (!requestId) {
-      return NextResponse.json({ error: 'Missing request_id' }, { status: 400 });
+      return jsonWithCors({ error: 'Missing request_id' }, { status: 400 });
     }
 
     // Fetch existing request
@@ -614,7 +614,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (fetchError || !vinRequest) {
-      return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+      return jsonWithCors({ error: 'Request not found' }, { status: 404 });
     }
 
     // Log lookup
@@ -646,7 +646,7 @@ export async function POST(req: NextRequest) {
       })
       .eq('id', requestId);
 
-    return NextResponse.json({
+    return jsonWithCors({
       success: true,
       draft,
       model: 'claude-sonnet-4-6',
@@ -657,6 +657,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('VIN draft generation error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return jsonWithCors({ error: err.message }, { status: 500 });
   }
 }
