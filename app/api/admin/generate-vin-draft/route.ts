@@ -258,16 +258,16 @@ If LastVIN lookup failed, use:
 
 export async function POST(req: NextRequest) {
   try {
-    const { id } = await req.json();
-    if (!id) {
-      return NextResponse.json({ error: 'Missing request id' }, { status: 400 });
+    const { request_id } = await req.json();
+    if (!request_id) {
+      return NextResponse.json({ error: .eq('id', request_id) }, { status: 400 });
     }
 
     // 1. Get request from DB
     const { data: vinRequest, error: fetchError } = await supabase
       .from('vin_check_requests')
       .select('*')
-      .eq('id', id)
+      .eq('id', request_id)
       .single();
 
     if (fetchError || !vinRequest) {
@@ -375,7 +375,7 @@ Strongly recommend Upload Data Card.`;
           ? `lastvin-ok: ${lastVinData.sourceUrl} (${lastVinData.options.length} options)`
           : 'lastvin-failed',
       })
-      .eq('id', id);
+      .eq('id', request_id);
 
     return NextResponse.json({
       success: true,
