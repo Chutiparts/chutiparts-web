@@ -71,8 +71,9 @@ export default function VinCheckForm() {
       <div className="bg-green-50 border-2 border-green-300 rounded-lg p-8 text-center">
         <div className="text-6xl mb-4">✅</div>
         <h3 className="font-serif text-2xl text-gray-900 mb-3">ส่งสำเร็จ!</h3>
-        <p className="text-gray-700 mb-4">{message}</p>
-        
+        <p className="text-gray-700 mb-4">{message}</p>               
+        <a
+
           href="https://line.me/R/ti/p/%40440ifncj"
           className="inline-block bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium px-6 py-3 rounded transition"
         >
