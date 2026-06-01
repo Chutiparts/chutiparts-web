@@ -147,10 +147,12 @@ export default function VinToolPage() {
                 Multi-source decoder · NHTSA + Apify + Cache · V4.4 · Phase 7
               </p>
             </div>
-            
+            <a
               href="/admin/vin-check"
               className="text-xs sm:text-sm bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-center transition"
-            >← กลับไปคิว VIN</a>
+            >
+              {'← กลับไปคิว VIN'}
+            </a>
           </div>
         </header>
 
@@ -260,11 +262,15 @@ export default function VinToolPage() {
                 <button
                   onClick={copyDraft}
                   className="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 rounded-md transition"
-                >📋 Copy</button>
+                >
+                  {'📋 Copy'}
+                </button>
                 <button
                   onClick={downloadDraft}
                   className="px-3 py-1.5 text-xs font-semibold bg-slate-600 hover:bg-slate-500 rounded-md transition"
-                >⬇ Download .md</button>
+                >
+                  {'⬇ Download .md'}
+                </button>
               </div>
             </div>
             <pre className="bg-slate-900 p-4 rounded-md font-mono text-xs leading-relaxed whitespace-pre-wrap break-words text-slate-200 max-h-[600px] overflow-y-auto border border-slate-700">
