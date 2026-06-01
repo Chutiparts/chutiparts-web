@@ -535,24 +535,24 @@ async function decodeVIN(vin: string): Promise<DecodedVin> {
   // Layer 3: Apify Bypasser (MB_BUILD) — only if we have encoded URL
   // For NEW VINs without encoded URL, skip this layer.
   // Mr.Chuti can manually paste encoded URL in admin to enable for future requests.
-  let mbBuildData: ReturnType<typeof parseLastVinHtml> | null = null;
+  // mbBuildData removed in Phase 1
   // (Will be populated later when admin provides encoded URL)
 
   // Combine all data
   const combined = {
     vehicle: {
       vin,
-      fin: mbBuildData?.vehicle.fin || vin,
+      fin: fin || vin,
       series_code: series,
       model_code: `${series.slice(1)}.???`,
-      model_text: mbBuildData?.vehicle.model_text,
+      model_text: model_text,
       plant_name: nhtsa.plant_name,
       country_of_origin: nhtsa.country_of_origin,
       model_year: nhtsa.model_year,
-      delivery_date: mbBuildData?.vehicle.delivery_date,
-      approx_build_date: mbBuildData?.vehicle.approx_build_date,
-      order_location: mbBuildData?.vehicle.order_location,
-      order_number: mbBuildData?.vehicle.order_number,
+      delivery_date: delivery_date,
+      approx_build_date: approx_build_date,
+      order_location: order_location,
+      order_number: order_number,
     },
     powertrain: mbBuildData?.powertrain || {},
     colors: mbBuildData?.colors || {},
