@@ -281,7 +281,7 @@ export default function VinToolPage() {
 
         {/* Footer */}
         <footer className="text-center text-[11px] text-slate-500 mt-6">
-          ChutiBenz Mercedes Parts · LINE @mr.chuti5988 · chutibenz.com · Phase 7 admin tool
+          ChutiBenz Mercedes Parts · LINE mr.chuti5988 · chutibenz.com · Phase 7 admin tool
         </footer>
       </div>
     </div>
