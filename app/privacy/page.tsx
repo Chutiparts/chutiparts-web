@@ -55,7 +55,7 @@ export default function PrivacyPage() {
       <h2>6. การติดต่อ</h2>
       <p>เรื่องนโยบายความเป็นส่วนตัว ติดต่อ:</p>
       <ul>
-        <li>LINE: @mr.chuti5988</li>
+        <li>LINE: mr.chuti5988</li>
         <li>โทร: 081-828-5855</li>
       </ul>
 

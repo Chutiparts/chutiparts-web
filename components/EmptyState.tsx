@@ -40,7 +40,7 @@ export default function EmptyState({ onClear, hasFilters }: Props) {
             rel="noopener noreferrer"
             className="font-bold text-yellow-700 underline"
           >
-            @mr.chuti5988
+            mr.chuti5988
           </a>
           <br />
           บอกเราว่าคุณหาอะไรอยู่ เราอาจช่วยหาให้ได้

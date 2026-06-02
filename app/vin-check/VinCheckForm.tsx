@@ -62,7 +62,7 @@ export default function VinCheckForm() {
       }
     } catch (err) {
       setStatus('error')
-      setMessage(`เกิดข้อผิดพลาด — ลองอีกครั้ง หรือทักไลน์ @mr.chuti5988`)
+      setMessage(`เกิดข้อผิดพลาด — ลองอีกครั้ง หรือทักไลน์ mr.chuti5988`)
     }
   }
 
