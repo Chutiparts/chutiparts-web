@@ -500,8 +500,10 @@ async function decodeVIN(vin: string, lastvinUrl?: string): Promise<DecodedVin> 
 // AI DRAFT (Sonnet 4.6)
 // ════════════════════════════════════════════════════════════
 
+ 
 const SYSTEM_PROMPT = `You are formatting a VIN check response for ChutiBenz (chutibenz.com),
-Thailand's Mercedes-Benz classic parts specialist. Do NOT mention "S70 AMG" or "1 of 27" or "10+ ปีในวงการ" anywhere in the output.
+Thailand's Mercedes-Benz classic parts specialist.
+Do NOT mention "S70 AMG" or "1 of 27" or "10+ ปีในวงการ" anywhere in the output.
 
 ABSOLUTE RULES:
 
@@ -511,7 +513,10 @@ ABSOLUTE RULES:
    - NEVER hallucinate fields not in the data
    - Use "—" for missing fields
 
-2. FORMAT = LASTVIN-STYLE (English data tables + Thai footer only)
+2. FORMAT = LINE-FRIENDLY (emoji + bullet, NO markdown tables)
+   - LINE app does not render markdown tables — use emoji + plain text
+   - Keep field labels short and scannable
+   - One field per line, no | characters
 
 3. HARDCODED CONTACT (NEVER CHANGE)
    LINE ID: @mr.chuti5988
@@ -522,30 +527,26 @@ ABSOLUTE RULES:
 สวัสดีครับ คุณ {customer_name}
 ขอบคุณที่ส่ง VIN มาตรวจสอบครับ
 
-## Datacard
+🚗 ข้อมูลรถ
+━━━━━━━━━━━━━━━
+🔢 FIN: {vin}
+🚙 รุ่น: {model_text or "—"}
+📋 Series: {series_code}
+⚙️ เครื่องยนต์: {engine_number or engine_code or "—"}
+🔧 เกียร์: {transmission_number or "—"}
+📦 Order Number: {order_number or "—"}
+🌏 Order Location: {order_location or "—"}
+🪑 ภายใน: {interior_text or "—"}
+🎨 สี: {paint_text_primary or "—"}
+📅 ส่งมอบ: {delivery_date or "—"}
+🏗 ผลิตวันที่: {approx_build_date or "—"}
+🏭 โรงงาน: {plant_name}, {country_of_origin}
 
-| Field | Value |
-|---|---|
-| FIN | {vin} |
-| Model | {model_text or "—"} |
-| Series | {series_code} |
-| Engine | {engine_number or engine_code or "—"} |
-| Transmission | {transmission_number or "—"} |
-| Order Number | {order_number or "—"} |
-| Order Location | {order_location or "—"} |
-| Interior | {interior_text or "—"} |
-| Paint | {paint_text_primary or "—"} |
-| Delivery Date | {delivery_date or "—"} |
-| Build Date | {approx_build_date or "—"} |
-| Plant | {plant_name}, {country_of_origin} |
+🔧 Option Codes ({option_count} รายการ)
+━━━━━━━━━━━━━━━
+{ALL options from data — list every single one, format: "• {code} — {description_en}", one per line}
 
-## Option Codes ({option_count})
-
-| Code | Description |
-|---|---|
-{ALL options from data — list every single one, do not abbreviate}
-
----
+━━━━━━━━━━━━━━━
 
 💡 บริการเพิ่มเติม
 
@@ -554,8 +555,7 @@ ABSOLUTE RULES:
 📱 LINE: @mr.chuti5988
 
 — Mr.Chuti, ChutiBenz
-Thailand's Mercedes Classic Parts Specialist
-Thailand's Mercedes Classic Parts Specialist · W140 S70 AMG (1 of 27 worldwide)`;
+Thailand's Mercedes Classic Parts Specialist`;
 
 async function generateDraft(
   customerName: string,
