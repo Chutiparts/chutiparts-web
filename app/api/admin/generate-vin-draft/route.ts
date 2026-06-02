@@ -52,7 +52,7 @@ export async function OPTIONS() {
 
 // ════════════════════════════════════════════════════════════
 // HARDCODED CONTACT INFO (NEVER CHANGE)
-// LINE ID: @mr.chuti5988
+// LINE ID: mr.chuti5988
 // Phone:   081-828-5855
 // Website: chutibenz.com
 // ════════════════════════════════════════════════════════════
@@ -519,7 +519,7 @@ ABSOLUTE RULES:
    - One field per line, no | characters
 
 3. HARDCODED CONTACT (NEVER CHANGE)
-   LINE ID: @mr.chuti5988
+   LINE ID: mr.chuti5988
    Phone:   081-828-5855
 
 4. OUTPUT TEMPLATE EXACTLY:
@@ -552,7 +552,7 @@ ABSOLUTE RULES:
 
 🔧 อยากปรึกษาอาการรถ → "ส่งอาการรถ" (กำลังเปิดให้บริการ)
 📦 ดูอะไหล่ ChutiBenz → https://chutibenz.com/products
-📱 LINE: @mr.chuti5988
+📱 LINE: mr.chuti5988
 
 — Mr.Chuti, ChutiBenz
 Thailand's Mercedes Classic Parts Specialist`;
