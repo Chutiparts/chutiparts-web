@@ -1,20 +1,21 @@
-// app/page.tsx — Home (Server Component) — DARK PREMIUM SPLIT HERO
+// app/page.tsx — Home (Server Component) — eBook-First Launch
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
-import { CHASSIS_MODELS, MODEL_INFO, LINE_OA_URL } from '@/lib/constants'
-import HomeClient from './HomeClient'
+import { CHASSIS_MODELS, LINE_OA_URL } from '@/lib/constants'
 
 export const revalidate = 300
 
 export default async function HomePage() {
   const supabase = await createClient()
 
-  const [productsRes, articlesRes] = await Promise.all([
-    supabase.from('products').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(12),
-    supabase.from('content').select('*').eq('is_published', true).eq('type', 'knowledge').order('published_at', { ascending: false }).limit(3),
-  ])
+  const articlesRes = await supabase
+    .from('content')
+    .select('*')
+    .eq('is_published', true)
+    .eq('type', 'knowledge')
+    .order('published_at', { ascending: false })
+    .limit(3)
 
-  const products = productsRes.data ?? []
   const articles = articlesRes.data ?? []
 
   return (
@@ -66,7 +67,7 @@ export default async function HomePage() {
                 href="/search"
                 className="rounded-none border border-[#C9A961] text-[#C9A961] hover:bg-[#C9A961]/10 font-medium px-6 py-3.5 text-center tracking-wide transition"
               >
-                เลือกตามรุ่นรถ →
+                ค้นหาอะไหล่ →
               </Link>
             </div>
           </div>
@@ -118,85 +119,21 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* CATALOG — by chassis */}
-      <section className="container mx-auto px-4 py-12 max-w-7xl">
-        <div className="text-center mb-8">
-          <p className="text-[10px] tracking-[0.32em] text-[#8B7355] font-serif mb-2">PARTS CATALOG</p>
-          <h2 className="text-2xl md:text-3xl font-serif font-medium text-gray-900">เลือกตามรุ่นรถ</h2>
-        </div>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-          {CHASSIS_MODELS.map((m) => (
-            <Link
-              key={m}
-              href={`/search?model=${m}`}
-              className="rounded-md bg-white border border-gray-200 hover:border-[#C9A961] p-4 text-center transition group"
-            >
-              <div className="font-serif font-medium text-lg text-gray-900 group-hover:text-[#C9A961]">{m}</div>
-              <div className="text-xs text-[#8B7355] mt-1">
-                {MODEL_INFO[m].thai_name.split(' ').slice(0, 2).join(' ')}
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* FEATURED PRODUCTS */}
-      <section className="container mx-auto px-4 max-w-7xl pb-12">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-serif font-medium text-gray-900">🛒 อะไหล่พร้อมขาย</h2>
-          <Link href="/search" className="text-sm text-[#C9A961] hover:underline">ดูทั้งหมด →</Link>
-        </div>
-        <HomeClient products={products} />
-      </section>
-
-      {/* ARTICLES */}
-      {articles.length > 0 && (
-        <section className="container mx-auto px-4 py-10 max-w-7xl border-t border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-serif font-medium text-gray-900">📖 บทความความรู้</h2>
-            <Link href="/articles" className="text-sm text-[#C9A961] hover:underline">ดูทั้งหมด →</Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {articles.map((a: any) => (
-              <Link
-                key={a.id}
-                href={`/articles/${a.slug}`}
-                className="block rounded-md bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
-              >
-                {a.cover_image && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.cover_image} alt={a.title} className="w-full h-40 object-cover" />
-                )}
-                <div className="p-4">
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {a.related_models?.slice(0, 3).map((m: string) => (
-                      <span key={m} className="text-xs bg-[#C9A961]/10 text-[#8B7355] border border-[#C9A961]/30 px-2 py-0.5">{m}</span>
-                    ))}
-                  </div>
-                  <h3 className="font-serif font-medium text-gray-900 line-clamp-2">{a.title}</h3>
-                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">{a.excerpt}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* ============================================ */}
-      {/* SECTION: eBook ฟรี — Mercedes-Benz Classic   */}
+      {/* SECTION: eBook ฟรี — Hero Lead Magnet         */}
       {/* ============================================ */}
-      <section className="container mx-auto px-4 py-12 max-w-7xl">
-        <div className="text-center mb-8">
+      <section className="container mx-auto px-4 py-14 md:py-16 max-w-7xl">
+        <div className="text-center mb-10">
           <p className="text-[10px] tracking-[0.32em] text-[#8B7355] font-serif mb-2">
-            FREE EBOOKS
+            FREE EBOOKS · MERCEDES-BENZ CLASSIC
           </p>
-          <h2 className="text-2xl md:text-3xl font-serif font-medium text-gray-900">
-            📖 ดาวน์โหลด eBook ฟรี
+          <h2 className="text-3xl md:text-4xl font-serif font-medium text-gray-900">
+            📖 ดาวน์โหลด eBook ฟรี — 5 รุ่นในตำนาน
           </h2>
-          <p className="text-sm md:text-base text-gray-600 mt-3 max-w-2xl mx-auto">
-            คู่มือฉบับคนเล่นจริง — เลือกซื้อให้เป็น ดูอาการให้ออก
+          <p className="text-sm md:text-base text-gray-600 mt-4 max-w-2xl mx-auto leading-relaxed">
+            คู่มือฉบับ <strong className="text-[#C9A961]">คนเล่นจริง</strong> — เลือกซื้อให้เป็น ดูอาการให้ออก
             <br className="hidden md:block" />
-            จากประสบการณ์ 10+ ปีของ Mr.Chuti · กดที่ปกเพื่อโหลด (LITE Version)
+            จากประสบการณ์ <strong className="text-[#C9A961]">10+ ปี</strong> ของ Mr.Chuti · กดที่ปกเพื่อโหลด (LITE Version)
           </p>
         </div>
 
@@ -238,13 +175,13 @@ export default async function HomePage() {
         </div>
 
         {/* LINE banner — FULL version request */}
-        <div className="mt-6 bg-gray-50 border border-gray-200 p-4 md:p-5 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
-          <div className="flex-shrink-0 text-3xl">💬</div>
+        <div className="mt-8 bg-gray-50 border border-gray-200 p-4 md:p-6 flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex-shrink-0 text-4xl">💬</div>
           <div className="flex-1 text-center sm:text-left">
-            <p className="text-sm font-medium text-gray-900">
+            <p className="text-base font-medium text-gray-900">
               ต้องการ FULL Version (พร้อมรูปประกอบเชิงลึก)?
             </p>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-sm text-gray-600 mt-1">
               ทักไลน์{' '}
               <a
                 href={LINE_OA_URL}
@@ -261,12 +198,45 @@ export default async function HomePage() {
             href={LINE_OA_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-[#06C755] hover:bg-[#05B04A] text-white font-medium px-5 py-2.5 text-sm whitespace-nowrap transition"
+            className="bg-[#06C755] hover:bg-[#05B04A] text-white font-medium px-6 py-3 text-sm whitespace-nowrap transition"
           >
             💬 ทักไลน์ขอเล่มเต็ม
           </a>
         </div>
       </section>
+
+      {/* ARTICLES */}
+      {articles.length > 0 && (
+        <section className="container mx-auto px-4 py-10 max-w-7xl border-t border-gray-100">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-serif font-medium text-gray-900">📖 บทความความรู้</h2>
+            <Link href="/articles" className="text-sm text-[#C9A961] hover:underline">ดูทั้งหมด →</Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {articles.map((a: any) => (
+              <Link
+                key={a.id}
+                href={`/articles/${a.slug}`}
+                className="block rounded-md bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
+              >
+                {a.cover_image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.cover_image} alt={a.title} className="w-full h-40 object-cover" />
+                )}
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {a.related_models?.slice(0, 3).map((m: string) => (
+                      <span key={m} className="text-xs bg-[#C9A961]/10 text-[#8B7355] border border-[#C9A961]/30 px-2 py-0.5">{m}</span>
+                    ))}
+                  </div>
+                  <h3 className="font-serif font-medium text-gray-900 line-clamp-2">{a.title}</h3>
+                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">{a.excerpt}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* CTA BANNER — dark premium */}
       <section className="container mx-auto px-4 py-12 max-w-7xl">
