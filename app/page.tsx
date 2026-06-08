@@ -86,6 +86,14 @@ export default async function HomePage() {
             <p className="absolute bottom-3 right-3 text-[10px] text-[#C9A961] tracking-widest font-serif bg-[#1C1D2C]/80 px-2 py-1 z-20">
               W140 · S70 AMG
             </p>
+            {/* eBook CTA RIBBON — top-left */}
+            <a
+              href="#ebooks"
+              className="absolute top-4 left-4 z-20 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] px-3 py-2 text-xs md:text-sm font-medium tracking-wide shadow-lg transition-all hover:scale-105 flex items-center gap-1.5"
+            >
+              📖 <span>eBook ฟรี 5 เล่ม</span>
+              <span className="text-[#1C1D2C]/70">↓</span>
+            </a>
           </div>
         </div>
 
@@ -122,7 +130,7 @@ export default async function HomePage() {
       {/* ============================================ */}
       {/* SECTION: eBook ฟรี — Hero Lead Magnet         */}
       {/* ============================================ */}
-      <section className="container mx-auto px-4 py-14 md:py-16 max-w-7xl">
+      <section id="ebooks" className="container mx-auto px-4 py-14 md:py-16 max-w-7xl scroll-mt-20">
         <div className="text-center mb-10">
           <p className="text-[10px] tracking-[0.32em] text-[#8B7355] font-serif mb-2">
             FREE EBOOKS · MERCEDES-BENZ CLASSIC
