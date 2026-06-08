@@ -182,6 +182,92 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* ============================================ */}
+      {/* SECTION: eBook ฟรี — Mercedes-Benz Classic   */}
+      {/* ============================================ */}
+      <section className="container mx-auto px-4 py-12 max-w-7xl">
+        <div className="text-center mb-8">
+          <p className="text-[10px] tracking-[0.32em] text-[#8B7355] font-serif mb-2">
+            FREE EBOOKS
+          </p>
+          <h2 className="text-2xl md:text-3xl font-serif font-medium text-gray-900">
+            📖 ดาวน์โหลด eBook ฟรี
+          </h2>
+          <p className="text-sm md:text-base text-gray-600 mt-3 max-w-2xl mx-auto">
+            คู่มือฉบับคนเล่นจริง — เลือกซื้อให้เป็น ดูอาการให้ออก
+            <br className="hidden md:block" />
+            จากประสบการณ์ 10+ ปีของ Mr.Chuti · กดที่ปกเพื่อโหลด (LITE Version)
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+          {[
+            { code: 'W123', name: 'เบนซ์ตาหวาน', emoji: '👁', tagline: 'E-Class รุ่นต้น' },
+            { code: 'W124', name: 'รถถังเยอรมัน', emoji: '🛡', tagline: 'E-Class · E500' },
+            { code: 'W126', name: 'เจ้าพ่อเซี่ยงไฮ้', emoji: '👑', tagline: 'S-Class ตำนาน' },
+            { code: 'W140', name: 'ปลาวาฬปราบเสี่ย', emoji: '🐋', tagline: 'S-Class · S70 AMG' },
+            { code: 'W201', name: 'Baby-Benz', emoji: '👶', tagline: '190E คลาสสิคเริ่มต้น' },
+          ].map((book) => (
+            <a
+              key={book.code}
+              href={`/ebooks/${book.code}_LITE.pdf`}
+              download
+              className="group bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
+            >
+              <div className="aspect-[3/4] bg-gray-100 overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/ebooks/${book.code}_cover.jpg`}
+                  alt={`${book.code} — ${book.name} eBook cover`}
+                  className="w-full h-full object-cover group-hover:scale-105 transition"
+                  loading="lazy"
+                />
+              </div>
+              <div className="p-3">
+                <div className="font-serif font-medium text-base text-gray-900 group-hover:text-[#C9A961]">
+                  {book.emoji} {book.code}
+                </div>
+                <div className="text-xs text-[#8B7355] mt-1 line-clamp-1">{book.name}</div>
+                <div className="text-[10px] text-gray-500 mt-1 line-clamp-1">{book.tagline}</div>
+                <div className="text-[11px] text-[#C9A961] mt-2 font-medium flex items-center gap-1">
+                  <span>⬇</span> LITE · ฟรี
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+
+        {/* LINE banner — FULL version request */}
+        <div className="mt-6 bg-gray-50 border border-gray-200 p-4 md:p-5 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+          <div className="flex-shrink-0 text-3xl">💬</div>
+          <div className="flex-1 text-center sm:text-left">
+            <p className="text-sm font-medium text-gray-900">
+              ต้องการ FULL Version (พร้อมรูปประกอบเชิงลึก)?
+            </p>
+            <p className="text-xs text-gray-600 mt-1">
+              ทักไลน์{' '}
+              <a
+                href={LINE_OA_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#C9A961] hover:underline font-medium"
+              >
+                mr.chuti5988
+              </a>
+              {' '}— ส่งให้ฟรีในวันเดียวกัน
+            </p>
+          </div>
+          <a
+            href={LINE_OA_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-[#06C755] hover:bg-[#05B04A] text-white font-medium px-5 py-2.5 text-sm whitespace-nowrap transition"
+          >
+            💬 ทักไลน์ขอเล่มเต็ม
+          </a>
+        </div>
+      </section>
+
       {/* CTA BANNER — dark premium */}
       <section className="container mx-auto px-4 py-12 max-w-7xl">
         <div className="bg-[#1C1D2C] text-[#F2EDE0] p-8 md:p-12 text-center">
