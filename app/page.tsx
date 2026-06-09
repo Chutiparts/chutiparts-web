@@ -154,7 +154,7 @@ export default async function HomePage() {
             { code: 'W140', name: 'ปลาวาฬปราบเสี่ย', emoji: '🐋', tagline: 'S-Class · S70 AMG', online: true },
             { code: 'W201', name: 'Baby-Benz', emoji: '👶', tagline: '190E คลาสสิคเริ่มต้น' },
           ].map((book) => {
-            const href = book.online ? `/ebooks/${book.code}-FULL.html` : `/ebooks/${book.code}_LITE.pdf`
+            const href = book.online ? `/ebooks/${book.code}-FULL.pdf` : `/ebooks/${book.code}_LITE.pdf`
             const linkProps = book.online
               ? { href, target: '_blank' as const, rel: 'noopener noreferrer' }
               : { href, download: true as unknown as string }
@@ -167,7 +167,7 @@ export default async function HomePage() {
                 <div className="aspect-[3/4] bg-gray-100 overflow-hidden relative">
                   {book.online && (
                     <span className="absolute top-2 right-2 z-10 bg-emerald-600/95 text-white text-[9px] md:text-[10px] font-medium px-2 py-0.5 shadow-md tracking-wide">
-                      🆕 ฉบับเต็ม
+                      📕 PDF ฉบับเต็ม
                     </span>
                   )}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -186,7 +186,7 @@ export default async function HomePage() {
                   <div className="text-[10px] text-gray-500 mt-1 line-clamp-1">{book.tagline}</div>
                   <div className="text-[11px] text-[#C9A961] mt-2 font-medium flex items-center gap-1">
                     {book.online ? (
-                      <><span>📖</span> อ่านออนไลน์ · ฟรี</>
+                      <><span>📖</span> PDF ฉบับเต็ม · ฟรี</>
                     ) : (
                       <><span>⬇</span> LITE · ฟรี</>
                     )}
