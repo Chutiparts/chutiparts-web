@@ -1,4 +1,5 @@
 // app/page.tsx — Home (Server Component) — eBook-First Launch
+// v5 = W124 + W140 "อ่านออนไลน์ฉบับเต็ม" (HTML page) — replaces v4 "v2 เร็วๆ นี้" badge
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { CHASSIS_MODELS, LINE_OA_URL } from '@/lib/constants'
@@ -141,45 +142,59 @@ export default async function HomePage() {
           <p className="text-sm md:text-base text-gray-600 mt-4 max-w-2xl mx-auto leading-relaxed">
             คู่มือฉบับ <strong className="text-[#C9A961]">คนเล่นจริง</strong> — เลือกซื้อให้เป็น ดูอาการให้ออก
             <br className="hidden md:block" />
-            จากประสบการณ์ <strong className="text-[#C9A961]">10+ ปี</strong> ของ Mr.Chuti · กดที่ปกเพื่อโหลด (LITE Version)
+            จากประสบการณ์ <strong className="text-[#C9A961]">10+ ปี</strong> ของ Mr.Chuti · กดที่ปก W124 / W140 เพื่ออ่านออนไลน์ฉบับเต็ม · รุ่นอื่นโหลด LITE PDF
           </p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
           {[
             { code: 'W123', name: 'เบนซ์ตาหวาน', emoji: '👁', tagline: 'E-Class รุ่นต้น' },
-            { code: 'W124', name: 'รถถังเยอรมัน', emoji: '🛡', tagline: 'E-Class · E500' },
+            { code: 'W124', name: 'รถถังเยอรมัน', emoji: '🛡', tagline: 'E-Class · E500', online: true },
             { code: 'W126', name: 'เจ้าพ่อเซี่ยงไฮ้', emoji: '👑', tagline: 'S-Class ตำนาน' },
-            { code: 'W140', name: 'ปลาวาฬปราบเสี่ย', emoji: '🐋', tagline: 'S-Class · S70 AMG' },
+            { code: 'W140', name: 'ปลาวาฬปราบเสี่ย', emoji: '🐋', tagline: 'S-Class · S70 AMG', online: true },
             { code: 'W201', name: 'Baby-Benz', emoji: '👶', tagline: '190E คลาสสิคเริ่มต้น' },
-          ].map((book) => (
-            <a
-              key={book.code}
-              href={`/ebooks/${book.code}_LITE.pdf`}
-              download
-              className="group bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
-            >
-              <div className="aspect-[3/4] bg-gray-100 overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/ebooks/${book.code}_cover.jpg`}
-                  alt={`${book.code} — ${book.name} eBook cover`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition"
-                  loading="lazy"
-                />
-              </div>
-              <div className="p-3">
-                <div className="font-serif font-medium text-base text-gray-900 group-hover:text-[#C9A961]">
-                  {book.emoji} {book.code}
+          ].map((book) => {
+            const href = book.online ? `/ebooks/${book.code}-FULL.html` : `/ebooks/${book.code}_LITE.pdf`
+            const linkProps = book.online
+              ? { href, target: '_blank' as const, rel: 'noopener noreferrer' }
+              : { href, download: true as unknown as string }
+            return (
+              <a
+                key={book.code}
+                {...linkProps}
+                className="group bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
+              >
+                <div className="aspect-[3/4] bg-gray-100 overflow-hidden relative">
+                  {book.online && (
+                    <span className="absolute top-2 right-2 z-10 bg-emerald-600/95 text-white text-[9px] md:text-[10px] font-medium px-2 py-0.5 shadow-md tracking-wide">
+                      🆕 ฉบับเต็ม
+                    </span>
+                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/ebooks/${book.code}_cover.jpg`}
+                    alt={`${book.code} — ${book.name} eBook cover`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition"
+                    loading="lazy"
+                  />
                 </div>
-                <div className="text-xs text-[#8B7355] mt-1 line-clamp-1">{book.name}</div>
-                <div className="text-[10px] text-gray-500 mt-1 line-clamp-1">{book.tagline}</div>
-                <div className="text-[11px] text-[#C9A961] mt-2 font-medium flex items-center gap-1">
-                  <span>⬇</span> LITE · ฟรี
+                <div className="p-3">
+                  <div className="font-serif font-medium text-base text-gray-900 group-hover:text-[#C9A961]">
+                    {book.emoji} {book.code}
+                  </div>
+                  <div className="text-xs text-[#8B7355] mt-1 line-clamp-1">{book.name}</div>
+                  <div className="text-[10px] text-gray-500 mt-1 line-clamp-1">{book.tagline}</div>
+                  <div className="text-[11px] text-[#C9A961] mt-2 font-medium flex items-center gap-1">
+                    {book.online ? (
+                      <><span>📖</span> อ่านออนไลน์ · ฟรี</>
+                    ) : (
+                      <><span>⬇</span> LITE · ฟรี</>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </a>
-          ))}
+              </a>
+            )
+          })}
         </div>
 
         {/* LINE banner — FULL version request */}
@@ -187,7 +202,7 @@ export default async function HomePage() {
           <div className="flex-shrink-0 text-4xl">💬</div>
           <div className="flex-1 text-center sm:text-left">
             <p className="text-base font-medium text-gray-900">
-              ต้องการ FULL Version (พร้อมรูปประกอบเชิงลึก)?
+              ต้องการ FULL Version รุ่นอื่น (พร้อมรูปประกอบเชิงลึก)?
             </p>
             <p className="text-sm text-gray-600 mt-1">
               ทักไลน์{' '}
@@ -249,7 +264,7 @@ export default async function HomePage() {
       {/* CTA BANNER — dark premium */}
       <section className="container mx-auto px-4 py-12 max-w-7xl">
         <div className="bg-[#1C1D2C] text-[#F2EDE0] p-8 md:p-12 text-center">
-          <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-3">CAN'T FIND WHAT YOU NEED?</p>
+          <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-3">CAN&apos;T FIND WHAT YOU NEED?</p>
           <h2 className="text-2xl md:text-3xl font-serif font-medium mb-3">
             ไม่รู้จะถามใคร? ไม่รู้จะเริ่มตรงไหน?
           </h2>
