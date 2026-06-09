@@ -214,7 +214,7 @@ export default async function HomePage() {
               >
                 mr.chuti5988
               </a>
-              {' '}— ส่งให้ฟรีในวันเดียวกัน
+              {' '}— สอบถามฉบับเต็ม FC (มีค่าใช้จ่าย)
             </p>
           </div>
           <a
@@ -223,7 +223,7 @@ export default async function HomePage() {
             rel="noopener noreferrer"
             className="bg-[#06C755] hover:bg-[#05B04A] text-white font-medium px-6 py-3 text-sm whitespace-nowrap transition"
           >
-            💬 ทักไลน์ขอเล่มเต็ม
+            💬 ทักไลน์สอบถามเล่มเต็ม
           </a>
         </div>
       </section>
