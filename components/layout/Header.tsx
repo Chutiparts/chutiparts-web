@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { href: '/vin-check', label: '🆔 VIN Check ฟรี' },
   { href: '/search', label: '🔍 ค้นหา' },
   { href: '/articles', label: '📖 บทความ' },
-  { href: '/garages', label: '🔨 อู่/ร้าน' },
+  { href: '/businesses', label: '🔨 อู่/ร้าน' },
   { href: '/intake', label: '📋 ส่งอาการรถ' },
 ]
 
