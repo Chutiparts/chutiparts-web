@@ -1,13 +1,6 @@
-// app/search/SearchClient.tsx — UX v5
-// 2026-06-01 — Improvements:
-//   1. Smart price display: ฿1,500 default → "ราคา TBC · ติดต่อ LINE"
-//   2. Branded placeholder card (gradient + chassis badge, not 🚗 emoji)
-//   3. Sort options: ล่าสุด, ราคา↑, ราคา↓, มีของ
-//   4. Keyword highlight in product names
-//   5. Inline LINE CTA card at bottom of results (always)
-//   6. "ขอราคา/รูป" quick-action LINE deep-link on placeholder cards
-//   7. Better mobile spacing (2-col on sm:, was 1-col)
-//   8. Stock badge ("มีของ" / "หมด")
+// app/search/SearchClient.tsx — UX v6
+// 2026-06-10: เพิ่มปุ่ม "ใส่ตะกร้า" ในการ์ดสินค้า (เชื่อม CartContext)
+// เดิม v5: smart price, branded placeholder, sort, highlight, LINE CTA
 
 'use client'
 
@@ -15,6 +8,7 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
 import { CHASSIS_MODELS, PARTS_CATEGORIES, LINE_OA_URL } from '@/lib/constants'
+import { useCart } from '@/app/context/CartContext'
 
 type Product = any
 type Article = any
@@ -47,10 +41,8 @@ const SORT_OPTIONS = [
 
 // Detect placeholder pricing (default values from Excel V11 bulk-add)
 function isPlaceholderPrice(p: any): boolean {
-  // Default values: cost=1000, sell=1500. If sell is exactly 1500 AND no image,
-  // it's likely a placeholder we haven't priced yet.
   if (p.price !== 1500) return false
-  if (p.image_url) return false // has photo → real listing
+  if (p.image_url) return false
   return true
 }
 
@@ -131,8 +123,6 @@ export default function SearchClient({
     return { p: sortedProducts, a: articles, b: businesses }
   })()
 
-  // The "highlight" term: prefer the resolved canonical for chassis lookups,
-  // but use the raw query (q) for everything else so users see what they typed.
   const highlightWord = q.trim()
 
   return (
@@ -214,7 +204,6 @@ export default function SearchClient({
           ))}
         </div>
         <div className="flex items-center gap-3 text-sm flex-wrap">
-          {/* Sort selector (only when there are products visible) */}
           {(tab === 'all' || tab === 'products') && products.length > 1 && (
             <div className="flex items-center gap-2">
               <label className="text-gray-600">เรียง:</label>
@@ -295,7 +284,7 @@ export default function SearchClient({
             </section>
           )}
 
-          {/* Inline LINE CTA at bottom (always show when there are results) */}
+          {/* Inline LINE CTA at bottom */}
           <BottomCta query={q} />
         </>
       )}
@@ -306,10 +295,27 @@ export default function SearchClient({
 /* ---------- ProductCard ---------- */
 
 function ProductCard({ p, highlight }: { p: any; highlight: string }) {
+  const { addItem } = useCart()
+  const [added, setAdded] = useState(false)
   const placeholder = isPlaceholderPrice(p)
   const stock = p.stock ?? 0
   const inStock = stock > 0
   const chassis = p.compatible_models?.[0]
+
+  const handleAdd = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    addItem({
+      id: p.id,
+      slug: p.slug,
+      name: p.name,
+      price: p.price ?? 0,
+      image_url: p.image_url ?? null,
+      stock: stock,
+    }, 1)
+    setAdded(true)
+    window.setTimeout(() => setAdded(false), 1500)
+  }
 
   return (
     <Link href={`/products/${p.slug}`} className="block group">
@@ -370,6 +376,23 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
             <p className="text-green-600 font-bold mt-auto">
               ฿{p.price?.toLocaleString()}
             </p>
+          )}
+
+          {/* Add to cart */}
+          {inStock && (
+            <button
+              type="button"
+              onClick={handleAdd}
+              aria-label={`ใส่ตะกร้า ${p.name}`}
+              className={[
+                'mt-3 w-full py-2 text-sm font-semibold rounded-lg transition flex items-center justify-center gap-1.5',
+                added
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-900 hover:bg-gray-800 text-white',
+              ].join(' ')}
+            >
+              {added ? '✓ เพิ่มแล้ว' : '🛒 ใส่ตะกร้า'}
+            </button>
           )}
         </div>
       </article>
