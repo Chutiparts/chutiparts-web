@@ -11,17 +11,36 @@ export default async function ProductDetail({
   const { slug } = await params
   const supabase = await createClient()
 
-  // FIX (2026-06-10): เปลี่ยนจาก .single() → .limit(1)
-  // เหตุผล: .single() จะ throw error ถ้ามี slug ซ้ำกัน (เกิดจาก bulk-add) → ทำให้หน้า 404
-  // ใช้ .limit(1) + เลือกแถวแรก = ทนต่อ slug ซ้ำ ไม่ 404 อีก
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .eq('slug', slug)
-    .eq('is_published', true)
-    .limit(1)
+  // FIX (2026-06-10): หน้า product เคย 404 เพราะ slug มีอักขระไทย
+  // การ query .eq('slug', <ไทย>) ส่งค่าฟิลเตอร์ไป PostgREST แล้ว match พลาด
+  // วิธีแก้ทนสุด: ลอง match ตรงก่อน ถ้าไม่เจอ → match ด้วย "code" นำหน้าแบบ ASCII
+  // (รูปแบบ slug = "NNN-NNN-ชื่อ-รุ่น" เช่น "140-003-...") code ไม่ซ้ำกันต่อสินค้า
+  let product: any = null
 
-  const product = products?.[0]
+  // 1) ลอง match slug ตรง
+  {
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .eq('slug', slug)
+      .eq('is_published', true)
+      .limit(1)
+    product = data?.[0] ?? null
+  }
+
+  // 2) ถ้าไม่เจอ → match ด้วย code นำหน้า (ASCII-safe, เลี่ยงปัญหาอักขระไทยใน filter)
+  if (!product) {
+    const codeMatch = slug.match(/^(\d+-\d+)/)
+    if (codeMatch) {
+      const { data } = await supabase
+        .from('products')
+        .select('*')
+        .ilike('slug', `${codeMatch[1]}-%`)
+        .eq('is_published', true)
+        .limit(1)
+      product = data?.[0] ?? null
+    }
+  }
 
   if (!product) {
     notFound()
