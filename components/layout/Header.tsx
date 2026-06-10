@@ -1,24 +1,39 @@
-// components/layout/Header.tsx — Quick fix (ไม่มี cart dependency)
-// 20 พ.ค. 2026
-//
-// เวอร์ชันนี้: ลบ "🚗 ChutiBenz ⭐" + เปลี่ยนเป็น "ChutiBenz"
-// ไม่ต้องสร้าง cart components ก่อน — apply ได้เลย build ผ่าน
-// ภายหลังเมื่อทำ cart เสร็จ → ใช้ FIX-header-clean.txt แทน (มี CartButton)
+// components/layout/Header.tsx
+// 2026-06-10: เพิ่มไอคอนตะกร้า (CartButton) เชื่อม CartContext
 
 'use client'
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import { useCart } from '@/app/context/CartContext'
 
- const NAV_ITEMS = [
-   { href: '/', label: 'หน้าแรก' },
+const NAV_ITEMS = [
+  { href: '/', label: 'หน้าแรก' },
   { href: '/vin-check', label: '🆔 VIN Check ฟรี' },
   { href: '/search', label: '🔍 ค้นหา' },
   { href: '/articles', label: '📖 บทความ' },
   { href: '/garages', label: '🔨 อู่/ร้าน' },
   { href: '/intake', label: '📋 ส่งอาการรถ' },
 ]
+
+function CartLink() {
+  const { totalItems } = useCart()
+  return (
+    <Link
+      href="/cart"
+      aria-label="ตะกร้าสินค้า"
+      className="relative inline-flex items-center justify-center w-10 h-10 text-gray-700 hover:text-[#C9A961] transition"
+    >
+      <span className="text-xl leading-none">🛒</span>
+      {totalItems > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[#C9A961] text-white text-[10px] font-bold leading-none">
+          {totalItems}
+        </span>
+      )}
+    </Link>
+  )
+}
 
 export default function Header() {
   const pathname = usePathname()
@@ -29,7 +44,7 @@ export default function Header() {
       <div className="container mx-auto px-4 max-w-7xl">
         <div className="flex items-center justify-between h-16">
 
-          {/* === BRAND — ข้อความเรียบ ๆ ไม่มี emoji === */}
+          {/* === BRAND === */}
           <Link
             href="/"
             className="flex items-center gap-2 group"
@@ -63,8 +78,9 @@ export default function Header() {
             })}
           </nav>
 
-          {/* === RIGHT: CTA === */}
+          {/* === RIGHT: Cart + CTA === */}
           <div className="flex items-center gap-2">
+            <CartLink />
             <Link
               href="/intake"
               className="hidden md:inline-block bg-[#C9A961] hover:bg-[#D8B872] text-white font-medium px-4 py-2 text-sm tracking-wide transition rounded"
@@ -102,6 +118,13 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
+            <Link
+              href="/cart"
+              onClick={() => setMobileOpen(false)}
+              className="block px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-[#C9A961] rounded"
+            >
+              🛒 ตะกร้าสินค้า
+            </Link>
             <Link
               href="/intake"
               onClick={() => setMobileOpen(false)}
