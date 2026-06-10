@@ -1,6 +1,6 @@
 // app/page.tsx — Home (Server Component) — eBook-First Launch
-// v6 = ปิดแจก FULL ทุกรุ่น → โหลดได้เฉพาะ LITE PDF ฟรี · ฉบับเต็ม = สินค้าขายผ่านไลน์
-//      (replaces v5 "อ่านออนไลน์ฉบับเต็ม" W124/W140)
+// v7 = เพิ่ม W202 + W210 (รวมเป็น 7 รุ่น) · โหลด LITE ฟรีทุกรุ่น · ฉบับเต็ม = ขายผ่านไลน์
+//      (replaces v6 — เพิ่ม 2 การ์ด + ปรับหัวข้อ 5→7 รุ่น)
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { CHASSIS_MODELS, LINE_OA_URL } from '@/lib/constants'
@@ -93,7 +93,7 @@ export default async function HomePage() {
               href="#ebooks"
               className="absolute top-4 left-4 z-20 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] px-3 py-2 text-xs md:text-sm font-medium tracking-wide shadow-lg transition-all hover:scale-105 flex items-center gap-1.5"
             >
-              📖 <span>eBook ฟรี 5 เล่ม</span>
+              📖 <span>eBook ฟรี 7 เล่ม</span>
               <span className="text-[#1C1D2C]/70">↓</span>
             </a>
           </div>
@@ -138,7 +138,7 @@ export default async function HomePage() {
             FREE EBOOKS · MERCEDES-BENZ CLASSIC
           </p>
           <h2 className="text-3xl md:text-4xl font-serif font-medium text-gray-900">
-            📖 ดาวน์โหลด eBook ฟรี — 5 รุ่นในตำนาน (ฉบับ LITE)
+            📖 ดาวน์โหลด eBook ฟรี — 7 รุ่นในตำนาน (ฉบับ LITE)
           </h2>
           <p className="text-sm md:text-base text-gray-600 mt-4 max-w-2xl mx-auto leading-relaxed">
             คู่มือฉบับ <strong className="text-[#C9A961]">คนเล่นจริง</strong> — เลือกซื้อให้เป็น ดูอาการให้ออก
@@ -147,13 +147,15 @@ export default async function HomePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
           {[
             { code: 'W123', name: 'เบนซ์ตาหวาน', emoji: '👁', tagline: 'E-Class รุ่นต้น' },
             { code: 'W124', name: 'รถถังเยอรมัน', emoji: '🛡', tagline: 'E-Class · E500' },
             { code: 'W126', name: 'เจ้าพ่อเซี่ยงไฮ้', emoji: '👑', tagline: 'S-Class ตำนาน' },
             { code: 'W140', name: 'ปลาวาฬปราบเสี่ย', emoji: '🐋', tagline: 'S-Class · S70 AMG' },
             { code: 'W201', name: 'Baby-Benz', emoji: '👶', tagline: '190E คลาสสิคเริ่มต้น' },
+            { code: 'W202', name: 'เบนซ์จิ้มลิ้ม', emoji: '🚙', tagline: 'C-Class คันแรก' },
+            { code: 'W210', name: 'ตา 4 รู', emoji: '👀', tagline: 'E-Class ยุค 2000' },
           ].map((book) => {
             const href = `/ebooks/${book.code}_LITE.pdf`
             return (
