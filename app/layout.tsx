@@ -1,20 +1,12 @@
-// app/layout.tsx — FULL FILE replacement (ChutiBenz)
-// 27 พ.ค. 2026
-//
-// ⚠️ อ่านก่อน apply:
-// ไฟล์นี้คือ "best-guess template" สำหรับ Next.js 13+ App Router
-// ถ้า layout.tsx เดิมของคุณมี custom providers / fonts / context อื่น ๆ
-// → อย่าทับทั้งไฟล์ — ให้ copy แค่ block "export const metadata = {...}" จากที่นี่ไปแทนของเดิม
-//
-// ถ้าโครงสร้างเดิม simple (แค่ Header/Footer/children) → paste ทั้งไฟล์ทับได้เลย
+// app/layout.tsx — ChutiBenz root layout
+// 2026-06-10: เพิ่ม <CartProvider> ครอบทั้งแอป (จำเป็นสำหรับระบบตะกร้า)
 
 import type { Metadata } from 'next'
 import './globals.css'
 import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
+import { CartProvider } from './context/CartContext'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
-
 
 const SITE_URL = 'https://chutibenz.com'
 const BRAND = 'ChutiBenz'
@@ -115,44 +107,46 @@ export default function RootLayout({
   return (
     <html lang="th">
       <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
-        <Header />
-        <main>{children}</main>
+        <CartProvider>
+          <Header />
+          <main>{children}</main>
 
-        {/* Footer (basic) — replace ด้วย <Footer /> ถ้ามี component แยก */}
-        <footer className="bg-[#1C1D2C] text-[#B8B3A7] mt-12 py-10">
-          <div className="container mx-auto px-4 max-w-7xl grid md:grid-cols-3 gap-8 text-sm">
-            <div>
-              <h3 className="font-serif text-lg text-[#F2EDE0] mb-2">ChutiBenz</h3>
-              <p className="text-xs leading-relaxed">
-                คลังอะไหล่ Mercedes-Benz มือสองคุณภาพดี<br />
-                เชี่ยวชาญรุ่นคลาสสิค W124, W126, W140, W201, W202, W210
-              </p>
+          {/* Footer (basic) */}
+          <footer className="bg-[#1C1D2C] text-[#B8B3A7] mt-12 py-10">
+            <div className="container mx-auto px-4 max-w-7xl grid md:grid-cols-3 gap-8 text-sm">
+              <div>
+                <h3 className="font-serif text-lg text-[#F2EDE0] mb-2">ChutiBenz</h3>
+                <p className="text-xs leading-relaxed">
+                  คลังอะไหล่ Mercedes-Benz มือสองคุณภาพดี<br />
+                  เชี่ยวชาญรุ่นคลาสสิค W124, W126, W140, W201, W202, W210
+                </p>
+              </div>
+              <div>
+                <h3 className="text-xs font-medium text-[#C9A961] tracking-widest mb-3">เมนู</h3>
+                <ul className="space-y-1">
+                  <li><a href="/" className="hover:text-[#C9A961]">หน้าแรก</a></li>
+                  <li><a href="/search" className="hover:text-[#C9A961]">ค้นหาอะไหล่</a></li>
+                  <li><a href="/articles" className="hover:text-[#C9A961]">บทความความรู้</a></li>
+                  <li><a href="/intake" className="hover:text-[#C9A961]">📋 ส่งอาการรถ</a></li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-xs font-medium text-[#C9A961] tracking-widest mb-3">ติดต่อเรา</h3>
+                <ul className="space-y-1">
+                  <li><a href="https://line.me/R/ti/p/%40440ifncj" target="_blank" rel="noopener noreferrer" className="hover:text-[#C9A961]">💬 Line: mr.chuti5988</a></li>
+                  <li><a href="tel:0818285855" className="hover:text-[#C9A961]">📞 081-828-5855</a></li>
+                  <li>📍 ส่งทั่วประเทศไทย</li>
+                </ul>
+                <p className="text-[10px] mt-3 text-[#8B7355]">
+                  © 2026 ChutiBenz · คลังอะไหล่เบนซ์มือสองคุณภาพดี
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xs font-medium text-[#C9A961] tracking-widest mb-3">เมนู</h3>
-              <ul className="space-y-1">
-                <li><a href="/" className="hover:text-[#C9A961]">หน้าแรก</a></li>
-                <li><a href="/search" className="hover:text-[#C9A961]">ค้นหาอะไหล่</a></li>
-                <li><a href="/articles" className="hover:text-[#C9A961]">บทความความรู้</a></li>
-                <li><a href="/intake" className="hover:text-[#C9A961]">📋 ส่งอาการรถ</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-xs font-medium text-[#C9A961] tracking-widest mb-3">ติดต่อเรา</h3>
-              <ul className="space-y-1">
-                <li><a href="https://line.me/R/ti/p/%40440ifncj" target="_blank" rel="noopener noreferrer" className="hover:text-[#C9A961]">💬 Line: mr.chuti5988</a></li>
-                <li><a href="tel:0818285855" className="hover:text-[#C9A961]">📞 081-828-5855</a></li>
-                <li>📍 ส่งทั่วประเทศไทย</li>
-              </ul>
-              <p className="text-[10px] mt-3 text-[#8B7355]">
-                © 2026 ChutiBenz · คลังอะไหล่เบนซ์มือสองคุณภาพดี
-              </p>
-            </div>
-          </div>
-        </footer>
+          </footer>
 
-        <Analytics />
-        <SpeedInsights />
+          <Analytics />
+          <SpeedInsights />
+        </CartProvider>
       </body>
     </html>
   )
