@@ -6,20 +6,11 @@
  * Unblocked by: CR-001 (2026-05-29)
  *
  * STRATEGY (2-step, slug-preserving):
- *   1. Lookup existing rows by part_number → map part_number → {id, slug}
- *   2. For each V10 row: existing → preserve slug; new → generate slug
- *   3. Upsert with onConflict='slug' (existing UNIQUE constraint)
+ * 1. Lookup existing rows by part_number → map part_number → {id, slug}
+ * 2. For each V10 row: existing → preserve slug; new → generate slug
+ * 3. Upsert with onConflict='slug' (existing UNIQUE constraint)
  *
- * Red lines (preserved):
- *   - ห้ามแตะ cart, ห้ามแตะ B (datacard-ops)
- *   - ห้าม leak ต้นทุน (col 8 EXCLUDED from upsert)
- *   - Audit-first: ทุก sync เขียน stock_sync_log row
- *   - ห้าม run without CRON_SECRET → 401
- *   - Preserve existing image_url / views_count / location / condition
- *
- * Owner manual trigger:
- *   curl -X POST https://chutibenz.com/api/sync-stock \
- *        -H "Authorization: Bearer ${CRON_SECRET}"
+ * 2026-06-10 FIX: generateSlug → ASCII-only (กันอักษรไทยใน slug ที่ทำให้ query .eq พลาด/404)
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
@@ -115,22 +106,21 @@ function toBoolThai(raw: string): boolean {
 }
 
 /**
- * Generate slug matching A's existing convention:
- *   `{sku}-{slugified-name}`
- * Examples (verified against existing data):
- *   - "ไฟท้าย W140 ซ้าย" + "140-001" → "140-001-ไฟท้าย-w140-ซ้าย"
- *   - 'ล้อ ST2 18"' + "124-001" → "124-001-ล้อ-st2-18"
+ * Generate slug — ASCII-only (2026-06-10)
+ * รูปแบบ: `{sku}-{ascii-part-of-name}` เช่น
+ *   - "กันชนหลัง W140" + "140-003" → "140-003-w140"
+ *   - "ECU กล่องไฟ" + "140-020"   → "140-020-ecu"
+ * อักษรไทย/ช่องว่าง/สัญลักษณ์ → '-' แล้วยุบ; ถ้าไม่เหลือ ascii ใช้ sku ล้วน
+ * (sku ไม่ซ้ำ → slug ไม่ซ้ำเสมอ)
  */
 function generateSlug(name: string, sku: string): string {
-  const slugName = name
+  const asciiName = name
     .toLowerCase()
     .replace(/["'`]/g, '')
-    .replace(/\s+/g, '-')
-    // keep ASCII alphanum, dash, and Thai range U+0E00..U+0E7F
-    .replace(/[^a-z0-9฀-๿-]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
-  return `${sku}-${slugName}`
+  return asciiName ? `${sku}-${asciiName}` : sku
 }
 
 function composeDescription(importFrom: string, hasDefect: boolean, defectNote: string): string | null {
@@ -163,9 +153,6 @@ type LogContext = {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const startedAt = Date.now()
-  // Env var names match Vercel project (chutiparts-web) actual config:
-  //   - NEXT_PUBLIC_SUPABASE_URL  (already used by client; safe to reuse server-side)
-  //   - SUPABASE_SECRET_KEY        (service-role key; server-only)
   const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supaKey = process.env.SUPABASE_SECRET_KEY
   const sheetUrl = process.env.STOCK_SHEET_CSV_URL
@@ -291,7 +278,6 @@ export async function POST(req: NextRequest) {
       price,
       stock,
       is_published: true,
-      // pass-through category with V10 prefix (per Q1 = ก)
       ...(category && { category }),
       ...(chassis && { compatible_models: [chassis] }),
       ...(oem && { oem_number: oem }),
@@ -299,7 +285,7 @@ export async function POST(req: NextRequest) {
       ...(yearTo != null && { year_to: yearTo }),
       ...(description && { description }),
       // OMITTED (preserve existing or DB default):
-      //   image_url, condition, currency, views_count, location, slug (added per-row)
+      // image_url, condition, currency, views_count, location, slug (added per-row)
     }
 
     candidates.push({ sku, fields })
@@ -310,7 +296,6 @@ export async function POST(req: NextRequest) {
     auth: { persistSession: false },
   })
 
-  // Closure for logging + response (carries supa client without typing headaches)
   const logAndRespond = async (ctx: LogContext): Promise<NextResponse> => {
     const durationMs = Date.now() - startedAt
     const logRow = {
