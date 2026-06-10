@@ -1,5 +1,6 @@
 // app/page.tsx — Home (Server Component) — eBook-First Launch
-// v5 = W124 + W140 "อ่านออนไลน์ฉบับเต็ม" (HTML page) — replaces v4 "v2 เร็วๆ นี้" badge
+// v6 = ปิดแจก FULL ทุกรุ่น → โหลดได้เฉพาะ LITE PDF ฟรี · ฉบับเต็ม = สินค้าขายผ่านไลน์
+//      (replaces v5 "อ่านออนไลน์ฉบับเต็ม" W124/W140)
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { CHASSIS_MODELS, LINE_OA_URL } from '@/lib/constants'
@@ -137,39 +138,32 @@ export default async function HomePage() {
             FREE EBOOKS · MERCEDES-BENZ CLASSIC
           </p>
           <h2 className="text-3xl md:text-4xl font-serif font-medium text-gray-900">
-            📖 ดาวน์โหลด eBook ฟรี — 5 รุ่นในตำนาน
+            📖 ดาวน์โหลด eBook ฟรี — 5 รุ่นในตำนาน (ฉบับ LITE)
           </h2>
           <p className="text-sm md:text-base text-gray-600 mt-4 max-w-2xl mx-auto leading-relaxed">
             คู่มือฉบับ <strong className="text-[#C9A961]">คนเล่นจริง</strong> — เลือกซื้อให้เป็น ดูอาการให้ออก
             <br className="hidden md:block" />
-            จากประสบการณ์ <strong className="text-[#C9A961]">10+ ปี</strong> ของ Mr.Chuti · กดที่ปก W124 / W140 เพื่ออ่านออนไลน์ฉบับเต็ม · รุ่นอื่นโหลด LITE PDF
+            จากประสบการณ์ <strong className="text-[#C9A961]">10+ ปี</strong> ของ Mr.Chuti · ทุกรุ่นโหลดฉบับ LITE ฟรี · <strong className="text-[#C9A961]">ฉบับเต็ม</strong> สั่งซื้อทางไลน์
           </p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
           {[
             { code: 'W123', name: 'เบนซ์ตาหวาน', emoji: '👁', tagline: 'E-Class รุ่นต้น' },
-            { code: 'W124', name: 'รถถังเยอรมัน', emoji: '🛡', tagline: 'E-Class · E500', online: true },
+            { code: 'W124', name: 'รถถังเยอรมัน', emoji: '🛡', tagline: 'E-Class · E500' },
             { code: 'W126', name: 'เจ้าพ่อเซี่ยงไฮ้', emoji: '👑', tagline: 'S-Class ตำนาน' },
-            { code: 'W140', name: 'ปลาวาฬปราบเสี่ย', emoji: '🐋', tagline: 'S-Class · S70 AMG', online: true },
+            { code: 'W140', name: 'ปลาวาฬปราบเสี่ย', emoji: '🐋', tagline: 'S-Class · S70 AMG' },
             { code: 'W201', name: 'Baby-Benz', emoji: '👶', tagline: '190E คลาสสิคเริ่มต้น' },
           ].map((book) => {
-            const href = book.online ? `/ebooks/${book.code}-FULL.pdf` : `/ebooks/${book.code}_LITE.pdf`
-            const linkProps = book.online
-              ? { href, target: '_blank' as const, rel: 'noopener noreferrer' }
-              : { href, download: true as unknown as string }
+            const href = `/ebooks/${book.code}_LITE.pdf`
             return (
               <a
                 key={book.code}
-                {...linkProps}
+                href={href}
+                download
                 className="group bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
               >
                 <div className="aspect-[3/4] bg-gray-100 overflow-hidden relative">
-                  {book.online && (
-                    <span className="absolute top-2 right-2 z-10 bg-emerald-600/95 text-white text-[9px] md:text-[10px] font-medium px-2 py-0.5 shadow-md tracking-wide">
-                      📕 PDF ฉบับเต็ม
-                    </span>
-                  )}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`/ebooks/${book.code}_cover.jpg`}
@@ -185,11 +179,7 @@ export default async function HomePage() {
                   <div className="text-xs text-[#8B7355] mt-1 line-clamp-1">{book.name}</div>
                   <div className="text-[10px] text-gray-500 mt-1 line-clamp-1">{book.tagline}</div>
                   <div className="text-[11px] text-[#C9A961] mt-2 font-medium flex items-center gap-1">
-                    {book.online ? (
-                      <><span>📖</span> PDF ฉบับเต็ม · ฟรี</>
-                    ) : (
-                      <><span>⬇</span> LITE · ฟรี</>
-                    )}
+                    <span>⬇</span> LITE · ฟรี
                   </div>
                 </div>
               </a>
@@ -197,15 +187,15 @@ export default async function HomePage() {
           })}
         </div>
 
-        {/* LINE banner — FULL version request */}
+        {/* LINE banner — FULL version = paid product */}
         <div className="mt-8 bg-gray-50 border border-gray-200 p-4 md:p-6 flex flex-col sm:flex-row items-center gap-4">
-          <div className="flex-shrink-0 text-4xl">💬</div>
+          <div className="flex-shrink-0 text-4xl">📚</div>
           <div className="flex-1 text-center sm:text-left">
             <p className="text-base font-medium text-gray-900">
-              ต้องการ FULL Version รุ่นอื่น (พร้อมรูปประกอบเชิงลึก)?
+              ต้องการ <strong>eBook ฉบับเต็ม</strong> (เนื้อหาครบทุกบท + รูปประกอบเชิงลึก)?
             </p>
             <p className="text-sm text-gray-600 mt-1">
-              ทักไลน์{' '}
+              ฉบับเต็มมีจำหน่ายเฉพาะทางไลน์ — ทักไลน์{' '}
               <a
                 href={LINE_OA_URL}
                 target="_blank"
@@ -214,7 +204,7 @@ export default async function HomePage() {
               >
                 mr.chuti5988
               </a>
-              {' '}— สอบถามฉบับเต็ม FC (มีค่าใช้จ่าย)
+              {' '}เพื่อสั่งซื้อ / สอบถามราคา
             </p>
           </div>
           <a
@@ -223,7 +213,7 @@ export default async function HomePage() {
             rel="noopener noreferrer"
             className="bg-[#06C755] hover:bg-[#05B04A] text-white font-medium px-6 py-3 text-sm whitespace-nowrap transition"
           >
-            💬 ทักไลน์สอบถามเล่มเต็ม
+            💬 สั่งซื้อเล่มเต็มทางไลน์
           </a>
         </div>
       </section>
