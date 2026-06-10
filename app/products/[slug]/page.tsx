@@ -3,22 +3,27 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import AddToCartButton from '../../components/AddToCartButton'
 
-export default async function ProductDetail({ 
-  params 
-}: { 
-  params: Promise<{ slug: string }> 
+export default async function ProductDetail({
+  params
+}: {
+  params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
   const supabase = await createClient()
-  
-  const { data: product, error } = await supabase
+
+  // FIX (2026-06-10): เปลี่ยนจาก .single() → .limit(1)
+  // เหตุผล: .single() จะ throw error ถ้ามี slug ซ้ำกัน (เกิดจาก bulk-add) → ทำให้หน้า 404
+  // ใช้ .limit(1) + เลือกแถวแรก = ทนต่อ slug ซ้ำ ไม่ 404 อีก
+  const { data: products } = await supabase
     .from('products')
     .select('*')
     .eq('slug', slug)
     .eq('is_published', true)
-    .single()
-  
-  if (error || !product) {
+    .limit(1)
+
+  const product = products?.[0]
+
+  if (!product) {
     notFound()
   }
 
@@ -40,7 +45,7 @@ export default async function ProductDetail({
               ChutiBenz <span className="text-yellow-400">⭐</span>
             </Link>
             <div className="flex gap-2">
-              <a 
+              <a
                 href="https://line.me/ti/p/~mr.chuti5988"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -48,7 +53,7 @@ export default async function ProductDetail({
               >
                 💬 Line
               </a>
-              <a 
+              <a
                 href="tel:0818285855"
                 className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded-lg transition"
               >
@@ -73,7 +78,7 @@ export default async function ProductDetail({
             {/* Image */}
             <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden">
               {product.image_url ? (
-                <img 
+                <img
                   src={product.image_url}
                   alt={product.name}
                   className="w-full h-full object-cover"
@@ -98,10 +103,10 @@ export default async function ProductDetail({
                   {product.category}
                 </span>
                 <span className="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded-full font-medium">
-                  {product.condition === 'used-good' ? 'มือสอง สภาพดี' : 
-                   product.condition === 'oem' ? 'OEM แท้' :
-                   product.condition === 'aftermarket' ? 'Aftermarket' : 
-                   product.condition}
+                  {product.condition === 'used-good' ? 'มือสอง สภาพดี' :
+                    product.condition === 'oem' ? 'OEM แท้' :
+                    product.condition === 'aftermarket' ? 'Aftermarket' :
+                    product.condition}
                 </span>
               </div>
 
@@ -121,8 +126,8 @@ export default async function ProductDetail({
                   <p className="text-sm font-semibold text-gray-700 mb-2">🚗 รองรับรุ่น:</p>
                   <div className="flex flex-wrap gap-2">
                     {product.compatible_models.map((model: string) => (
-                      <span 
-                        key={model} 
+                      <span
+                        key={model}
                         className="px-3 py-1 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm font-medium"
                       >
                         {model}
@@ -160,7 +165,7 @@ export default async function ProductDetail({
 
               {/* Contact Buttons */}
               <div className="grid grid-cols-2 gap-3 mb-4">
-                <a 
+                <a
                   href="https://line.me/ti/p/~mr.chuti5988"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -168,7 +173,7 @@ export default async function ProductDetail({
                 >
                   💬 ติดต่อทาง Line
                 </a>
-                <a 
+                <a
                   href="tel:0818285855"
                   className="px-6 py-4 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl text-center transition shadow-md hover:shadow-lg"
                 >
@@ -203,14 +208,14 @@ export default async function ProductDetail({
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {relatedProducts.map((rp) => (
-                <Link 
+                <Link
                   key={rp.id}
                   href={`/products/${rp.slug}`}
                   className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100"
                 >
                   <div className="relative aspect-square bg-gray-100 overflow-hidden">
                     {rp.image_url ? (
-                      <img 
+                      <img
                         src={rp.image_url}
                         alt={rp.name}
                         className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
@@ -245,4 +250,3 @@ export default async function ProductDetail({
     </div>
   )
 }
-
