@@ -4,6 +4,7 @@
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { CHASSIS_MODELS, LINE_OA_URL } from '@/lib/constants'
+import EbookCard from './components/EbookCard'
 
 export const revalidate = 300
 
@@ -156,37 +157,9 @@ export default async function HomePage() {
             { code: 'W201', name: 'Baby-Benz', emoji: '👶', tagline: '190E คลาสสิคเริ่มต้น' },
             { code: 'W202', name: 'เบนซ์จิ้มลิ้ม', emoji: '🚙', tagline: 'C-Class คันแรก' },
             { code: 'W210', name: 'ตา 4 รู', emoji: '👀', tagline: 'E-Class ยุค 2000' },
-          ].map((book) => {
-            const href = `/ebooks/${book.code}_LITE.pdf`
-            return (
-              <a
-                key={book.code}
-                href={href}
-                download
-                className="group bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
-              >
-                <div className="aspect-[3/4] bg-gray-100 overflow-hidden relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/ebooks/${book.code}_cover.jpg`}
-                    alt={`${book.code} — ${book.name} eBook cover`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="p-3">
-                  <div className="font-serif font-medium text-base text-gray-900 group-hover:text-[#C9A961]">
-                    {book.emoji} {book.code}
-                  </div>
-                  <div className="text-xs text-[#8B7355] mt-1 line-clamp-1">{book.name}</div>
-                  <div className="text-[10px] text-gray-500 mt-1 line-clamp-1">{book.tagline}</div>
-                  <div className="text-[11px] text-[#C9A961] mt-2 font-medium flex items-center gap-1">
-                    <span>⬇</span> LITE · ฟรี
-                  </div>
-                </div>
-              </a>
-            )
-          })}
+          ].map((book) => (
+            <EbookCard key={book.code} book={book} />
+          ))}
         </div>
 
         {/* LINE banner — FULL version = paid product */}
