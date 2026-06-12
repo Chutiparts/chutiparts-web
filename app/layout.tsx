@@ -7,6 +7,7 @@ import Header from '@/components/layout/Header'
 import { CartProvider } from './context/CartContext'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import ContactHub from '@/components/ContactHub'
 
 const SITE_URL = 'https://chutibenz.com'
 const BRAND = 'ChutiBenz'
@@ -146,6 +147,7 @@ export default function RootLayout({
 
           <Analytics />
           <SpeedInsights />
+          <ContactHub />
         </CartProvider>
       </body>
     </html>
