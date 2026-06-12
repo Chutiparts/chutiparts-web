@@ -59,7 +59,7 @@ async function setStatus(formData: FormData) {
   const status = String(formData.get('status') || '')
   if (!id) return
   if (!STATUS_VALUES.includes(status)) return
-  await svc().from('leads').update({ status }).eq('id', id)
+  await svc().from('contact_leads').update({ status }).eq('id', id)
   revalidatePath('/ops-x7k2m9/leads')
 }
 
@@ -81,7 +81,7 @@ export default async function LeadsPage() {
   }
 
   const supa = svc()
-  const { data, error } = await supa.from('leads').select('*').order('created_at', { ascending: false }).limit(300)
+  const { data, error } = await supa.from('contact_leads').select('*').order('created_at', { ascending: false }).limit(300)
   const leads = data ?? []
   const newCount = leads.filter((l) => l.status === 'new').length
   const fmt = (d: string) => new Date(d).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
