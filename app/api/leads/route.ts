@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supa = createClient(supaUrl, supaKey, { auth: { persistSession: false } })
-  const { data, error } = await supa.from('leads').insert(row).select('id').single()
+  const { data, error } = await supa.from('contact_leads').insert(row).select('id').single()
   if (error || !data) {
     console.error('[leads] insert failed:', error)
     return NextResponse.json({ ok: false, error: 'lead_insert_failed' }, { status: 500 })
