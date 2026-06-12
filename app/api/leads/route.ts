@@ -1,6 +1,7 @@
 // app/api/leads/route.ts
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { notifyNewLead } from '@/lib/notify-lead'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -70,5 +71,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'lead_insert_failed' }, { status: 500 })
   }
   const ref = String(data.id).slice(0, 8).toUpperCase()
+
+  // แจ้งเตือนแอดมินแบบ best-effort — insert สำเร็จแล้วเสมอ ห้ามทำให้ลูกค้า submit fail
+  try {
+    await notifyNewLead({
+      id: data.id,
+      name: row.name,
+      phone: row.phone,
+      line_id: row.line_id,
+      email: row.email,
+      topic,
+      source,
+      detail: row.detail,
+    })
+  } catch (e) {
+    console.error('[leads] notify error:', (e as Error)?.message)
+  }
+
   return NextResponse.json({ ok: true, id: data.id, ref, message: 'received' })
 }
