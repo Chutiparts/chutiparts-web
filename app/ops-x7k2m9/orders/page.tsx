@@ -14,10 +14,10 @@ function svc() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-function authed(): boolean {
+async function authed(): Promise<boolean> {
   const secret = process.env.ADMIN_OPS_SECRET
   if (!secret) return false
-  return cookies().get(COOKIE)?.value === secret
+  return (await cookies()).get(COOKIE)?.value === secret
 }
 
 async function loginOps(formData: FormData) {
@@ -25,7 +25,7 @@ async function loginOps(formData: FormData) {
   const pw = String(formData.get('password') || '')
   const secret = process.env.ADMIN_OPS_SECRET
   if (secret && pw === secret) {
-    cookies().set(COOKIE, secret, { httpOnly: true, secure: true, sameSite: 'lax', path: '/ops-x7k2m9', maxAge: 60 * 60 * 24 * 30 })
+    (await cookies()).set(COOKIE, secret, { httpOnly: true, secure: true, sameSite: 'lax', path: '/ops-x7k2m9', maxAge: 60 * 60 * 24 * 30 })
   }
   revalidatePath('/ops-x7k2m9/orders')
 }
@@ -41,7 +41,7 @@ const STATUS_CLS: Record<string, string> = {
 // TODO(phase-next): ย้ายการตัดสต็อกเป็น Postgres RPC/transaction แบบ atomic
 async function confirmOrder(formData: FormData) {
   'use server'
-  if (!authed()) return
+  if (!(await authed())) return
   const id = String(formData.get('id') || '')
   if (!id) return
   const supa = svc()
@@ -66,7 +66,7 @@ async function confirmOrder(formData: FormData) {
 // NOTE(phase-next): การคืน/restore stock เมื่อยกเลิกออเดอร์ที่ confirmed แล้ว = เฟสถัดไป
 async function cancelOrder(formData: FormData) {
   'use server'
-  if (!authed()) return
+  if (!(await authed())) return
   const id = String(formData.get('id') || '')
   if (!id) return
   const supa = svc()
@@ -75,7 +75,7 @@ async function cancelOrder(formData: FormData) {
 }
 
 export default async function OrdersPage() {
-  if (!authed()) {
+  if (!(await authed())) {
     return (
       <section className="container mx-auto px-4 py-20 max-w-sm">
         <h1 className="text-xl font-serif font-medium text-gray-900 mb-1">Admin · Orders</h1>
