@@ -30,7 +30,7 @@ export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)!
   const supa = createClient(url, key, { auth: { persistSession: false } })
-  const { data, error } = await supa.from('leads').select('*').order('created_at', { ascending: false }).limit(5000)
+  const { data, error } = await supa.from('contact_leads').select('*').order('created_at', { ascending: false }).limit(5000)
   if (error) return NextResponse.json({ ok: false, error: 'fetch_failed' }, { status: 500 })
 
   const rows = data ?? []
