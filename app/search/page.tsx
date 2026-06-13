@@ -6,6 +6,7 @@ import { resolveAliases } from '@/lib/search-utils'
 export const metadata = {
   title: 'ค้นหาอะไหล่',
   description: 'ค้นหาอะไหล่ Mercedes-Benz มือสอง — รุ่น W124, W126, W140, W201, W202, W210',
+  alternates: { canonical: 'https://chutibenz.com/search' },
 }
 
 export const dynamic = 'force-dynamic'
@@ -33,10 +34,22 @@ export default async function SearchPage({
     .eq('is_published', true)
     .limit(20)
 
+  const qNorm = searchQuery.replace(/[^a-zA-Z0-9]/g, '')
+
   if (searchQuery) {
-    productsQuery = productsQuery.or(
-      `name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,part_number.ilike.%${searchQuery}%,oem_number.ilike.%${searchQuery}%,slug.ilike.%${searchQuery}%`
-    )
+    const orParts = [
+      `name.ilike.%${searchQuery}%`,
+      `description.ilike.%${searchQuery}%`,
+      `part_number.ilike.%${searchQuery}%`,
+      `oem_number.ilike.%${searchQuery}%`,
+    ]
+    if (qNorm) {
+      orParts.push(
+        `part_number_norm.ilike.%${qNorm}%`,
+        `oem_number_norm.ilike.%${qNorm}%`
+      )
+    }
+    productsQuery = productsQuery.or(orParts.join(','))
   }
   if (model) {
     productsQuery = productsQuery.contains('compatible_models', [model])
