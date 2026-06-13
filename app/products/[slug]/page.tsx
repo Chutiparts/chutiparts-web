@@ -1,20 +1,14 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import type { Metadata } from 'next'
 import AddToCartButton from '../../components/AddToCartButton'
 
-export default async function ProductDetail({
-  params
-}: {
-  params: Promise<{ slug: string }>
-}) {
-  const { slug } = await params
-  const supabase = await createClient()
+const SITE_URL = 'https://chutibenz.com'
 
-  // FIX (2026-06-10): หน้า product เคย 404 เพราะ slug มีอักขระไทย
-  // การ query .eq('slug', <ไทย>) ส่งค่าฟิลเตอร์ไป PostgREST แล้ว match พลาด
-  // วิธีแก้ทนสุด: ลอง match ตรงก่อน ถ้าไม่เจอ → match ด้วย "code" นำหน้าแบบ ASCII
-  // (รูปแบบ slug = "NNN-NNN-ชื่อ-รุ่น" เช่น "140-003-...") code ไม่ซ้ำกันต่อสินค้า
+// ดึงสินค้าจาก slug (รองรับ slug ไทย + fallback ด้วย code นำหน้าแบบ ASCII)
+async function getProductBySlug(slug: string) {
+  const supabase = await createClient()
   let product: any = null
 
   // 1) ลอง match slug ตรง
@@ -41,11 +35,57 @@ export default async function ProductDetail({
       product = data?.[0] ?? null
     }
   }
+  return product
+}
+
+// Phase 0 (2026-06-13): metadata รายหน้า — canonical/title/description/og ของสินค้าแต่ละชิ้น
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const product = await getProductBySlug(slug)
+  if (!product) {
+    return { title: 'ไม่พบสินค้า | ChutiBenz' }
+  }
+  const chassis = product.compatible_models?.length
+    ? ` ${product.compatible_models.join(' ')}`
+    : ''
+  const oem = product.oem_number ? ` ${product.oem_number}` : ''
+  const title = `${product.name}${chassis}${oem} | ChutiBenz`
+  const description = (
+    product.description ||
+    `${product.name} อะไหล่ Mercedes-Benz มือสอง — ChutiBenz`
+  ).slice(0, 160)
+  const url = `${SITE_URL}/products/${product.slug}`
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: 'website',
+      images: product.image_url ? [{ url: product.image_url }] : undefined,
+    },
+  }
+}
+
+export default async function ProductDetail({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const product = await getProductBySlug(slug)
 
   if (!product) {
     notFound()
   }
 
+  const supabase = await createClient()
   const { data: relatedProducts } = await supabase
     .from('products')
     .select('*')
@@ -156,24 +196,42 @@ export default async function ProductDetail({
                 </div>
               )}
 
-              {/* Part Number */}
-              {product.part_number && (
+              {/* OEM Part Number (เด่น) + รหัสสินค้าในร้าน — Phase 0 decision 2 */}
+              {product.oem_number ? (
+                <div className="mb-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-xs text-gray-500">OEM Part No.</p>
+                  <p className="font-mono font-bold text-lg text-gray-900">{product.oem_number}</p>
+                  {product.part_number && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      รหัสสินค้าในร้าน: <span className="font-mono">{product.part_number}</span>
+                    </p>
+                  )}
+                </div>
+              ) : product.part_number ? (
                 <div className="mb-6 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Part Number</p>
+                  <p className="text-xs text-gray-500">รหัสสินค้าในร้าน (SKU)</p>
                   <p className="font-mono font-semibold">{product.part_number}</p>
                 </div>
-              )}
+              ) : null}
 
               {/* Price */}
               <div className="mb-6 pb-6 border-b border-gray-200">
                 <p className="text-sm text-gray-500 mb-1">ราคา</p>
                 <div className="flex items-end gap-3">
-                  <p className="text-4xl md:text-5xl font-bold text-green-600">
-                    ฿{product.price.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-gray-500 mb-2">
-                    มี {product.stock} ชิ้น
-                  </p>
+                  {typeof product.price === 'number' && product.price > 0 ? (
+                    <>
+                      <p className="text-4xl md:text-5xl font-bold text-green-600">
+                        ฿{product.price.toLocaleString()}
+                      </p>
+                      <p className="text-sm text-gray-500 mb-2">
+                        มี {product.stock} ชิ้น
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xl font-semibold text-gray-700">
+                      ติดต่อสอบถามราคาทาง LINE
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -200,19 +258,19 @@ export default async function ProductDetail({
                 </a>
               </div>
 
-              {/* Trust badges */}
+              {/* Trust badges — Phase 0 decision 4: ข้อความกลางที่เป็นจริงเท่านั้น */}
               <div className="grid grid-cols-3 gap-2 text-center text-xs text-gray-600">
                 <div className="p-2">
-                  <p className="text-2xl mb-1">✅</p>
-                  <p>OEM แท้ 100%</p>
+                  <p className="text-2xl mb-1">🔍</p>
+                  <p>ตรวจสภาพก่อนส่ง</p>
                 </div>
                 <div className="p-2">
-                  <p className="text-2xl mb-1">🛡️</p>
-                  <p>รับประกัน 15 วัน</p>
+                  <p className="text-2xl mb-1">📋</p>
+                  <p>แจ้งเงื่อนไขก่อนชำระ</p>
                 </div>
                 <div className="p-2">
-                  <p className="text-2xl mb-1">🚚</p>
-                  <p>ส่งทั่วไทย</p>
+                  <p className="text-2xl mb-1">💬</p>
+                  <p>ติดต่อกลับโดยเร็ว</p>
                 </div>
               </div>
             </div>
@@ -249,9 +307,15 @@ export default async function ProductDetail({
                     <h3 className="font-bold text-gray-900 mb-2 line-clamp-2">
                       {rp.name}
                     </h3>
-                    <p className="text-2xl font-bold text-green-600">
-                      ฿{rp.price.toLocaleString()}
-                    </p>
+                    {typeof rp.price === 'number' && rp.price > 0 ? (
+                      <p className="text-2xl font-bold text-green-600">
+                        ฿{rp.price.toLocaleString()}
+                      </p>
+                    ) : (
+                      <p className="text-sm font-semibold text-gray-600">
+                        สอบถามราคาทาง LINE
+                      </p>
+                    )}
                   </div>
                 </Link>
               ))}
