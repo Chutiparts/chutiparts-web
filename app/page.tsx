@@ -115,13 +115,13 @@ export default async function HomePage() {
                 <span className="text-[#C9A961] text-lg font-serif">✓</span>
                 <div>
                   <p className="text-xs font-medium text-[#C9A961] tracking-widest">ส่งทั่วไทย</p>
-                  <p className="text-[11px] text-[#B8B3A7] mt-1">EMS / Kerry / Flash · เก็บปลายทางได้</p>
+                  <p className="text-[11px] text-[#B8B3A7] mt-1">EMS / Kerry / Flash</p>
                 </div>
               </div>
               <div className="bg-white/[0.03] border border-[#C9A961]/25 px-5 py-3.5 flex items-start gap-3">
                 <span className="text-[#C9A961] text-lg font-serif">✓</span>
                 <div>
-                  <p className="text-xs font-medium text-[#C9A961] tracking-widest">ตอบใน 4 ชั่วโมง</p>
+                  <p className="text-xs font-medium text-[#C9A961] tracking-widest">ติดต่อกลับโดยเร็ว</p>
                   <p className="text-[11px] text-[#B8B3A7] mt-1">ทีม Mr.Chuti · เจ้าของรถ V12 ตัวจริง</p>
                 </div>
               </div>
@@ -234,7 +234,7 @@ export default async function HomePage() {
             ไม่รู้จะถามใคร? ไม่รู้จะเริ่มตรงไหน?
           </h2>
           <p className="text-base text-[#B8B3A7] mb-7">
-            ส่งอาการรถมาเลย — ทีมตอบกลับใน <strong className="text-[#C9A961]">4 ชั่วโมง</strong>
+            ส่งอาการรถมาเลย — ทีมจะติดต่อกลับ<strong className="text-[#C9A961]">โดยเร็วที่สุด</strong>
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
