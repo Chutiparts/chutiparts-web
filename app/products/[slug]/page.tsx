@@ -49,11 +49,10 @@ export async function generateMetadata({
   if (!product) {
     return { title: 'ไม่พบสินค้า | ChutiBenz' }
   }
-  const chassis = product.compatible_models?.length
-    ? ` ${product.compatible_models.join(' ')}`
-    : ''
   const oem = product.oem_number ? ` ${product.oem_number}` : ''
-  const title = `${product.name}${chassis}${oem} | ChutiBenz`
+  // ไม่เติม " | ChutiBenz" เพราะ layout มี title template เติมให้แล้ว (กันซ้ำ)
+  // และไม่เติม chassis ซ้ำ เพราะชื่อสินค้ามักมีรุ่นอยู่แล้ว
+  const title = `${product.name}${oem}`.trim()
   const description = (
     product.description ||
     `${product.name} อะไหล่ Mercedes-Benz มือสอง — ChutiBenz`
@@ -64,7 +63,7 @@ export async function generateMetadata({
     description,
     alternates: { canonical: url },
     openGraph: {
-      title,
+      title: `${title} | ChutiBenz`,
       description,
       url,
       type: 'website',
