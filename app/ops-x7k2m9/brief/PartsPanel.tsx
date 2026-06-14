@@ -58,7 +58,6 @@ export default function PartsPanel() {
         <span className="text-[11px] text-[#7c8090]">{pending ? 'กำลังโหลด…' : `${parts.length} ชิ้น`}</span>
       </div>
 
-      {/* add form */}
       <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 mb-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ชื่อสินค้า *" className="col-span-2 text-xs bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white placeholder-[#6b6f80] focus:border-[#C9A961] focus:outline-none" />
         <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="รุ่น เช่น W140" className="text-xs bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white placeholder-[#6b6f80] focus:border-[#C9A961] focus:outline-none" />
@@ -135,4 +134,24 @@ function PartEdit({ p, onCancel, onSave }: { p: any; onCancel: () => void; onSav
     website_url: p.website_url || '', social_url: p.social_url || '', fitment_note: p.fitment_note || '',
   })
   const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }))
-  const inp = 'text-xs bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white placeholder-[#6b6f80] focus:border-[#C9A961]
+  const inp = 'text-xs bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white placeholder-[#6b6f80] focus:border-[#C9A961] focus:outline-none'
+  return (
+    <div className="rounded-lg border border-[#C9A961]/40 bg-white/[0.04] p-3 space-y-2">
+      <input value={f.title} onChange={(e) => set('title', e.target.value)} placeholder="ชื่อสินค้า" className={`w-full ${inp}`} />
+      <div className="grid grid-cols-2 gap-2">
+        <input value={f.model} onChange={(e) => set('model', e.target.value)} placeholder="รุ่น" className={inp} />
+        <input value={f.sku} onChange={(e) => set('sku', e.target.value)} placeholder="SKU / OEM" className={inp} />
+        <input value={f.condition} onChange={(e) => set('condition', e.target.value)} placeholder="สภาพ" className={`col-span-2 ${inp}`} />
+        <input value={f.price} onChange={(e) => set('price', e.target.value.replace(/[^0-9]/g, ''))} placeholder="ราคา" inputMode="numeric" className={inp} />
+        <input value={f.stock} onChange={(e) => set('stock', e.target.value.replace(/[^0-9]/g, ''))} placeholder="จำนวน" inputMode="numeric" className={inp} />
+        <input value={f.website_url} onChange={(e) => set('website_url', e.target.value)} placeholder="URL เว็บ" className={`col-span-2 ${inp}`} />
+        <input value={f.social_url} onChange={(e) => set('social_url', e.target.value)} placeholder="URL โพสต์ social" className={`col-span-2 ${inp}`} />
+        <input value={f.fitment_note} onChange={(e) => set('fitment_note', e.target.value)} placeholder="fitment note (ความเข้ากันได้)" className={`col-span-2 ${inp}`} />
+      </div>
+      <div className="flex justify-end gap-2">
+        <button onClick={onCancel} className="text-xs text-[#7c8090] hover:text-white px-2 py-1">ยกเลิก</button>
+        <button onClick={() => { if (f.title.trim()) onSave(f) }} className="bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] text-xs font-semibold px-3 py-1 rounded">บันทึก</button>
+      </div>
+    </div>
+  )
+}
