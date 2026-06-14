@@ -1,6 +1,7 @@
 'use client'
 // app/ops-x7k2m9/brief/PartsPanel.tsx
 // Phase D — Premium Parts Pipeline (อะไหล่พรีเมียม, จัดกลุ่มตามสถานะ)
+// + กรอก/แก้ URL เว็บสินค้า inline ได้ทันที + ลิงก์ 🔗 เปิดหน้าสินค้า
 import { useEffect, useState, useTransition } from 'react'
 import { loadParts, createPart, updatePart, setPartStatus, deletePart, type PartsData } from './actions-parts'
 
@@ -79,7 +80,7 @@ export default function PartsPanel() {
                 {rows.map((p) =>
                   editId === p.id
                     ? <PartEdit key={p.id} p={p} onCancel={() => setEditId(null)} onSave={(patch) => { setEditId(null); run(() => updatePart({ id: p.id, ...patch })) }} />
-                    : <PartRow key={p.id} p={p} pending={pending} onStatus={(s) => run(() => setPartStatus(p.id, s))} onSaveInquiry={(note) => run(() => updatePart({ id: p.id, inquiry_note: note }))} onEdit={() => setEditId(p.id)} onDelete={() => run(() => deletePart(p.id))} />
+                    : <PartRow key={p.id} p={p} pending={pending} onStatus={(s) => run(() => setPartStatus(p.id, s))} onSavePatch={(patch) => run(() => updatePart({ id: p.id, ...patch }))} onEdit={() => setEditId(p.id)} onDelete={() => run(() => deletePart(p.id))} />
                 )}
               </div>
             </div>
@@ -90,9 +91,10 @@ export default function PartsPanel() {
   )
 }
 
-function PartRow({ p, pending, onStatus, onSaveInquiry, onEdit, onDelete }: { p: any; pending: boolean; onStatus: (s: string) => void; onSaveInquiry: (note: string) => void; onEdit: () => void; onDelete: () => void }) {
+function PartRow({ p, pending, onStatus, onSavePatch, onEdit, onDelete }: { p: any; pending: boolean; onStatus: (s: string) => void; onSavePatch: (patch: any) => void; onEdit: () => void; onDelete: () => void }) {
   const [inq, setInq] = useState(p.inquiry_note || '')
-  const dirty = inq !== (p.inquiry_note || '')
+  const [web, setWeb] = useState(p.website_url || '')
+  const dirty = inq !== (p.inquiry_note || '') || web !== (p.website_url || '')
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
       <div className="flex items-start justify-between gap-2 mb-1">
@@ -105,7 +107,9 @@ function PartRow({ p, pending, onStatus, onSaveInquiry, onEdit, onDelete }: { p:
           </div>
           {p.fitment_note && <div className="text-[10px] text-[#7c8090] mt-0.5">⚙ {p.fitment_note}</div>}
           <div className="flex gap-3 mt-0.5">
-            {p.website_url && <a href={p.website_url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-300 hover:underline">🔗 เว็บ</a>}
+            {p.website_url
+              ? <a href={p.website_url} target="_blank" rel="noreferrer" className="text-[10px] text-sky-300 hover:underline">🔗 เปิดหน้าสินค้า</a>
+              : <span className="text-[10px] text-[#5b6070]">🔗 ยังไม่ได้ใส่ URL เว็บ</span>}
             {p.social_url && <a href={p.social_url} target="_blank" rel="noreferrer" className="text-[10px] text-[#9ba0b0] hover:underline">↗ โพสต์</a>}
           </div>
         </div>
@@ -113,9 +117,10 @@ function PartRow({ p, pending, onStatus, onSaveInquiry, onEdit, onDelete }: { p:
           {PSTATUS.map((s) => <option key={s.key} value={s.key} className="bg-[#15172A] text-white">{s.label}</option>)}
         </select>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+        <input value={web} onChange={(e) => setWeb(e.target.value)} placeholder="URL เว็บสินค้า (วางลิงก์หน้าสินค้า)" className="flex-1 min-w-[160px] text-[11px] bg-white/5 border border-white/10 rounded px-2 py-0.5 text-white placeholder-[#6b6f80] focus:border-[#C9A961] focus:outline-none" />
         <input value={inq} onChange={(e) => setInq(e.target.value)} placeholder="โน้ตลูกค้าถาม / ติดตาม" className="flex-1 min-w-[140px] text-[11px] bg-white/5 border border-white/10 rounded px-2 py-0.5 text-white placeholder-[#6b6f80] focus:border-[#C9A961] focus:outline-none" />
-        <button disabled={pending || !dirty} onClick={() => onSaveInquiry(inq)} className="text-[10px] font-semibold px-2.5 py-1 rounded bg-[#C9A961] hover:bg-[#D8B872] disabled:opacity-40 text-[#1C1D2C]">บันทึก</button>
+        <button disabled={pending || !dirty} onClick={() => onSavePatch({ website_url: web, inquiry_note: inq })} className="text-[10px] font-semibold px-2.5 py-1 rounded bg-[#C9A961] hover:bg-[#D8B872] disabled:opacity-40 text-[#1C1D2C]">บันทึก</button>
         <button onClick={onEdit} className="text-[10px] text-[#7c8090] hover:text-[#C9A961] px-1">แก้</button>
         <button onClick={() => { if (confirm('ลบสินค้านี้?')) onDelete() }} className="text-[10px] text-[#7c8090] hover:text-red-400 px-1">ลบ</button>
       </div>
@@ -130,24 +135,4 @@ function PartEdit({ p, onCancel, onSave }: { p: any; onCancel: () => void; onSav
     website_url: p.website_url || '', social_url: p.social_url || '', fitment_note: p.fitment_note || '',
   })
   const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }))
-  const inp = 'text-xs bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white placeholder-[#6b6f80] focus:border-[#C9A961] focus:outline-none'
-  return (
-    <div className="rounded-lg border border-[#C9A961]/40 bg-white/[0.04] p-3 space-y-2">
-      <input value={f.title} onChange={(e) => set('title', e.target.value)} placeholder="ชื่อสินค้า" className={`w-full ${inp}`} />
-      <div className="grid grid-cols-2 gap-2">
-        <input value={f.model} onChange={(e) => set('model', e.target.value)} placeholder="รุ่น" className={inp} />
-        <input value={f.sku} onChange={(e) => set('sku', e.target.value)} placeholder="SKU / OEM" className={inp} />
-        <input value={f.condition} onChange={(e) => set('condition', e.target.value)} placeholder="สภาพ" className={`col-span-2 ${inp}`} />
-        <input value={f.price} onChange={(e) => set('price', e.target.value.replace(/[^0-9]/g, ''))} placeholder="ราคา" inputMode="numeric" className={inp} />
-        <input value={f.stock} onChange={(e) => set('stock', e.target.value.replace(/[^0-9]/g, ''))} placeholder="จำนวน" inputMode="numeric" className={inp} />
-        <input value={f.website_url} onChange={(e) => set('website_url', e.target.value)} placeholder="URL เว็บ" className={`col-span-2 ${inp}`} />
-        <input value={f.social_url} onChange={(e) => set('social_url', e.target.value)} placeholder="URL โพสต์ social" className={`col-span-2 ${inp}`} />
-        <input value={f.fitment_note} onChange={(e) => set('fitment_note', e.target.value)} placeholder="fitment note (ความเข้ากันได้)" className={`col-span-2 ${inp}`} />
-      </div>
-      <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="text-xs text-[#7c8090] hover:text-white px-2 py-1">ยกเลิก</button>
-        <button onClick={() => { if (f.title.trim()) onSave(f) }} className="bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] text-xs font-semibold px-3 py-1 rounded">บันทึก</button>
-      </div>
-    </div>
-  )
-}
+  const inp = 'text-xs bg-white/5 border border-white/10 rounded px-2 py-1.5 text-white placeholder-[#6b6f80] focus:border-[#C9A961]
