@@ -1,6 +1,7 @@
 'use client'
 // app/ops-x7k2m9/brief/SalesPanel.tsx
 // Phase B — eBook leads + orders จริง + ติดตามสถานะการขาย (โหลดข้อมูลเอง)
+// + test data: ซ่อนโดย default, มี badge TEST, ไม่นับใน revenue
 import { useEffect, useState, useTransition } from 'react'
 import { loadSales, setSaleStatus, type SalesData } from './actions-sales'
 
@@ -19,6 +20,7 @@ const fmt = (d: string) => { try { return new Date(d).toLocaleDateString('th-TH'
 export default function SalesPanel() {
   const [data, setData] = useState<SalesData | null>(null)
   const [pending, startTransition] = useTransition()
+  const [showTest, setShowTest] = useState(false)
 
   function apply(res: SalesData) {
     if (res.ok) setData(res)
@@ -29,22 +31,33 @@ export default function SalesPanel() {
   const save = (ref_type: string, ref_id: string, patch: { status: string; amount: any; note: string }) =>
     startTransition(async () => apply(await setSaleStatus({ ref_type, ref_id, ...patch })))
 
-  const leads = data?.leads ?? []
-  const orders = data?.orders ?? []
+  const allLeads = data?.leads ?? []
+  const allOrders = data?.orders ?? []
+  const leads = allLeads.filter((l) => showTest || !l.is_test)
+  const orders = allOrders.filter((o) => showTest || !o.is_test)
+  const testCount = allLeads.filter((l) => l.is_test).length + allOrders.filter((o) => o.is_test).length
   const rev = data?.revenue
 
   return (
     <section className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-white flex items-center gap-2"><span>💰</span>eBook Leads & Orders (ข้อมูลจริง)</h2>
-        <span className="text-[11px] text-[#7c8090]">{pending ? 'กำลังโหลด…' : `lead ${leads.length} · order ${orders.length}`}</span>
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+        <h2 className="text-sm font-semibold text-white flex items-center gap-2"><span>💰</span>eBook Leads &amp; Orders (ข้อมูลจริง)</h2>
+        <div className="flex items-center gap-3">
+          {testCount > 0 && (
+            <label className="flex items-center gap-1.5 text-[11px] text-[#9ba0b0] cursor-pointer select-none">
+              <input type="checkbox" checked={showTest} onChange={(e) => setShowTest(e.target.checked)} className="accent-[#C9A961]" />
+              แสดง test ({testCount})
+            </label>
+          )}
+          <span className="text-[11px] text-[#7c8090]">{pending ? 'กำลังโหลด…' : `lead ${leads.length} · order ${orders.length}`}</span>
+        </div>
       </div>
 
-      {/* สรุปรายได้ eBook */}
+      {/* สรุปรายได้ eBook (ไม่รวม test) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
         <div className="bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2">
           <div className="text-lg font-semibold text-[#E7C977]">฿{baht(rev?.total || 0)}</div>
-          <div className="text-[10px] text-[#7c8090]">รายได้ eBook (ชำระแล้ว)</div>
+          <div className="text-[10px] text-[#7c8090]">รายได้ eBook (ชำระแล้ว · ไม่รวม test)</div>
         </div>
         <div className="bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2">
           <div className="text-lg font-semibold text-emerald-300">{rev?.paidCount || 0}</div>
@@ -52,7 +65,7 @@ export default function SalesPanel() {
         </div>
         <div className="bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2">
           <div className="text-lg font-semibold text-[#E7E3D8]">{leads.length}</div>
-          <div className="text-[10px] text-[#7c8090]">eBook leads ทั้งหมด</div>
+          <div className="text-[10px] text-[#7c8090]">eBook leads {showTest ? 'ทั้งหมด' : '(จริง)'}</div>
         </div>
       </div>
 
@@ -80,10 +93,13 @@ function SaleRow({ r, pending, onSave, amountHint }: { r: any; pending: boolean;
   const dirty = status !== r.status || (amount === '' ? r.amount != null : Number(amount) !== r.amount) || note !== (r.note || '')
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+    <div className={`rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 ${r.is_test ? 'opacity-70' : ''}`}>
       <div className="flex items-start justify-between gap-2 mb-1">
         <div className="min-w-0">
-          <div className="text-sm text-[#E7E3D8] truncate">{r.title} <span className="text-[11px] text-[#7c8090]">· {r.contact}</span></div>
+          <div className="text-sm text-[#E7E3D8] truncate">
+            {r.is_test && <span className="text-[9px] font-bold tracking-wide mr-1.5 px-1.5 py-0.5 rounded bg-red-500/15 text-red-300 border border-red-400/30 align-middle">TEST</span>}
+            {r.title} <span className="text-[11px] text-[#7c8090]">· {r.contact}</span>
+          </div>
           {r.detail && <div className="text-[11px] text-[#8a8f9f] mt-0.5 line-clamp-2">{r.detail}</div>}
         </div>
         <span className="text-[10px] text-[#5b6070] shrink-0">{fmt(r.created_at)}</span>
