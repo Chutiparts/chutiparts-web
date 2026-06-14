@@ -6,7 +6,7 @@ import {
   createItem, updateItem, setItemStatus, archiveItem, deleteItem,
   addDecision, archiveDecision, deleteDecision, exportMarkdown, logout,
 } from './actions'
-import SalesPanel from './SalesPanel'
+import SalesPanel from './SalesPanel'; import SocialPanel from './SocialPanel'
 
 type OpsData = { ok: boolean; items?: any[]; decisions?: any[]; error?: string }
 type Item ={ id: string; module: string; title: string; detail: string | null; status: string; priority: string; archived: boolean; updated_at?: string }
@@ -141,7 +141,7 @@ export default function OpsBriefClient({ initialItems, initialDecisions }: { ini
         </div>
 
         {/* Phase B — ข้อมูลจริง: eBook leads + orders */}
-        <SalesPanel />
+        <SalesPanel /><SocialPanel />
 
         <p className="text-[11px] text-[#5b6070] text-center mt-6">OpsBrief Private · ใช้ภายในเท่านั้น · ข้อมูลเก็บบน Supabase</p>
       </div>
