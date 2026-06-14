@@ -1,6 +1,7 @@
 'use server'
 // app/ops-x7k2m9/brief/actions-sales.ts
 // Phase B — อ่าน ebook leads + orders จริง + overlay สถานะติดตาม (ops_sales_status)
+// + ตรวจจับ test data (test/ทดสอบ) → ติดธง is_test, ไม่นับใน revenue
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
@@ -19,6 +20,10 @@ async function authed(): Promise<boolean> {
 
 const STATUSES = ['new', 'contacted', 'waiting_payment', 'paid', 'file_sent', 'follow_up']
 const clip = (v: unknown, n: number) => (typeof v === 'string' ? v.trim().slice(0, n) : '')
+
+// test data = ฟิลด์ใดมีคำว่า test หรือ ทดสอบ
+const TEST_RE = /test|ทดสอบ/i
+const looksTest = (...vals: any[]) => TEST_RE.test(vals.filter(Boolean).join(' '))
 
 export type SalesData = {
   ok: boolean
@@ -51,6 +56,7 @@ async function fetchSales(): Promise<SalesData> {
       status: st?.status || 'new',
       amount: st?.amount ?? null,
       note: st?.note ?? null,
+      is_test: looksTest(l.name, l.phone, l.line_id, l.detail),
     }
   })
 
@@ -69,11 +75,12 @@ async function fetchSales(): Promise<SalesData> {
       status: st?.status || 'new',
       amount: st?.amount ?? o.subtotal ?? null,
       note: st?.note ?? null,
+      is_test: looksTest(o.customer_name, o.customer_contact, summary),
     }
   })
 
-  // รายได้ eBook เบื้องต้น = ผลรวม amount ของ lead ที่ paid/file_sent
-  const paid = leads.filter((l) => l.status === 'paid' || l.status === 'file_sent')
+  // รายได้ eBook = ผลรวม amount ของ lead ที่ paid/file_sent (ไม่รวม test)
+  const paid = leads.filter((l) => !l.is_test && (l.status === 'paid' || l.status === 'file_sent'))
   const total = paid.reduce((s, l) => s + (Number(l.amount) || 0), 0)
 
   return { ok: true, leads, orders, revenue: { paidCount: paid.length, total } }
