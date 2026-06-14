@@ -139,7 +139,7 @@ export default function OpsBriefClient({ initialItems, initialDecisions }: { ini
           />
         </div>
 
-        <p className="text-[11px] text-[#5b6070] text-center mt-6">OpsBrief Private · ใช้ภายในเท่านั้น · ข้อมูลเก็บบน Supabase</p>
+        <SalesPanel /><p className="text-[11px] text-[#5b6070] text-center mt-6">OpsBrief Private · ใช้ภายในเท่านั้น · ข้อมูลเก็บบน Supabase</p>
       </div>
     </div>
   )
