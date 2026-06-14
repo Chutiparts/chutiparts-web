@@ -219,7 +219,7 @@ function ItemRow({
       <div className="flex items-start gap-2">
         <span className="mt-1.5 h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: PRIO_DOT[item.priority] }} title={`สำคัญ: ${PRIO_LABEL[item.priority]}`} />
         <div className="flex-1 min-w-0">
-          <div className={`text-sm text-[#E7E3D8] ${item.status === 'done' ? 'line-through text-[#7c8090]' : ''}`}>{item.title}</div>
+          <div className={`text-sm text-[#E7E3D8] ${item.status === 'done' ? 'text-[#7c8090]' : ''}`}>{item.title}</div>
           {item.detail && <div className="text-[11px] text-[#8a8f9f] mt-0.5 leading-snug">{item.detail}</div>}
           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
             <select
