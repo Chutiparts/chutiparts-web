@@ -5,7 +5,8 @@ import { useMemo, useState, useTransition } from 'react'
 import {
   createItem, updateItem, setItemStatus, archiveItem, deleteItem,
   addDecision, archiveDecision, deleteDecision, exportMarkdown, logout,
-} from './actions'; import SalesPanel from './SalesPanel'; import SalesPanel from './SalesPanel'
+} from './actions'
+import SalesPanel from './SalesPanel'
 
 type OpsData = { ok: boolean; items?: any[]; decisions?: any[]; error?: string }
 type Item ={ id: string; module: string; title: string; detail: string | null; status: string; priority: string; archived: boolean; updated_at?: string }
@@ -139,7 +140,10 @@ export default function OpsBriefClient({ initialItems, initialDecisions }: { ini
           />
         </div>
 
-        <SalesPanel /><p className="text-[11px] text-[#5b6070] text-center mt-6">OpsBrief Private · ใช้ภายในเท่านั้น · ข้อมูลเก็บบน Supabase</p>
+        {/* Phase B — ข้อมูลจริง: eBook leads + orders */}
+        <SalesPanel />
+
+        <p className="text-[11px] text-[#5b6070] text-center mt-6">OpsBrief Private · ใช้ภายในเท่านั้น · ข้อมูลเก็บบน Supabase</p>
       </div>
     </div>
   )
@@ -219,6 +223,7 @@ function ItemRow({
       <div className="flex items-start gap-2">
         <span className="mt-1.5 h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: PRIO_DOT[item.priority] }} title={`สำคัญ: ${PRIO_LABEL[item.priority]}`} />
         <div className="flex-1 min-w-0">
+          {/* ไม่ใช้ line-through เพราะเส้นตัดผ่านสระ/วรรณยุกต์ไทยทำให้อ่านยาก — ใช้ทำสีจางแทน */}
           <div className={`text-sm text-[#E7E3D8] ${item.status === 'done' ? 'text-[#7c8090]' : ''}`}>{item.title}</div>
           {item.detail && <div className="text-[11px] text-[#8a8f9f] mt-0.5 leading-snug">{item.detail}</div>}
           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
