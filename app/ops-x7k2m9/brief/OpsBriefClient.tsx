@@ -5,7 +5,7 @@ import { useMemo, useState, useTransition } from 'react'
 import {
   createItem, updateItem, setItemStatus, archiveItem, deleteItem,
   addDecision, archiveDecision, deleteDecision, exportMarkdown, logout,
-} from './actions'
+} from './actions'; import SalesPanel from './SalesPanel'; import SalesPanel from './SalesPanel'
 
 type OpsData = { ok: boolean; items?: any[]; decisions?: any[]; error?: string }
 type Item ={ id: string; module: string; title: string; detail: string | null; status: string; priority: string; archived: boolean; updated_at?: string }
