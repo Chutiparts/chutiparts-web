@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { CHASSIS_MODELS, LINE_OA_URL } from '@/lib/constants'
 import EbookCard from './components/EbookCard'
+import HomePremiumParts from './components/HomePremiumParts'
 
 export const revalidate = 300
 
@@ -225,7 +226,7 @@ export default async function HomePage() {
           </div>
         </section>
       )}
-
+      <HomePremiumParts />
       {/* CTA BANNER — dark premium */}
       <section className="container mx-auto px-4 py-12 max-w-7xl">
         <div className="bg-[#1C1D2C] text-[#F2EDE0] p-8 md:p-12 text-center">
