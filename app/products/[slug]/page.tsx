@@ -1,7 +1,9 @@
-// app/products/[slug]/page.tsx — Phase 1 Product Detail Page (หน้าขายจริง)
-// 2026-06-13: โครง 11 ส่วน — gallery, OEM/SKU/alt, รุ่นรถ, รหัสเครื่อง, checklist, CTA, trust, JSON-LD
+// app/products/[slug]/page.tsx — Product Detail Page (หน้าขายจริง)
+// Phase 2 (2026-06-15): เติมเฉพาะจุดจาก Phase 1 — ไม่รื้อโครงเดิม
+//   (A) OG/Twitter image รองรับ image_urls (สินค้าแกลเลอรี) + twitter card ชัด
+//   (B) ข้อความ "กรุณาสอบถามสถานะสินค้าก่อนตัดสินใจ" เด่นเหนือปุ่มติดต่อ
+//   (C) Trust strip 4 ช่อง: ตรวจสภาพ · สอบถามสถานะ · จัดส่ง/นัดรับ · ติดต่อเร็ว
 // defensive ต่อ field ใหม่ (image_urls, engine_codes, oem_verified, warranty_days, fitment_note, side)
-//   → ทำงานได้แม้ยังไม่เพิ่มคอลัมน์ (ฟีเจอร์ใหม่จะ "ติด" เมื่อมีคอลัมน์ + ข้อมูล)
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -33,6 +35,13 @@ async function getProductBySlug(slug: string) {
   return product
 }
 
+// helper: รวมรูปแบบ defensive (image_urls ก่อน, ไม่งั้น image_url)
+function productImages(product: any): string[] {
+  return Array.isArray(product.image_urls) && product.image_urls.length > 0
+    ? product.image_urls
+    : product.image_url ? [product.image_url] : []
+}
+
 // helper: prefill ข้อความ LINE ด้วยชื่อสินค้า + OEM
 function lineLink(product: any) {
   const oem = product.oem_number ? ` OEM ${product.oem_number}` : ''
@@ -56,6 +65,9 @@ export async function generateMetadata({
     `${product.name} อะไหล่ Mercedes-Benz มือสอง${oem ? ` OEM${oem}` : ''} — ChutiBenz`
   ).slice(0, 160)
   const url = `${SITE_URL}/products/${product.slug}`
+  // (A) รูปสำหรับแชร์ social — รองรับสินค้าที่มีแค่ image_urls (แกลเลอรี)
+  const imgs = productImages(product)
+  const ogImages = imgs.length > 0 ? imgs.slice(0, 4).map((u: string) => ({ url: u })) : undefined
   return {
     title,
     description,
@@ -65,7 +77,13 @@ export async function generateMetadata({
       description,
       url,
       type: 'website',
-      images: product.image_url ? [{ url: product.image_url }] : undefined,
+      images: ogImages,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} | ChutiBenz`,
+      description,
+      images: imgs.length > 0 ? [imgs[0]] : undefined,
     },
   }
 }
@@ -86,10 +104,7 @@ export default async function ProductDetail({
     .neq('id', product.id).limit(3)
 
   // --- derived (defensive) ---
-  const images: string[] =
-    Array.isArray(product.image_urls) && product.image_urls.length > 0
-      ? product.image_urls
-      : product.image_url ? [product.image_url] : []
+  const images: string[] = productImages(product)
   const mainImage = images[0] || null
   const hasPrice = typeof product.price === 'number' && product.price > 0
   const engineCodes: string[] = Array.isArray(product.engine_codes) ? product.engine_codes : []
@@ -148,7 +163,10 @@ export default async function ProductDetail({
                 {mainImage ? (
                   <img src={mainImage} alt={product.image_alt || product.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400"><span className="text-9xl">🚗</span></div>
+                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                    <span className="text-8xl">🚗</span>
+                    <span className="text-xs mt-2">รูปสินค้ากำลังจัดเตรียม · สอบถามรูปจริงทาง LINE</span>
+                  </div>
                 )}
                 {typeof product.stock === 'number' && product.stock <= 1 && product.stock > 0 && (
                   <span className="absolute top-4 right-4 px-3 py-1.5 bg-red-500 text-white text-sm font-bold rounded">เหลือชิ้นสุดท้าย!</span>
@@ -256,6 +274,11 @@ export default async function ProductDetail({
               {/* Add to Cart */}
               {hasPrice && <div className="mb-6"><AddToCartButton product={product} /></div>}
 
+              {/* (B) แจ้งสอบถามสถานะก่อนตัดสินใจ — เด่นเหนือปุ่มติดต่อ */}
+              <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-sm text-amber-900">
+                <span className="font-semibold">⚠️ กรุณาสอบถามสถานะสินค้าก่อนตัดสินใจ</span> — สินค้ามือสอง/ของหายาก มีจำนวนจำกัด อาจถูกจองหรือขายไปก่อน ทักไลน์เช็คสถานะล่าสุดได้เลยครับ
+              </div>
+
               {/* (8) CTA */}
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <a href={lineLink(product)} target="_blank" rel="noopener noreferrer"
@@ -275,11 +298,12 @@ export default async function ProductDetail({
                 </div>
               )}
 
-              {/* (9) Trust strip — ข้อความกลาง + badge เงื่อนไข */}
-              <div className="grid grid-cols-3 gap-2 text-center text-xs text-gray-600">
+              {/* (9) Trust strip — 4 ช่อง (ตรวจสภาพ · สอบถามสถานะ · จัดส่ง/นัดรับ · ติดต่อเร็ว) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs text-gray-600">
                 <div className="p-2"><p className="text-2xl mb-1">🔍</p><p>ตรวจสภาพก่อนส่ง</p></div>
-                <div className="p-2"><p className="text-2xl mb-1">📋</p><p>แจ้งเงื่อนไขก่อนชำระ</p></div>
-                <div className="p-2"><p className="text-2xl mb-1">💬</p><p>ติดต่อกลับโดยเร็ว</p></div>
+                <div className="p-2"><p className="text-2xl mb-1">💬</p><p>สอบถามสถานะก่อนซื้อ</p></div>
+                <div className="p-2"><p className="text-2xl mb-1">🚚</p><p>จัดส่งทั่วไทย / นัดรับได้</p></div>
+                <div className="p-2"><p className="text-2xl mb-1">⚡</p><p>ติดต่อกลับโดยเร็ว</p></div>
               </div>
               {product.oem_verified === true && (
                 <div className="mt-3 text-center">
