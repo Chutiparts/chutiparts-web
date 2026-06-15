@@ -1,5 +1,5 @@
 // app/ops-x7k2m9/brief/backup/route.ts
-// OpsBrief Private — backup endpoint (อ่านอย่างเดียว) คืน Markdown เป็น text/plain
+// OpsBrief Private — backup endpoint (อ่านอย่างเดียว) คืน Markdown ห่อใน HTML
 // ใช้โดย scheduled task ผ่าน web_fetch (GET เท่านั้น แนบ header ไม่ได้ จึงใช้ token ใน query)
 // ป้องกันด้วย env OPS_BACKUP_TOKEN — fail-closed ถ้าไม่ตั้ง env
 import { NextResponse, type NextRequest } from 'next/server'
@@ -59,7 +59,10 @@ export async function GET(req: NextRequest) {
       return new NextResponse('# OpsBrief backup error\nfetch_failed', { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
     }
     const md = buildMarkdown(it.data ?? [], dc.data ?? [])
-    return new NextResponse(md, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    // ห่อใน HTML doc จริง + <pre> เพื่อให้ web_fetch (scheduled backup) ดึงเนื้อหาได้
+    const esc = md.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>OpsBrief Backup</title></head><body><pre>${esc}</pre></body></html>`
+    return new NextResponse(html, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
   } catch (e) {
     return new NextResponse(`# OpsBrief backup error\n${(e as Error)?.message || 'unknown'}`, { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
   }
