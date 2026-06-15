@@ -10,6 +10,7 @@ import { useCart } from '@/app/context/CartContext'
 
 const NAV_ITEMS = [
   { href: '/', label: 'หน้าแรก' },
+  { href: '/about', label: 'เรื่องราวของเรา' },
   { href: '/vin-check', label: '🆔 VIN Check ฟรี' },
   { href: '/search', label: '🔍 ค้นหา' },
   { href: '/articles', label: '📖 บทความ' },
