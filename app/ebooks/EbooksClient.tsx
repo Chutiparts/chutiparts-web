@@ -1,6 +1,7 @@
 'use client'
 // app/ebooks/EbooksClient.tsx — หน้า eBook (Lite ฟรี + Full/Bundle สั่งซื้อ manual)
 // ส่ง order เข้า /api/leads (topic='ebook') → แจ้ง LINE อัตโนมัติ · ไม่มี auto-download Full
+// v2 (2026-06-15): copy fix เฉพาะจุด — (1) ปุ่มระบุรุ่นชัด (2) checkbox ยินยอมเด่นขึ้น
 import { useState } from 'react'
 
 const LITE = [
@@ -9,9 +10,9 @@ const LITE = [
 ]
 
 const PAID = [
-  { id: 'w202-full', label: 'W202 ฉบับเต็ม (Full)', price: 199, desc: 'เนื้อหาครบทุกบท + เจาะลึกการเลือกซื้อ/ดูอาการ W202' },
-  { id: 'w210-full', label: 'W210 ฉบับเต็ม (Full)', price: 199, desc: 'เนื้อหาครบทุกบท + เจาะลึกการเลือกซื้อ/ดูอาการ W210' },
-  { id: 'bundle', label: 'Bundle W202 + W210 (Full ทั้ง 2 เล่ม)', price: 349, desc: 'คุ้มสุด — ได้ทั้ง W202 + W210 ฉบับเต็ม ประหยัด 49 บาท' },
+  { id: 'w202-full', label: 'W202 ฉบับเต็ม (Full)', cta: 'สั่งซื้อ Full W202', price: 199, desc: 'เนื้อหาครบทุกบท + เจาะลึกการเลือกซื้อ/ดูอาการ W202' },
+  { id: 'w210-full', label: 'W210 ฉบับเต็ม (Full)', cta: 'สั่งซื้อ Full W210', price: 199, desc: 'เนื้อหาครบทุกบท + เจาะลึกการเลือกซื้อ/ดูอาการ W210' },
+  { id: 'bundle', label: 'Bundle W202 + W210 (Full ทั้ง 2 เล่ม)', cta: 'สั่งซื้อ Bundle', price: 349, desc: 'คุ้มสุด — ได้ทั้ง W202 + W210 ฉบับเต็ม ประหยัด 49 บาท' },
 ]
 
 function detectSource(): string {
@@ -61,7 +62,7 @@ export default function EbooksClient() {
   const submit = async () => {
     setErr('')
     if (!phone.trim() && !lineId.trim()) { setErr('กรุณากรอกเบอร์โทร หรือ LINE อย่างน้อย 1 ช่อง'); return }
-    if (!consent) { setErr('กรุณายืนยันให้ทีมงานติดต่อกลับก่อนส่ง'); return }
+    if (!consent) { setErr('กรุณาติ๊ก “ยินยอมให้ทีมงานติดต่อกลับ” ก่อนกดส่ง'); return }
     const picked = PAID.find((p) => p.id === item)
     setSubmitting(true)
     try {
@@ -150,7 +151,7 @@ export default function EbooksClient() {
                 <p className="text-2xl font-bold text-[#C9A961] mt-3">฿{p.price}</p>
                 <button onClick={() => pickAndScroll(p.id)}
                   className="mt-3 bg-[#1C1D2C] hover:bg-[#2E303F] text-white font-medium rounded-lg px-4 py-2.5 text-sm">
-                  สั่งซื้อ {p.id === 'bundle' ? 'Bundle' : 'Full'}
+                  {p.cta}
                 </button>
               </div>
             ))}
@@ -182,14 +183,15 @@ export default function EbooksClient() {
             {['W202', 'W210', 'W202 + W210', 'อื่นๆ'].map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" className={`${inputCls} resize-none`} />
-          <label className="flex items-start gap-2 text-xs text-gray-600 cursor-pointer">
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 accent-[#C9A961]" />
-            <span>ยินยอมให้ทีมงานติดต่อกลับเพื่อยืนยันคำสั่งซื้อและจัดส่งไฟล์</span>
+          {/* consent — เน้นให้เด่น (กล่องไฮไลต์ + ขอบเปลี่ยนสีเมื่อยังไม่ติ๊ก) */}
+          <label className={`flex items-start gap-3 text-sm rounded-lg border p-3 cursor-pointer transition-colors ${consent ? 'border-[#C9A961] bg-[#FBF7EC] text-gray-800' : 'border-amber-300 bg-amber-50 text-gray-800'}`}>
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[#C9A961] shrink-0" />
+            <span><span className="font-semibold">ยินยอมให้ทีมงานติดต่อกลับ</span> เพื่อยืนยันคำสั่งซื้อและจัดส่งไฟล์ <span className="text-red-500">*</span></span>
           </label>
           <div className="absolute left-[-9999px] w-px h-px overflow-hidden" aria-hidden="true">
             <input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} name="website" />
           </div>
-          {err && <p className="text-sm text-red-600">{err}</p>}
+          {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
           <button onClick={submit} disabled={submitting}
             className="w-full bg-[#C9A961] hover:bg-[#D8B872] disabled:opacity-60 text-[#1C1D2C] font-bold rounded-lg px-4 py-3.5 text-base">
             {submitting ? 'กำลังส่ง…' : 'ส่งคำสั่งซื้อ'}
