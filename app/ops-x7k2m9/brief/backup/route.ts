@@ -56,11 +56,11 @@ export async function GET(req: NextRequest) {
       supa.from('ops_decisions').select('*').order('decided_on', { ascending: false }),
     ])
     if (it.error || dc.error) {
-      return new NextResponse('# OpsBrief backup error\nfetch_failed', { status: 500, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+      return new NextResponse('# OpsBrief backup error\nfetch_failed', { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
     }
     const md = buildMarkdown(it.data ?? [], dc.data ?? [])
-    return new NextResponse(md, { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    return new NextResponse(md, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
   } catch (e) {
-    return new NextResponse(`# OpsBrief backup error\n${(e as Error)?.message || 'unknown'}`, { status: 500, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    return new NextResponse(`# OpsBrief backup error\n${(e as Error)?.message || 'unknown'}`, { status: 500, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
   }
 }
