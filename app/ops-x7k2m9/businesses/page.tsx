@@ -5,6 +5,7 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
+import { SubmitButton } from './SubmitButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,7 @@ async function approve(formData: FormData) {
   const supa = svc()
   const { data: sub } = await supa.from('business_submissions').select('*').eq('id', id).single()
   if (!sub) return
+  if (sub.status !== 'pending') return  // กันกดซ้ำ/กดย้อน — อนุมัติได้ครั้งเดียว ป้องกัน insert ซ้ำ
   // copy ขึ้น businesses (verified=false — Joey ค่อยกด verify ทีหลังถ้าตรวจร้านแล้ว)
   // คอลัมน์ map ตรง schema จริงแล้ว: specialties (งานที่ถนัด), facebook_url (เว็บ/FB)
   const { error: insErr } = await supa.from('businesses').insert({
@@ -118,9 +120,9 @@ export default async function OpsBusinessesPage() {
             </div>
             <div className="flex gap-2 mt-3 border-t border-gray-100 pt-3">
               <form action={approve}><input type="hidden" name="id" value={b.id} />
-                <button className="bg-green-600 text-white text-sm font-medium px-4 py-1.5 rounded">✓ อนุมัติ</button></form>
+                <SubmitButton pendingText="กำลังอนุมัติ…" className="bg-green-600 text-white text-sm font-medium px-4 py-1.5 rounded">✓ อนุมัติ</SubmitButton></form>
               <form action={reject}><input type="hidden" name="id" value={b.id} />
-                <button className="bg-gray-200 text-gray-700 text-sm px-4 py-1.5 rounded">✕ ปฏิเสธ</button></form>
+                <SubmitButton pendingText="กำลังลบ…" className="bg-gray-200 text-gray-700 text-sm px-4 py-1.5 rounded">✕ ปฏิเสธ</SubmitButton></form>
             </div>
           </div>
         ))}
