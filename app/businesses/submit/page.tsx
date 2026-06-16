@@ -61,7 +61,8 @@ export default function BusinessSubmitPage() {
   return (
     <section className="container mx-auto px-4 max-w-xl py-12">
       <h1 className="text-2xl md:text-3xl font-serif font-medium text-gray-900 mb-2">เพิ่มอู่ / ร้านอะไหล่ของคุณ</h1>
-      <p className="text-sm text-gray-500 mb-6">กรอกข้อมูลร้าน — ทีมงานตรวจสอบก่อนขึ้นแสดง · ฟรี ไม่มีค่าใช้จ่าย</p>
+      <p className="text-sm text-gray-500 mb-1">กรอกข้อมูลร้าน — ทีมงานตรวจสอบก่อนขึ้นแสดง · ฟรี ไม่มีค่าใช้จ่าย</p>
+      <p className="text-xs text-gray-400 mb-6">กรอกเท่าที่มีก่อนได้ — หากข้อมูลไม่ครบ ทีมงานจะติดต่อกลับ</p>
 
       <div className="space-y-4">
         <input value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="ชื่ออู่ / ร้าน *" className={inputCls} />
@@ -92,6 +93,7 @@ export default function BusinessSubmitPage() {
         <div>
           <input value={f.google_maps_url} onChange={(e) => set('google_maps_url', e.target.value)} placeholder="📍 ลิงก์ Google Maps (โลเคชั่นร้าน)" className={inputCls} />
           <p className="text-[11px] text-gray-500 mt-1">เปิด Google Maps → หาร้าน → กดแชร์ → ก๊อปลิงก์มาวาง (ช่วยให้ลูกค้านำทางหาคุณได้)</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">ตัวอย่าง: https://maps.app.goo.gl/xxxx</p>
         </div>
 
         <div>
