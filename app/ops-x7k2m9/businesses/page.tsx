@@ -30,13 +30,22 @@ async function approve(formData: FormData) {
   if (!sub) return
   // copy ขึ้น businesses (verified=false — Joey ค่อยกด verify ทีหลังถ้าตรวจร้านแล้ว)
   // คอลัมน์ map ตรง schema จริงแล้ว: specialties (งานที่ถนัด), facebook_url (เว็บ/FB)
-  await supa.from('businesses').insert({
+  const { error: insErr } = await supa.from('businesses').insert({
     slug: toSlug(sub.name), name: sub.name, type: sub.type, province: sub.province,
     address: sub.address, google_maps_url: sub.google_maps_url, lat: sub.lat, lng: sub.lng,
     phone: sub.phone, line_id: sub.line_id, facebook_url: sub.website,
     models_expertise: sub.models_expertise, specialties: sub.services,
     description: sub.description, cover_image: sub.cover_image, verified: false,
   })
+  // ถ้า insert ไม่ผ่าน (เช่นชน constraint / type 'both' ไม่ถูกรับ) — อย่ามาร์ค approved
+  // คาไว้ pending + บันทึกสาเหตุใน reviewed_by_note ให้เห็นว่าทำไมไม่ขึ้น (กันข้อมูลหายเงียบ)
+  if (insErr) {
+    await supa.from('business_submissions')
+      .update({ reviewed_by_note: 'approve_failed: ' + insErr.message, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    revalidatePath('/ops-x7k2m9/businesses')
+    return
+  }
   await supa.from('business_submissions').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', id)
   revalidatePath('/ops-x7k2m9/businesses')
 }
@@ -105,6 +114,7 @@ export default async function OpsBusinessesPage() {
               {b.models_expertise?.length > 0 && <p>🚗 {b.models_expertise.join(', ')}</p>}
               {b.services?.length > 0 && <p>🔧 {b.services.join(', ')}</p>}
               {b.description && <p className="text-gray-600">{b.description}</p>}
+              {b.reviewed_by_note && <p className="text-red-600 text-xs font-medium">⚠️ {b.reviewed_by_note}</p>}
             </div>
             <div className="flex gap-2 mt-3 border-t border-gray-100 pt-3">
               <form action={approve}><input type="hidden" name="id" value={b.id} />
