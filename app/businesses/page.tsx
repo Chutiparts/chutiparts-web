@@ -28,6 +28,12 @@ export default async function BusinessesPage({ searchParams }: { searchParams: {
         <h1 className="text-3xl font-bold mb-2">🔨 อู่ / 🛒 ร้านอะไหล่</h1>
         <p className="text-gray-600">รายชื่ออู่และร้านที่ ChutiBenz แนะนำ</p>
       </header>
+      <div className="flex justify-end mb-4">
+        <a href="/businesses/submit"
+          className="inline-block bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium rounded-lg px-4 py-2 text-sm">
+          ➕ เพิ่มอู่/ร้านของคุณ (ฟรี)
+        </a>
+      </div>
 
       {/* Type tabs */}
       <div className="flex items-center gap-2 mb-6">
@@ -85,6 +91,9 @@ export default async function BusinessesPage({ searchParams }: { searchParams: {
           ))}
         </div>
       )}
+      <p className="text-[11px] text-gray-400 mt-10 border-t border-gray-100 pt-4 leading-relaxed max-w-3xl">
+        ℹ️ ChutiBenz เป็นผู้รวบรวมรายชื่ออู่/ร้านเพื่ออำนวยความสะดวกในการค้นหาเท่านั้น ไม่ได้เป็นเจ้าของ ไม่ได้รับประกันคุณภาพงานหรือความเสียหายที่เกิดจากอู่/ร้าน โปรดตรวจสอบและตกลงเงื่อนไขกับอู่/ร้านโดยตรงก่อนใช้บริการ
+      </p>
     </div>
   )
 }
