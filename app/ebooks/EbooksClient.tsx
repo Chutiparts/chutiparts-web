@@ -1,254 +1,106 @@
-'use client'
-// app/ebooks/EbooksClient.tsx — หน้า eBook · 3 หมวด: Free / Classic Guide / Premium
-// ส่ง order เข้า /api/leads (topic='ebook') → แจ้ง LINE · ไม่มี auto-download (Full/Premium ส่ง manual หลังตรวจยอดโอน)
-// v2 (06-15): copy fix · v3 (06-16): + Premium · v4 (06-17): + Classic Guide 4 เล่ม (W123/W126/W140/W201) + จัด 3 หมวด + status badge
-import { useState } from 'react'
+# Social→Web Content Kit v2 — โพสต์ /ebooks เข้ากลุ่ม FB
+2026-06-17 · หลัก: **value-first · ขายอยู่ปลายทาง ไม่ใช่ต้นทาง** · ทำเหมือน "แบ่งประสบการณ์ให้คนเล่นรถ" ไม่ใช่ขายของ
 
-// ---- Free (LITE ดาวน์โหลดฟรี) ----
-const LITE = [
-  { code: 'W202', label: 'W202 — เบนซ์จิ้มลิ้ม (C-Class)', file: '/ebooks/W202_LITE.pdf' },
-  { code: 'W210', label: 'W210 — ตา 4 รู (E-Class)', file: '/ebooks/W210_LITE.pdf' },
-]
+## โครงโพสต์ (ทุกโพสต์ยึดโครงนี้)
+1. เปิดด้วย **ปัญหาจริง** ที่คนเล่นรถรุ่นนั้นเจอ
+2. ให้ **checklist/ความรู้สั้น ๆ ในโพสต์เลย** (อ่านจบได้ประโยชน์ทันที ไม่ต้องคลิก)
+3. บอกเบา ๆ ว่า **ใครอยากอ่านลึกกว่านี้ มีคู่มือ LITE ฟรี** ที่เว็บ
+4. ลิงก์ + tracking
+5. ❌ ห้าม: "ด่วน!", "เหลือน้อย", "รีบ", "สั่งเลย", อิโมจิเร่งขาย — ปิดท้ายด้วยชวนคุย/แลกเปลี่ยน
 
-// ---- Classic Guide (คู่มือรายรุ่น · สั่งซื้อผ่านฟอร์ม) ----
-// status: 'พร้อมขาย' | 'เปิดจอง' | 'Coming Soon'
-const CLASSIC = [
-  { id: 'w123-full', label: 'W123 — คลาสสิกต้นตำรับ ยุค 70s–80s', price: 199, status: 'พร้อมขาย' },
-  { id: 'w126-full', label: 'W126 — S-Class “เจ้าพ่อเซี่ยงไฮ้”', price: 199, status: 'พร้อมขาย' },
-  { id: 'w140-full', label: 'W140 — S-Class “หัวแตงโม / ปลาวาฬ”', price: 299, status: 'พร้อมขาย' },
-  { id: 'w201-full', label: 'W201 — Baby Benz (190E)', price: 199, status: 'พร้อมขาย' },
-  { id: 'w202-full', label: 'W202 ฉบับเต็ม (Full)', price: 199, status: 'พร้อมขาย', desc: 'เจาะลึกการเลือกซื้อ/ดูอาการ W202' },
-  { id: 'w210-full', label: 'W210 ฉบับเต็ม (Full)', price: 199, status: 'พร้อมขาย', desc: 'เจาะลึกการเลือกซื้อ/ดูอาการ W210' },
-  { id: 'bundle', label: 'Bundle W202 + W210 (Full ทั้ง 2 เล่ม)', price: 349, status: 'พร้อมขาย', best: true, desc: 'คุ้มสุด — ประหยัด 49 บาท' },
-]
+## 🔗 Tracking (ตอนนี้ใช้ได้จริงแล้ว หลัง deploy โค้ดใหม่)
+- รูปแบบ: **`chutibenz.com/ebooks?src=fb_group&campaign=<รุ่น>_guide`**
+- `src=fb_group` → lead tag `source = facebook_group` · `campaign=...` → ติดใน lead detail (เห็นใน Contact Hub/OpsBrief)
+- **แยกได้:** กลุ่มไหน (ตั้ง campaign ต่างกันต่อกลุ่มก็ได้ เช่น `w140_guide_clubA`) / โพสต์ไหน / รุ่นไหน
 
-// ---- Premium / Special Project ----
-const PREMIUM = [
-  { id: 'premium-w124-m119', label: 'W124 M119 V8 Swap', price: 799, desc: 'รายละเอียดฉบับเต็มเร็ว ๆ นี้' },
-  { id: 'premium-genesis-s70', label: 'GENESIS Volume I · S70 AMG', price: 599, desc: 'รายละเอียดฉบับเต็มเร็ว ๆ นี้' },
-]
+| รุ่น | ลิงก์ |
+|---|---|
+| W123 | `chutibenz.com/ebooks?src=fb_group&campaign=w123_guide` |
+| W124 | `chutibenz.com/ebooks?src=fb_group&campaign=w124_guide` |
+| W126 | `chutibenz.com/ebooks?src=fb_group&campaign=w126_guide` |
+| W140 | `chutibenz.com/ebooks?src=fb_group&campaign=w140_guide` |
+| W201 | `chutibenz.com/ebooks?src=fb_group&campaign=w201_guide` |
+| W202 | `chutibenz.com/ebooks?src=fb_group&campaign=w202_guide` |
+| W210 | `chutibenz.com/ebooks?src=fb_group&campaign=w210_guide` |
 
-// รายการที่สั่งซื้อได้ทั้งหมด (Classic + Premium) — ใช้ในฟอร์ม + ตอนสร้าง detail
-const ORDERABLE = [...CLASSIC, ...PREMIUM]
+> กฎกลุ่ม: ถ้ากลุ่มห้ามลิงก์ในโพสต์ → วางลิงก์ใน**คอมเมนต์แรก** · 1 โพสต์/กลุ่ม/รอบ ไม่ถี่
 
-function statusStyle(s: string): string {
-  if (s === 'พร้อมขาย') return 'bg-green-100 text-green-700'
-  if (s === 'เปิดจอง') return 'bg-amber-100 text-amber-700'
-  return 'bg-gray-100 text-gray-500' // Coming Soon
-}
+---
 
-function detectSource(): string {
-  if (typeof window === 'undefined') return 'direct'
-  const p = new URLSearchParams(window.location.search)
-  const utm = (p.get('utm_source') || p.get('src') || '').toLowerCase()
-  if (utm.includes('group')) return 'facebook_group'
-  if (utm.includes('facebook') || utm === 'fb') return 'facebook_page'
-  if (utm.includes('instagram') || utm === 'ig') return 'instagram'
-  if (utm.includes('google')) return 'google'
-  if (utm === 'qr') return 'qr'
-  const r = (typeof document !== 'undefined' ? document.referrer : '').toLowerCase()
-  if (r.includes('facebook')) return 'facebook_page'
-  if (r.includes('instagram')) return 'instagram'
-  if (r.includes('google')) return 'google'
-  return 'direct'
-}
+## 📝 โพสต์ W140 (campaign=w140_guide)
 
-const SUPPORTED_SOURCES = ['facebook_page', 'facebook_group', 'instagram', 'google', 'qr', 'direct']
-function safeSource(): string {
-  const sx = detectSource()
-  return SUPPORTED_SOURCES.includes(sx) ? sx : 'direct'
-}
+> **W140 "ปลาวาฬ" — ของสวยข้างนอก ไม่ได้แปลว่าดีข้างใน** 🐋
+>
+> เห็นหลายคันสีสวยเบาะเนียน แต่จุดที่กินเงินจริงมันซ่อนอยู่ ใครกำลังตามรถอยู่ ลองเช็ค 4 จุดนี้ก่อนวางเงิน:
+> ▸ **ระบบไฮดรอลิก** ฝากระโปรง/ซันรูฟ — รั่วทีซ่อมแพง
+> ▸ **คอมแอร์ + ตู้เย็นหลัง** — ของหายาก เปลี่ยนทีหนัก
+> ▸ **สายไฟชุดเครื่อง (wiring harness)** รุ่นต้น ฉนวนกรอบ/ละลาย — ต้นเหตุไฟรวน
+> ▸ **สนิม** ขอบกระจก/ซุ้มล้อ/ใต้แบต
+>
+> ผมเล่นรุ่นนี้มานาน เลยสรุปจุดต้องดู + วิธีเช็คไว้ใน **คู่มือ W140 ฉบับ LITE โหลดฟรี** เผื่อใครจะได้ไม่โดนของผุข้างใน
+> 👉 chutibenz.com/ebooks?src=fb_group&campaign=w140_guide
+>
+> ใครเจออาการแปลก ๆ คันที่เล็งอยู่ คอมเมนต์มาได้ครับ เดี๋ยวช่วยดูให้ 🙏
 
-export default function EbooksClient() {
-  const [item, setItem] = useState('bundle')
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [lineId, setLineId] = useState('')
-  const [modelInterest, setModelInterest] = useState('')
-  const [note, setNote] = useState('')
-  const [consent, setConsent] = useState(false)
-  const [website, setWebsite] = useState('') // honeypot
-  const [submitting, setSubmitting] = useState(false)
-  const [err, setErr] = useState('')
-  const [done, setDone] = useState(false)
-  const [ref, setRef] = useState('')
+---
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-3 text-base focus:border-[#C9A961] focus:outline-none'
+## 📝 โพสต์ W124 (campaign=w124_guide)
 
-  const pickAndScroll = (id: string) => {
-    setItem(id)
-    document.getElementById('order')?.scrollIntoView({ behavior: 'smooth' })
-  }
+> **W124 "รถถังเยอรมัน" — แกร่งจริง แต่ตอนนี้อายุ 30+ ปีแล้ว** 🛡️
+>
+> รถดีแค่ไหน อายุขนาดนี้ก็มีจุดต้องดู ก่อนซื้อลองไล่ 4 ข้อนี้:
+> ▸ **สนิม** ซุ้มล้อ · ขอบกระจก · จุดแม่แรง · ใต้แบต (เจอแล้วลามเงียบ)
+> ▸ **เครื่อง M104** ปะเก็นฝาสูบ + โซ่ราวลิ้น (ฟังเสียงตอนสตาร์ทเย็น)
+> ▸ **สายไฟฉนวนกรอบ** (รุ่นปี 92–95) — ไฟโชว์มั่ว เพราะสายเปื่อย
+> ▸ **เซ็นทรัลล็อกระบบสุญญากาศ** ดูดไม่ลง = ปั๊ม/ท่อรั่ว
+>
+> รายละเอียด + วิธีเช็คแต่ละจุด ผมทำไว้ใน **คู่มือ W124 ฉบับ LITE ฟรี**
+> 👉 chutibenz.com/ebooks?src=fb_group&campaign=w124_guide
+>
+> ใครเล่น W124 อยู่ เจอจุดไหนกวนใจ มาเล่าสู่กันฟังครับ
 
-  const submit = async () => {
-    setErr('')
-    if (!phone.trim() && !lineId.trim()) { setErr('กรุณากรอกเบอร์โทร หรือ LINE อย่างน้อย 1 ช่อง'); return }
-    if (!consent) { setErr('กรุณาติ๊ก “ยินยอมให้ทีมงานติดต่อกลับ” ก่อนกดส่ง'); return }
-    const picked = ORDERABLE.find((p) => p.id === item)
-    setSubmitting(true)
-    try {
-      const safeNote = note.trim().slice(0, 500)
-      const detail = `[สั่งซื้อ eBook · หน้า /ebooks] รายการ: ${picked?.label} · ราคา ${picked?.price} บาท · รุ่นที่สนใจ: ${modelInterest || '-'}${safeNote ? ` · หมายเหตุ: ${safeNote}` : ''}`.slice(0, 1000)
-      const r = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          website, topic: 'ebook', name: name.trim().slice(0, 150), phone, line_id: lineId, email: '',
-          car_model: modelInterest, detail, source: safeSource(),
-          referrer: (typeof document !== 'undefined' ? document.referrer : ''), consent: true,
-        }),
-      })
-      const j = await r.json().catch(() => ({}))
-      if (j?.ok) { setRef(j.ref || ''); setDone(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }
-      else setErr('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง หรือทักไลน์เราโดยตรง')
-    } catch {
-      setErr('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง หรือทักไลน์เราโดยตรง')
-    } finally {
-      setSubmitting(false)
-    }
-  }
+---
 
-  if (done) {
-    return (
-      <div className="max-w-xl mx-auto px-4 py-16 text-center">
-        <div className="text-5xl mb-4">✅</div>
-        <h1 className="text-2xl font-serif font-medium text-gray-900 mb-3">ได้รับคำสั่งซื้อแล้ว</h1>
-        <p className="text-gray-700 leading-relaxed">
-          เราได้รับข้อมูลแล้ว ทีมงานจะติดต่อกลับเพื่อแจ้งขั้นตอนรับ eBook ครับ
-        </p>
-        {ref && <p className="text-xs text-gray-400 mt-3">เลขอ้างอิง: {ref}</p>}
-        <a href="https://line.me/R/ti/p/%40440ifncj" target="_blank" rel="noopener noreferrer"
-          className="inline-block mt-6 bg-[#06C755] hover:bg-[#05B04A] text-white rounded-lg px-6 py-3 text-sm font-medium">
-          💬 ทักไลน์เพื่อยืนยันคำสั่งซื้อ
-        </a>
-        <div className="mt-6"><a href="/ebooks" className="text-sm text-[#C9A961] hover:underline">← กลับหน้า eBook</a></div>
-      </div>
-    )
-  }
+## 📝 โพสต์ W202 (campaign=w202_guide)
 
-  return (
-    <>
-      {/* HERO */}
-      <section className="bg-[#1C1D2C] text-[#F2EDE0]">
-        <div className="container mx-auto px-4 max-w-5xl py-12 md:py-16 text-center">
-          <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-3">EBOOKS · MERCEDES-BENZ CLASSIC</p>
-          <h1 className="text-3xl md:text-4xl font-serif font-medium">eBook คู่มือ Mercedes-Benz คลาสสิก</h1>
-          <p className="text-[#B8B3A7] mt-4 max-w-2xl mx-auto">ฉบับ LITE ฟรี · Classic Guide คู่มือรายรุ่น · Premium / Special Project — สั่งซื้อได้เลย</p>
-        </div>
-      </section>
+> **W202 "เบนซ์จิ้มลิ้ม" — C-Class คันแรกที่หลายคนเริ่มจากรุ่นนี้** 🚙
+>
+> ราคาเข้าถึงง่าย แต่มีจุดคลาสสิกที่ต้องรู้ก่อนซื้อ:
+> ▸ **สายไฟชุดเครื่อง (M104/M111) ฉนวนย่อยสลาย** — อาการฮิตที่สุดของรุ่นนี้ ไฟรวน/สตาร์ทยาก
+> ▸ **แอร์** คอมแอร์/แผงร้อน
+> ▸ **สนิม** ขอบล่างประตู
+> ▸ **ภายในพลาสติก** แตกกรอบตามอายุ
+>
+> ใครกำลังเล็งคันแรก อ่าน **คู่มือ W202 ฉบับ LITE ฟรี** ก่อนได้ จะได้ดูเป็น ไม่โดนหลอก
+> 👉 chutibenz.com/ebooks?src=fb_group&campaign=w202_guide
+>
+> มีคำถามรุ่นนี้ ถามได้เลยครับ ผมตอบเท่าที่รู้
 
-      {/* ===== หมวด 1: FREE EBOOK ===== */}
-      <section className="container mx-auto px-4 max-w-5xl py-12">
-        <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">📖 Free eBook — ฉบับ LITE ดาวน์โหลดฟรี</h2>
-        <p className="text-sm text-gray-500 mb-6">อ่านเพื่อประกอบการตัดสินใจ</p>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {LITE.map((b) => (
-            <div key={b.code} className="border border-gray-200 rounded-xl p-5 bg-white">
-              <p className="font-semibold text-gray-900">{b.label}</p>
-              <p className="text-xs text-gray-500 mt-1">ฉบับ LITE · PDF · ฟรี</p>
-              <a href={b.file} target="_blank" rel="noopener noreferrer"
-                className="inline-block mt-4 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium rounded-lg px-5 py-2.5 text-sm">
-                ⬇ ดาวน์โหลด Lite ฟรี
-              </a>
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-gray-500 mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
-          ℹ️ ไฟล์ Lite แจกให้อ่านเพื่อประกอบการตัดสินใจ ห้ามนำไปขายต่อหรือเผยแพร่ซ้ำโดยไม่ได้รับอนุญาต
-        </p>
-      </section>
+---
 
-      {/* ===== หมวด 2: CLASSIC GUIDE ===== */}
-      <section className="bg-gray-50 border-y border-gray-100">
-        <div className="container mx-auto px-4 max-w-5xl py-12">
-          <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">📚 Classic Guide — คู่มือรายรุ่น</h2>
-          <p className="text-sm text-gray-500 mb-6">เนื้อหาฉบับเต็ม · สั่งซื้อแล้วทีมงานจัดส่งไฟล์ให้ (ไม่เปิดดาวน์โหลดสาธารณะ)</p>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {CLASSIC.map((c: any) => (
-              <div key={c.id} className={`rounded-xl p-5 bg-white border ${c.best ? 'border-[#C9A961] ring-1 ring-[#C9A961]' : 'border-gray-200'} flex flex-col`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${statusStyle(c.status)}`}>{c.status}</span>
-                  {c.best && <span className="text-[10px] bg-[#C9A961] text-[#1C1D2C] font-bold px-2 py-0.5 rounded">คุ้มสุด</span>}
-                </div>
-                <p className="font-semibold text-gray-900">{c.label}</p>
-                {c.desc ? <p className="text-xs text-gray-600 mt-1 flex-1">{c.desc}</p> : <div className="flex-1" />}
-                <p className="text-2xl font-bold text-[#C9A961] mt-3">฿{c.price}</p>
-                <button onClick={() => pickAndScroll(c.id)}
-                  className="mt-3 bg-[#1C1D2C] hover:bg-[#2E303F] text-white font-medium rounded-lg px-4 py-2.5 text-sm">
-                  สั่งซื้อ / ขอรายละเอียด
-                </button>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-gray-600 mt-5 bg-amber-50 border border-amber-200 rounded-lg p-3 leading-relaxed">
-            ⚠️ ไฟล์ฉบับเต็มเป็นลิขสิทธิ์ของ Mr.Chuti — สำหรับผู้ซื้อใช้ส่วนตัวเท่านั้น ห้ามนำไปจำหน่ายต่อ แจกจ่าย เผยแพร่ อัปโหลด หรือใช้เชิงพาณิชย์โดยไม่ได้รับอนุญาต
-          </p>
-        </div>
-      </section>
+## 🧩 เทมเพลตเปล่า (รุ่นอื่น เติมเอง — W123/W126/W201/W210)
+```
+[ชื่อเล่นรุ่น] — [ปัญหาจริง 1 ประโยคที่คนรุ่นนี้เจอ]
 
-      {/* ===== หมวด 3: PREMIUM / SPECIAL PROJECT ===== */}
-      <section className="bg-[#1C1D2C] text-[#F2EDE0] border-y border-[#2E303F]">
-        <div className="container mx-auto px-4 max-w-5xl py-12">
-          <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-2">PREMIUM · SPECIAL PROJECT · LIMITED</p>
-          <h2 className="text-2xl font-serif font-medium mb-2">👑 Premium / Special Project</h2>
-          <p className="text-sm text-[#B8B3A7] mb-6">เล่มเฉพาะทาง · สั่งซื้อ/สอบถามผ่านฟอร์ม — ทีมงานจัดส่งไฟล์ให้หลังยืนยันการชำระเงิน</p>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {PREMIUM.map((p) => (
-              <div key={p.id} className="rounded-xl p-5 bg-[#23243A] border border-[#3A3C52] flex flex-col">
-                <span className="text-[10px] bg-[#C9A961] text-[#1C1D2C] font-bold px-2 py-0.5 rounded self-start mb-2">PREMIUM</span>
-                <p className="font-semibold text-[#F2EDE0]">{p.label}</p>
-                <p className="text-xs text-[#B8B3A7] mt-1 flex-1">{p.desc}</p>
-                <p className="text-2xl font-bold text-[#C9A961] mt-3">฿{p.price}</p>
-                <button onClick={() => pickAndScroll(p.id)}
-                  className="mt-3 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-bold rounded-lg px-4 py-2.5 text-sm">
-                  สั่งซื้อ / ขอรายละเอียด
-                </button>
-              </div>
-            ))}
-          </div>
-          <p className="text-[11px] text-[#B8B3A7] mt-5 bg-[#23243A] border border-[#3A3C52] rounded-lg p-3 leading-relaxed">
-            🔒 ไฟล์ Premium ไม่เปิดให้ดาวน์โหลดสาธารณะ — ทีมงานจัดส่งให้เฉพาะหลังยืนยันยอดโอนแล้วเท่านั้น
-          </p>
-        </div>
-      </section>
+ก่อนซื้อลองเช็ค [3–4] จุดนี้:
+▸ [จุด 1]
+▸ [จุด 2]
+▸ [จุด 3]
 
-      {/* ===== ORDER FORM ===== */}
-      <section id="order" className="container mx-auto px-4 max-w-xl py-12 scroll-mt-20">
-        <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">📝 สั่งซื้อ eBook</h2>
-        <p className="text-sm text-gray-500 mb-6">กรอกข้อมูล ทีมงานจะติดต่อกลับเพื่อยืนยันการชำระเงิน + ส่งไฟล์</p>
-        <div className="space-y-3">
-          <label className="block text-xs text-gray-500">รายการที่สั่งซื้อ
-            <select value={item} onChange={(e) => setItem(e.target.value)} className={`${inputCls} mt-1`}>
-              {ORDERABLE.map((p) => <option key={p.id} value={p.id}>{p.label} — ฿{p.price}</option>)}
-            </select>
-          </label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อ" className={inputCls} />
-          <div className="grid grid-cols-2 gap-2">
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="เบอร์โทร (ถ้ามี)" className={inputCls} />
-            <input value={lineId} onChange={(e) => setLineId(e.target.value)} placeholder="LINE ID (ถ้ามี)" className={inputCls} />
-          </div>
-          <p className="text-[11px] text-gray-500 -mt-1">กรอกเบอร์ หรือ LINE อย่างน้อย 1 ช่อง</p>
-          <select value={modelInterest} onChange={(e) => setModelInterest(e.target.value)} className={inputCls}>
-            <option value="">รุ่นที่สนใจ (ถ้ามี)</option>
-            {['W123', 'W126', 'W140', 'W201', 'W202', 'W210', 'W124', 'S70 AMG', 'อื่นๆ'].map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" className={`${inputCls} resize-none`} />
-          {/* consent */}
-          <label className={`flex items-start gap-3 text-sm rounded-lg border p-3 cursor-pointer transition-colors ${consent ? 'border-[#C9A961] bg-[#FBF7EC] text-gray-800' : 'border-amber-300 bg-amber-50 text-gray-800'}`}>
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[#C9A961] shrink-0" />
-            <span><span className="font-semibold">ยินยอมให้ทีมงานติดต่อกลับ</span> เพื่อยืนยันคำสั่งซื้อและจัดส่งไฟล์ <span className="text-red-500">*</span></span>
-          </label>
-          <div className="absolute left-[-9999px] w-px h-px overflow-hidden" aria-hidden="true">
-            <input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} name="website" />
-          </div>
-          {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
-          <button onClick={submit} disabled={submitting}
-            className="w-full bg-[#C9A961] hover:bg-[#D8B872] disabled:opacity-60 text-[#1C1D2C] font-bold rounded-lg px-4 py-3.5 text-base">
-            {submitting ? 'กำลังส่ง…' : 'ส่งคำสั่งซื้อ'}
-          </button>
-          <p className="text-[11px] text-gray-400 text-center">ยังไม่ต้องชำระเงินตอนนี้ — ทีมงานจะติดต่อกลับเพื่อยืนยันยอดและช่องทางโอน</p>
-        </div>
-      </section>
-    </>
-  )
-}
+ผมสรุปไว้ใน คู่มือ [รุ่น] ฉบับ LITE โหลดฟรี เผื่อมีประโยชน์
+👉 chutibenz.com/ebooks?src=fb_group&campaign=[รุ่น]_guide
+
+[ชวนคุย/แลกเปลี่ยน 1 ประโยค ไม่เร่งขาย]
+```
+
+---
+
+## 💬 เทมเพลตตอบคอมเมนต์/อินบ็อกซ์ (ไม่กดดัน)
+- **ถามรุ่น/ขอคู่มือ:** "ได้เลยครับ โหลด LITE ฟรีที่ chutibenz.com/ebooks อ่านแล้วติดตรงไหนทักมาได้ครับ 🙏"
+- **อยากได้เต็ม/ถามราคา:** "ฉบับเต็มมีครับ กรอกในหน้า /ebooks หรือทักไลน์ @mr.chuti5988 เดี๋ยวส่งรายละเอียดให้ครับ" *(ไม่เร่ง)*
+- **ถามอะไหล่:** "ลองค้นที่ chutibenz.com/search ครับ ไม่เจอทักไลน์ส่งรูป+VIN มา เดี๋ยวเช็คให้"
+- **หาอู่:** "ดูรายชื่ออู่ที่ chutibenz.com/businesses ครับ รู้จักอู่ดี ๆ แนะนำเข้ามาได้ ช่วยกันสร้างฐานข้อมูล"
+- **ทักทาย/ขอบคุณ:** "ยินดีครับ เราคนเล่นรถสายเดียวกัน 🙏"
+
+## วัดผล
+ดู lead `source=facebook_group` + `campaign=...` ใน Contact Hub/OpsBrief → กลุ่ม/โพสต์/รุ่นไหน convert ดี → เน้นอันนั้น (ตาม Decision Log: track ช่องทางที่ขายได้)
