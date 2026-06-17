@@ -34,14 +34,16 @@ export default function IntakeFormClient() {
     }
   }, [data])
 
-  // Capture UTM on mount
+  // Capture UTM/campaign on mount
+  // NOTE: ลิงก์โปรโมตของเราใช้ ?campaign=... (param ที่ผ่านมาถึง client เสมอ)
+  // จึงต้องอ่าน campaign/src เป็น fallback ของ utm_campaign/utm_source ด้วย
   useEffect(() => {
-    if (!data.utm_source) {
+    if (!data.utm_source && !data.utm_campaign) {
       setData(d => ({
         ...d,
-        utm_source: params.get('utm_source') || undefined,
+        utm_source: params.get('utm_source') || params.get('src') || undefined,
         utm_medium: params.get('utm_medium') || undefined,
-        utm_campaign: params.get('utm_campaign') || undefined,
+        utm_campaign: params.get('utm_campaign') || params.get('campaign') || undefined,
         source: params.get('source') || 'web_form',
       }))
     }
