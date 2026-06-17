@@ -1,5 +1,6 @@
 // app/about/page.tsx — About / Founder Story (เรื่องราว ChutiBenz)
 // 2026-06-15: หน้าใหม่ · 3 ส่วน (Hero / Founder Story / Trust Points) · โทนจริงใจ ไม่ขายแข็ง
+// 2026-06-17: cleanup — "เคยโดน" → "เคยเจ็บ" (metadata + og) · เอา emoji ออกจากปุ่ม LINE
 // nav/footer มาจาก layout เหมือนหน้าแรก — หน้านี้ใส่เฉพาะเนื้อหา
 import Link from 'next/link'
 import type { Metadata } from 'next'
@@ -8,14 +9,14 @@ const SITE_URL = 'https://chutibenz.com'
 const LINE_OA = 'https://line.me/R/ti/p/%40440ifncj'
 
 export const metadata: Metadata = {
-  title: 'เรื่องราวของ ChutiBenz — จากคนซื้อ W140 ที่เคยโดน สู่คลังอะไหล่ที่ให้ความอุ่นใจ',
+  title: 'เรื่องราวของ ChutiBenz — จากคนซื้อ W140 ที่เคยเจ็บ สู่คลังอะไหล่ที่ให้ความอุ่นใจ',
   description:
     'จากความเจ็บของคนซื้อ Mercedes-Benz W140 คันแรก สู่คลังอะไหล่เบนซ์คลาสสิก W140/W124/W202/W210 ที่ให้ประกัน 15 วัน เพราะอยากให้ลูกค้าซื้ออย่างอุ่นใจ — ซื่อกินไม่หมด คดกินไม่นาน',
   alternates: { canonical: `${SITE_URL}/about` },
   openGraph: {
     title: 'เรื่องราวของ ChutiBenz — คนรัก W140 ที่อยากให้คุณซื้ออะไหล่อย่างอุ่นใจ',
     description:
-      'จากคนซื้อ W140 คันแรกที่เคยโดน สู่คลังอะไหล่เบนซ์คลาสสิกที่ให้ประกัน 15 วัน · ซื่อกินไม่หมด คดกินไม่นาน',
+      'จากคนซื้อ W140 คันแรกที่เคยเจ็บ สู่คลังอะไหล่เบนซ์คลาสสิกที่ให้ประกัน 15 วัน · ซื่อกินไม่หมด คดกินไม่นาน',
     url: `${SITE_URL}/about`,
     type: 'website',
   },
@@ -128,7 +129,7 @@ export default function AboutPage() {
             rel="noopener noreferrer"
             className="bg-[#06C755] hover:bg-[#05B04A] text-white font-medium rounded-lg px-7 py-3.5 transition"
           >
-            💬 ทักทาย / ปรึกษาทาง LINE
+            ทักทาย / ปรึกษาทาง LINE
           </a>
           <Link
             href="/search"
