@@ -1,6 +1,7 @@
 'use client'
 // app/ebooks/EbooksClient.tsx — หน้า eBook · 3 หมวด: Free / Classic Guide / Premium
 // v5 (06-17): + W140 Survival Pack แจกฟรี (featured บนหัว Free) + campaign tracking
+// v6 (06-17): + copy Premium W124 M119 / GENESIS S70 (แทน "รายละเอียดเร็ว ๆ นี้")
 import { useState } from 'react'
 const LITE = [
   { code: 'W202', label: 'W202 — เบนซ์จิ้มลิ้ม (C-Class)', file: '/ebooks/W202_LITE.pdf' },
@@ -16,8 +17,8 @@ const CLASSIC = [
   { id: 'bundle', label: 'Bundle W202 + W210 (Full ทั้ง 2 เล่ม)', price: 349, status: 'พร้อมขาย', best: true, desc: 'คุ้มสุด — ประหยัด 49 บาท' },
 ]
 const PREMIUM = [
-  { id: 'premium-w124-m119', label: 'W124 M119 V8 Swap', price: 799, desc: 'รายละเอียดฉบับเต็มเร็ว ๆ นี้' },
-  { id: 'premium-genesis-s70', label: 'GENESIS Volume I · S70 AMG', price: 599, desc: 'รายละเอียดฉบับเต็มเร็ว ๆ นี้' },
+  { id: 'premium-w124-m119', label: 'W124 M119 V8 Swap', price: 799, desc: 'โปรเจกต์สวอปเครื่อง M119 V8 ลง W124 — สเปกเครื่อง ความเข้ากันของแชสซี งานไฟ/เกียร์/ช่วงล่าง และบทเรียนจากการทำจริง' },
+  { id: 'premium-genesis-s70', label: 'GENESIS Volume I · S70 AMG', price: 599, desc: 'เจาะตำนาน S70 AMG เครื่อง 7.0 V8 — ที่มา สเปกหายาก จุดสังเกตของแท้ และเสน่ห์งาน hand-built AMG ยุค W140' },
 ]
 const ORDERABLE = [...CLASSIC, ...PREMIUM]
 function statusStyle(s: string): string {
