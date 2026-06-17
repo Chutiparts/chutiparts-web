@@ -1,7 +1,8 @@
 'use client'
-// app/ebooks/EbooksClient.tsx — หน้า eBook (Lite ฟรี + Full/Bundle สั่งซื้อ manual)
-// ส่ง order เข้า /api/leads (topic='ebook') → แจ้ง LINE อัตโนมัติ · ไม่มี auto-download Full
-// v2 (2026-06-15): copy fix เฉพาะจุด — (1) ปุ่มระบุรุ่นชัด (2) checkbox ยินยอมเด่นขึ้น
+// app/ebooks/EbooksClient.tsx — หน้า eBook (Lite ฟรี + Full/Bundle + Premium สั่งซื้อ manual)
+// ส่ง order เข้า /api/leads (topic='ebook') → แจ้ง LINE อัตโนมัติ · ไม่มี auto-download Full/Premium
+// v2 (2026-06-15): copy fix — (1) ปุ่มระบุรุ่นชัด (2) checkbox ยินยอมเด่นขึ้น
+// v3 (2026-06-16): + หมวด Premium eBook (สั่งซื้อ/ขอรายละเอียดผ่านฟอร์มเดิม · ไฟล์ส่งหลังตรวจยอดโอน)
 import { useState } from 'react'
 
 const LITE = [
@@ -13,6 +14,13 @@ const PAID = [
   { id: 'w202-full', label: 'W202 ฉบับเต็ม (Full)', cta: 'สั่งซื้อ Full W202', price: 199, desc: 'เนื้อหาครบทุกบท + เจาะลึกการเลือกซื้อ/ดูอาการ W202' },
   { id: 'w210-full', label: 'W210 ฉบับเต็ม (Full)', cta: 'สั่งซื้อ Full W210', price: 199, desc: 'เนื้อหาครบทุกบท + เจาะลึกการเลือกซื้อ/ดูอาการ W210' },
   { id: 'bundle', label: 'Bundle W202 + W210 (Full ทั้ง 2 เล่ม)', cta: 'สั่งซื้อ Bundle', price: 349, desc: 'คุ้มสุด — ได้ทั้ง W202 + W210 ฉบับเต็ม ประหยัด 49 บาท' },
+]
+
+// Premium eBook — เล่มเฉพาะทาง · ราคาสูงกว่า · สั่งซื้อ/ขอรายละเอียดผ่านฟอร์มเดิม
+// (รายละเอียดเนื้อหา + copy ขาย ค่อยเติมทีหลัง)
+const PREMIUM = [
+  { id: 'premium-w124-m119', label: 'W124 M119 V8 Swap', cta: 'สั่งซื้อ / ขอรายละเอียด', price: 799, desc: 'รายละเอียดฉบับเต็มเร็ว ๆ นี้' },
+  { id: 'premium-genesis-s70', label: 'GENESIS Volume I · S70 AMG', cta: 'สั่งซื้อ / ขอรายละเอียด', price: 599, desc: 'รายละเอียดฉบับเต็มเร็ว ๆ นี้' },
 ]
 
 function detectSource(): string {
@@ -37,6 +45,9 @@ function safeSource(): string {
   const sx = detectSource()
   return SUPPORTED_SOURCES.includes(sx) ? sx : 'direct'
 }
+
+// รายการที่สั่งซื้อได้ทั้งหมด (Full/Bundle + Premium) — ใช้ในฟอร์ม + ตอนสร้าง detail
+const ORDERABLE = [...PAID, ...PREMIUM]
 
 export default function EbooksClient() {
   const [item, setItem] = useState('bundle')
@@ -63,7 +74,7 @@ export default function EbooksClient() {
     setErr('')
     if (!phone.trim() && !lineId.trim()) { setErr('กรุณากรอกเบอร์โทร หรือ LINE อย่างน้อย 1 ช่อง'); return }
     if (!consent) { setErr('กรุณาติ๊ก “ยินยอมให้ทีมงานติดต่อกลับ” ก่อนกดส่ง'); return }
-    const picked = PAID.find((p) => p.id === item)
+    const picked = ORDERABLE.find((p) => p.id === item)
     setSubmitting(true)
     try {
       const safeNote = note.trim().slice(0, 500)
@@ -110,9 +121,9 @@ export default function EbooksClient() {
       {/* HERO */}
       <section className="bg-[#1C1D2C] text-[#F2EDE0]">
         <div className="container mx-auto px-4 max-w-5xl py-12 md:py-16 text-center">
-          <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-3">FREE EBOOKS · MERCEDES-BENZ CLASSIC</p>
+          <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-3">EBOOKS · MERCEDES-BENZ CLASSIC</p>
           <h1 className="text-3xl md:text-4xl font-serif font-medium">eBook คู่มือ Mercedes-Benz คลาสสิก</h1>
-          <p className="text-[#B8B3A7] mt-4 max-w-2xl mx-auto">โหลดฉบับ LITE ฟรี เพื่อประกอบการตัดสินใจ · ฉบับเต็ม (Full) เนื้อหาครบ สั่งซื้อได้เลย</p>
+          <p className="text-[#B8B3A7] mt-4 max-w-2xl mx-auto">โหลดฉบับ LITE ฟรี เพื่อประกอบการตัดสินใจ · ฉบับเต็ม (Full) และ Premium สั่งซื้อได้เลย</p>
         </div>
       </section>
 
@@ -162,14 +173,40 @@ export default function EbooksClient() {
         </div>
       </section>
 
+      {/* PREMIUM eBook — สั่งซื้อ/ขอรายละเอียดผ่านฟอร์มเดิม · ไฟล์ส่งหลังตรวจยอดโอน */}
+      <section className="bg-[#1C1D2C] text-[#F2EDE0] border-y border-[#2E303F]">
+        <div className="container mx-auto px-4 max-w-5xl py-12">
+          <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-2">PREMIUM EBOOK · LIMITED</p>
+          <h2 className="text-2xl font-serif font-medium mb-2">👑 Premium eBook</h2>
+          <p className="text-sm text-[#B8B3A7] mb-6">เล่มเฉพาะทาง · สั่งซื้อ/สอบถามผ่านฟอร์ม — ทีมงานจัดส่งไฟล์ให้หลังยืนยันการชำระเงิน</p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {PREMIUM.map((p) => (
+              <div key={p.id} className="rounded-xl p-5 bg-[#23243A] border border-[#3A3C52] flex flex-col">
+                <span className="text-[10px] bg-[#C9A961] text-[#1C1D2C] font-bold px-2 py-0.5 rounded self-start mb-2">PREMIUM</span>
+                <p className="font-semibold text-[#F2EDE0]">{p.label}</p>
+                <p className="text-xs text-[#B8B3A7] mt-1 flex-1">{p.desc}</p>
+                <p className="text-2xl font-bold text-[#C9A961] mt-3">฿{p.price}</p>
+                <button onClick={() => pickAndScroll(p.id)}
+                  className="mt-3 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-bold rounded-lg px-4 py-2.5 text-sm">
+                  {p.cta}
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-[#B8B3A7] mt-5 bg-[#23243A] border border-[#3A3C52] rounded-lg p-3 leading-relaxed">
+            🔒 ไฟล์ Premium ไม่เปิดให้ดาวน์โหลดสาธารณะ — ทีมงานจัดส่งให้เฉพาะหลังยืนยันยอดโอนแล้วเท่านั้น
+          </p>
+        </div>
+      </section>
+
       {/* ORDER FORM */}
       <section id="order" className="container mx-auto px-4 max-w-xl py-12 scroll-mt-20">
-        <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">📝 สั่งซื้อ eBook ฉบับเต็ม</h2>
+        <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">📝 สั่งซื้อ eBook</h2>
         <p className="text-sm text-gray-500 mb-6">กรอกข้อมูล ทีมงานจะติดต่อกลับเพื่อยืนยันการชำระเงิน + ส่งไฟล์</p>
         <div className="space-y-3">
           <label className="block text-xs text-gray-500">รายการที่สั่งซื้อ
             <select value={item} onChange={(e) => setItem(e.target.value)} className={`${inputCls} mt-1`}>
-              {PAID.map((p) => <option key={p.id} value={p.id}>{p.label} — ฿{p.price}</option>)}
+              {ORDERABLE.map((p) => <option key={p.id} value={p.id}>{p.label} — ฿{p.price}</option>)}
             </select>
           </label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อ" className={inputCls} />
@@ -180,7 +217,7 @@ export default function EbooksClient() {
           <p className="text-[11px] text-gray-500 -mt-1">กรอกเบอร์ หรือ LINE อย่างน้อย 1 ช่อง</p>
           <select value={modelInterest} onChange={(e) => setModelInterest(e.target.value)} className={inputCls}>
             <option value="">รุ่นที่สนใจ (ถ้ามี)</option>
-            {['W202', 'W210', 'W202 + W210', 'อื่นๆ'].map((m) => <option key={m} value={m}>{m}</option>)}
+            {['W202', 'W210', 'W202 + W210', 'W124', 'S70 AMG', 'อื่นๆ'].map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" className={`${inputCls} resize-none`} />
           {/* consent — เน้นให้เด่น (กล่องไฮไลต์ + ขอบเปลี่ยนสีเมื่อยังไม่ติ๊ก) */}
