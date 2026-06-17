@@ -1,17 +1,11 @@
 'use client'
 // app/ebooks/EbooksClient.tsx — หน้า eBook · 3 หมวด: Free / Classic Guide / Premium
-// ส่ง order เข้า /api/leads (topic='ebook') → แจ้ง LINE · ไม่มี auto-download (Full/Premium ส่ง manual หลังตรวจยอดโอน)
-// v2 (06-15): copy fix · v3 (06-16): + Premium · v4 (06-17): + Classic Guide 4 เล่ม (W123/W126/W140/W201) + จัด 3 หมวด + status badge
+// v5 (06-17): + W140 Survival Pack แจกฟรี (featured บนหัว Free) + campaign tracking
 import { useState } from 'react'
-
-// ---- Free (LITE ดาวน์โหลดฟรี) ----
 const LITE = [
   { code: 'W202', label: 'W202 — เบนซ์จิ้มลิ้ม (C-Class)', file: '/ebooks/W202_LITE.pdf' },
   { code: 'W210', label: 'W210 — ตา 4 รู (E-Class)', file: '/ebooks/W210_LITE.pdf' },
 ]
-
-// ---- Classic Guide (คู่มือรายรุ่น · สั่งซื้อผ่านฟอร์ม) ----
-// status: 'พร้อมขาย' | 'เปิดจอง' | 'Coming Soon'
 const CLASSIC = [
   { id: 'w123-full', label: 'W123 — คลาสสิกต้นตำรับ ยุค 70s–80s', price: 199, status: 'พร้อมขาย' },
   { id: 'w126-full', label: 'W126 — S-Class “เจ้าพ่อเซี่ยงไฮ้”', price: 199, status: 'พร้อมขาย' },
@@ -21,22 +15,16 @@ const CLASSIC = [
   { id: 'w210-full', label: 'W210 ฉบับเต็ม (Full)', price: 199, status: 'พร้อมขาย', desc: 'เจาะลึกการเลือกซื้อ/ดูอาการ W210' },
   { id: 'bundle', label: 'Bundle W202 + W210 (Full ทั้ง 2 เล่ม)', price: 349, status: 'พร้อมขาย', best: true, desc: 'คุ้มสุด — ประหยัด 49 บาท' },
 ]
-
-// ---- Premium / Special Project ----
 const PREMIUM = [
   { id: 'premium-w124-m119', label: 'W124 M119 V8 Swap', price: 799, desc: 'รายละเอียดฉบับเต็มเร็ว ๆ นี้' },
   { id: 'premium-genesis-s70', label: 'GENESIS Volume I · S70 AMG', price: 599, desc: 'รายละเอียดฉบับเต็มเร็ว ๆ นี้' },
 ]
-
-// รายการที่สั่งซื้อได้ทั้งหมด (Classic + Premium) — ใช้ในฟอร์ม + ตอนสร้าง detail
 const ORDERABLE = [...CLASSIC, ...PREMIUM]
-
 function statusStyle(s: string): string {
   if (s === 'พร้อมขาย') return 'bg-green-100 text-green-700'
   if (s === 'เปิดจอง') return 'bg-amber-100 text-amber-700'
-  return 'bg-gray-100 text-gray-500' // Coming Soon
+  return 'bg-gray-100 text-gray-500'
 }
-
 function detectSource(): string {
   if (typeof window === 'undefined') return 'direct'
   const p = new URLSearchParams(window.location.search)
@@ -52,20 +40,16 @@ function detectSource(): string {
   if (r.includes('google')) return 'google'
   return 'direct'
 }
-
 const SUPPORTED_SOURCES = ['facebook_page', 'facebook_group', 'instagram', 'google', 'qr', 'direct']
 function safeSource(): string {
   const sx = detectSource()
   return SUPPORTED_SOURCES.includes(sx) ? sx : 'direct'
 }
-
-// อ่าน campaign จาก URL (?campaign=... หรือ ?utm_campaign=...) → ติด lead เพื่อแยกว่ามาจากโพสต์ไหน/รุ่นไหน
 function getCampaign(): string {
   if (typeof window === 'undefined') return ''
   const p = new URLSearchParams(window.location.search)
   return (p.get('campaign') || p.get('utm_campaign') || '').toLowerCase().replace(/[^a-z0-9_\-]/g, '').slice(0, 60)
 }
-
 export default function EbooksClient() {
   const [item, setItem] = useState('bundle')
   const [name, setName] = useState('')
@@ -74,19 +58,16 @@ export default function EbooksClient() {
   const [modelInterest, setModelInterest] = useState('')
   const [note, setNote] = useState('')
   const [consent, setConsent] = useState(false)
-  const [website, setWebsite] = useState('') // honeypot
+  const [website, setWebsite] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState(false)
   const [ref, setRef] = useState('')
-
   const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-3 text-base focus:border-[#C9A961] focus:outline-none'
-
   const pickAndScroll = (id: string) => {
     setItem(id)
     document.getElementById('order')?.scrollIntoView({ behavior: 'smooth' })
   }
-
   const submit = async () => {
     setErr('')
     if (!phone.trim() && !lineId.trim()) { setErr('กรุณากรอกเบอร์โทร หรือ LINE อย่างน้อย 1 ช่อง'); return }
@@ -115,28 +96,21 @@ export default function EbooksClient() {
       setSubmitting(false)
     }
   }
-
   if (done) {
     return (
       <div className="max-w-xl mx-auto px-4 py-16 text-center">
         <div className="text-5xl mb-4">✅</div>
         <h1 className="text-2xl font-serif font-medium text-gray-900 mb-3">ได้รับคำสั่งซื้อแล้ว</h1>
-        <p className="text-gray-700 leading-relaxed">
-          เราได้รับข้อมูลแล้ว ทีมงานจะติดต่อกลับเพื่อแจ้งขั้นตอนรับ eBook ครับ
-        </p>
+        <p className="text-gray-700 leading-relaxed">เราได้รับข้อมูลแล้ว ทีมงานจะติดต่อกลับเพื่อแจ้งขั้นตอนรับ eBook ครับ</p>
         {ref && <p className="text-xs text-gray-400 mt-3">เลขอ้างอิง: {ref}</p>}
         <a href="https://line.me/R/ti/p/%40440ifncj" target="_blank" rel="noopener noreferrer"
-          className="inline-block mt-6 bg-[#06C755] hover:bg-[#05B04A] text-white rounded-lg px-6 py-3 text-sm font-medium">
-          💬 ทักไลน์เพื่อยืนยันคำสั่งซื้อ
-        </a>
+          className="inline-block mt-6 bg-[#06C755] hover:bg-[#05B04A] text-white rounded-lg px-6 py-3 text-sm font-medium">💬 ทักไลน์เพื่อยืนยันคำสั่งซื้อ</a>
         <div className="mt-6"><a href="/ebooks" className="text-sm text-[#C9A961] hover:underline">← กลับหน้า eBook</a></div>
       </div>
     )
   }
-
   return (
     <>
-      {/* HERO */}
       <section className="bg-[#1C1D2C] text-[#F2EDE0]">
         <div className="container mx-auto px-4 max-w-5xl py-12 md:py-16 text-center">
           <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-3">EBOOKS · MERCEDES-BENZ CLASSIC</p>
@@ -144,28 +118,35 @@ export default function EbooksClient() {
           <p className="text-[#B8B3A7] mt-4 max-w-2xl mx-auto">ฉบับ LITE ฟรี · Classic Guide คู่มือรายรุ่น · Premium / Special Project — สั่งซื้อได้เลย</p>
         </div>
       </section>
-
       {/* ===== หมวด 1: FREE EBOOK ===== */}
       <section className="container mx-auto px-4 max-w-5xl py-12">
-        <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">📖 Free eBook — ฉบับ LITE ดาวน์โหลดฟรี</h2>
+        <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">📖 Free eBook — ดาวน์โหลดฟรี</h2>
         <p className="text-sm text-gray-500 mb-6">อ่านเพื่อประกอบการตัดสินใจ</p>
+
+        {/* FEATURED — W140 Survival Pack (แจกฟรี) */}
+        <div className="mb-6 rounded-xl p-5 bg-[#1C1D2C] text-[#F2EDE0] border border-[#C9A961]/50 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1">
+            <span className="text-[10px] tracking-[0.2em] text-[#C9A961] font-serif">FREE GUIDE · W140 · ใหม่</span>
+            <p className="font-semibold text-lg mt-1">🐋 W140 Survival Pack — คู่มือซื้อมือสอง (16 หน้า)</p>
+            <p className="text-xs text-[#B8B3A7] mt-1 leading-relaxed">10 จุดต้องเช็คก่อนซื้อ · เฟส 1/2/ME · สายไฟ Biodegradable · โช้ค ADS · ราคาซ่อมจริง · checklist พกไปดูรถ</p>
+          </div>
+          <a href="https://drive.google.com/file/d/10ZfK_ayKdJ5qjZspuZsg9bnG5GRO75g9/view" target="_blank" rel="noopener noreferrer"
+            className="shrink-0 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-bold rounded-lg px-6 py-3 text-sm text-center">⬇ โหลดฟรี</a>
+        </div>
+
+        <p className="text-sm font-medium text-gray-700 mb-3">📚 ฉบับ LITE รายรุ่น (ฟรี)</p>
         <div className="grid sm:grid-cols-2 gap-4">
           {LITE.map((b) => (
             <div key={b.code} className="border border-gray-200 rounded-xl p-5 bg-white">
               <p className="font-semibold text-gray-900">{b.label}</p>
               <p className="text-xs text-gray-500 mt-1">ฉบับ LITE · PDF · ฟรี</p>
               <a href={b.file} target="_blank" rel="noopener noreferrer"
-                className="inline-block mt-4 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium rounded-lg px-5 py-2.5 text-sm">
-                ⬇ ดาวน์โหลด Lite ฟรี
-              </a>
+                className="inline-block mt-4 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium rounded-lg px-5 py-2.5 text-sm">⬇ ดาวน์โหลด Lite ฟรี</a>
             </div>
           ))}
         </div>
-        <p className="text-xs text-gray-500 mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
-          ℹ️ ไฟล์ Lite แจกให้อ่านเพื่อประกอบการตัดสินใจ ห้ามนำไปขายต่อหรือเผยแพร่ซ้ำโดยไม่ได้รับอนุญาต
-        </p>
+        <p className="text-xs text-gray-500 mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">ℹ️ ไฟล์ Lite แจกให้อ่านเพื่อประกอบการตัดสินใจ ห้ามนำไปขายต่อหรือเผยแพร่ซ้ำโดยไม่ได้รับอนุญาต</p>
       </section>
-
       {/* ===== หมวด 2: CLASSIC GUIDE ===== */}
       <section className="bg-gray-50 border-y border-gray-100">
         <div className="container mx-auto px-4 max-w-5xl py-12">
@@ -181,20 +162,14 @@ export default function EbooksClient() {
                 <p className="font-semibold text-gray-900">{c.label}</p>
                 {c.desc ? <p className="text-xs text-gray-600 mt-1 flex-1">{c.desc}</p> : <div className="flex-1" />}
                 <p className="text-2xl font-bold text-[#C9A961] mt-3">฿{c.price}</p>
-                <button onClick={() => pickAndScroll(c.id)}
-                  className="mt-3 bg-[#1C1D2C] hover:bg-[#2E303F] text-white font-medium rounded-lg px-4 py-2.5 text-sm">
-                  สั่งซื้อ / ขอรายละเอียด
-                </button>
+                <button onClick={() => pickAndScroll(c.id)} className="mt-3 bg-[#1C1D2C] hover:bg-[#2E303F] text-white font-medium rounded-lg px-4 py-2.5 text-sm">สั่งซื้อ / ขอรายละเอียด</button>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-600 mt-5 bg-amber-50 border border-amber-200 rounded-lg p-3 leading-relaxed">
-            ⚠️ ไฟล์ฉบับเต็มเป็นลิขสิทธิ์ของ Mr.Chuti — สำหรับผู้ซื้อใช้ส่วนตัวเท่านั้น ห้ามนำไปจำหน่ายต่อ แจกจ่าย เผยแพร่ อัปโหลด หรือใช้เชิงพาณิชย์โดยไม่ได้รับอนุญาต
-          </p>
+          <p className="text-xs text-gray-600 mt-5 bg-amber-50 border border-amber-200 rounded-lg p-3 leading-relaxed">⚠️ ไฟล์ฉบับเต็มเป็นลิขสิทธิ์ของ Mr.Chuti — สำหรับผู้ซื้อใช้ส่วนตัวเท่านั้น ห้ามนำไปจำหน่ายต่อ แจกจ่าย เผยแพร่ อัปโหลด หรือใช้เชิงพาณิชย์โดยไม่ได้รับอนุญาต</p>
         </div>
       </section>
-
-      {/* ===== หมวด 3: PREMIUM / SPECIAL PROJECT ===== */}
+      {/* ===== หมวด 3: PREMIUM ===== */}
       <section className="bg-[#1C1D2C] text-[#F2EDE0] border-y border-[#2E303F]">
         <div className="container mx-auto px-4 max-w-5xl py-12">
           <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-2">PREMIUM · SPECIAL PROJECT · LIMITED</p>
@@ -207,19 +182,13 @@ export default function EbooksClient() {
                 <p className="font-semibold text-[#F2EDE0]">{p.label}</p>
                 <p className="text-xs text-[#B8B3A7] mt-1 flex-1">{p.desc}</p>
                 <p className="text-2xl font-bold text-[#C9A961] mt-3">฿{p.price}</p>
-                <button onClick={() => pickAndScroll(p.id)}
-                  className="mt-3 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-bold rounded-lg px-4 py-2.5 text-sm">
-                  สั่งซื้อ / ขอรายละเอียด
-                </button>
+                <button onClick={() => pickAndScroll(p.id)} className="mt-3 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-bold rounded-lg px-4 py-2.5 text-sm">สั่งซื้อ / ขอรายละเอียด</button>
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-[#B8B3A7] mt-5 bg-[#23243A] border border-[#3A3C52] rounded-lg p-3 leading-relaxed">
-            🔒 ไฟล์ Premium ไม่เปิดให้ดาวน์โหลดสาธารณะ — ทีมงานจัดส่งให้เฉพาะหลังยืนยันยอดโอนแล้วเท่านั้น
-          </p>
+          <p className="text-[11px] text-[#B8B3A7] mt-5 bg-[#23243A] border border-[#3A3C52] rounded-lg p-3 leading-relaxed">🔒 ไฟล์ Premium ไม่เปิดให้ดาวน์โหลดสาธารณะ — ทีมงานจัดส่งให้เฉพาะหลังยืนยันยอดโอนแล้วเท่านั้น</p>
         </div>
       </section>
-
       {/* ===== ORDER FORM ===== */}
       <section id="order" className="container mx-auto px-4 max-w-xl py-12 scroll-mt-20">
         <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">📝 สั่งซื้อ eBook</h2>
@@ -241,7 +210,6 @@ export default function EbooksClient() {
             {['W123', 'W126', 'W140', 'W201', 'W202', 'W210', 'W124', 'S70 AMG', 'อื่นๆ'].map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" className={`${inputCls} resize-none`} />
-          {/* consent */}
           <label className={`flex items-start gap-3 text-sm rounded-lg border p-3 cursor-pointer transition-colors ${consent ? 'border-[#C9A961] bg-[#FBF7EC] text-gray-800' : 'border-amber-300 bg-amber-50 text-gray-800'}`}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 w-5 h-5 accent-[#C9A961] shrink-0" />
             <span><span className="font-semibold">ยินยอมให้ทีมงานติดต่อกลับ</span> เพื่อยืนยันคำสั่งซื้อและจัดส่งไฟล์ <span className="text-red-500">*</span></span>
@@ -250,10 +218,7 @@ export default function EbooksClient() {
             <input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} name="website" />
           </div>
           {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
-          <button onClick={submit} disabled={submitting}
-            className="w-full bg-[#C9A961] hover:bg-[#D8B872] disabled:opacity-60 text-[#1C1D2C] font-bold rounded-lg px-4 py-3.5 text-base">
-            {submitting ? 'กำลังส่ง…' : 'ส่งคำสั่งซื้อ'}
-          </button>
+          <button onClick={submit} disabled={submitting} className="w-full bg-[#C9A961] hover:bg-[#D8B872] disabled:opacity-60 text-[#1C1D2C] font-bold rounded-lg px-4 py-3.5 text-base">{submitting ? 'กำลังส่ง…' : 'ส่งคำสั่งซื้อ'}</button>
           <p className="text-[11px] text-gray-400 text-center">ยังไม่ต้องชำระเงินตอนนี้ — ทีมงานจะติดต่อกลับเพื่อยืนยันยอดและช่องทางโอน</p>
         </div>
       </section>
