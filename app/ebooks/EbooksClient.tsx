@@ -3,10 +3,14 @@
 // v5 (06-17): + W140 Survival Pack แจกฟรี (featured บนหัว Free) + campaign tracking
 // v6 (06-17): + copy Premium W124 M119 / GENESIS S70 (แทน "รายละเอียดเร็ว ๆ นี้")
 // v7 (07-03): Lite รายรุ่น ครบ 7 รุ่น + เลิกแจก PDF ตรง → ขอรับผ่าน LINE (lead funnel) · ส่วนอื่นคงเดิม
+// v8 (07-03): Lite ปุ่ม = มือถือเปิดแชท OA + ข้อความรุ่น prefill · เดสก์ท็อป = หน้า QR แอดเพื่อน OA (ให้เหมือนการ์ดหน้าแรก)
 import { useState } from 'react'
 const LINE_OA_ID = '@440ifncj'
+// มือถือ: เปิดแชท OA พร้อมข้อความรุ่น (prefill) — ทำงานในแอป LINE
 const liteLineLink = (code: string) =>
   `https://line.me/R/oaMessage/${encodeURIComponent(LINE_OA_ID)}/?${encodeURIComponent('ขอรับ eBook Lite รุ่น ' + code)}`
+// เดสก์ท็อป (default): หน้าแอดเพื่อน OA — โชว์ QR ให้สแกน
+const LINE_ADD_FRIEND = `https://line.me/R/ti/p/${encodeURIComponent(LINE_OA_ID)}`
 const LITE = [
   { code: 'W123', label: 'W123 — เบนซ์ตาหวาน (ต้นตำรับ 70s–80s)' },
   { code: 'W124', label: 'W124 — รถถังเยอรมัน (E-Class)' },
@@ -78,6 +82,16 @@ export default function EbooksClient() {
     setItem(id)
     document.getElementById('order')?.scrollIntoView({ behavior: 'smooth' })
   }
+  // มือถือ → เปิดแชท OA + ข้อความรุ่น (prefill) · เดสก์ท็อป → ปล่อยให้ href (แอดเพื่อน/QR) ทำงาน
+  const openLite = (e: React.MouseEvent<HTMLAnchorElement>, code: string) => {
+    try {
+      const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || ''
+      if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) {
+        e.preventDefault()
+        window.location.href = liteLineLink(code)
+      }
+    } catch { /* ใช้ href เดิม */ }
+  }
   const submit = async () => {
     setErr('')
     if (!phone.trim() && !lineId.trim()) { setErr('กรุณากรอกเบอร์โทร หรือ LINE อย่างน้อย 1 ช่อง'); return }
@@ -148,7 +162,7 @@ export default function EbooksClient() {
             <div key={b.code} className="border border-gray-200 rounded-xl p-5 bg-white">
               <p className="font-semibold text-gray-900">{b.label}</p>
               <p className="text-xs text-gray-500 mt-1">ฉบับ LITE · PDF · ฟรี (รับทาง LINE)</p>
-              <a href={liteLineLink(b.code)} target="_blank" rel="noopener noreferrer"
+              <a href={LINE_ADD_FRIEND} target="_blank" rel="noopener noreferrer" onClick={(e) => openLite(e, b.code)}
                 className="inline-block mt-4 bg-[#06C755] hover:bg-[#05B04A] text-white font-medium rounded-lg px-5 py-2.5 text-sm">💬 ขอรับ eBook Lite ทาง LINE</a>
               <p className="text-[11px] text-gray-500 mt-2">ทีมงานจะส่งลิงก์ PDF ให้ทาง LINE และแจ้งอัปเดตอะไหล่รุ่นนี้เป็นครั้งคราว</p>
             </div>
