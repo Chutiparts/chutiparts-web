@@ -2,10 +2,19 @@
 // app/ebooks/EbooksClient.tsx — หน้า eBook · 3 หมวด: Free / Classic Guide / Premium
 // v5 (06-17): + W140 Survival Pack แจกฟรี (featured บนหัว Free) + campaign tracking
 // v6 (06-17): + copy Premium W124 M119 / GENESIS S70 (แทน "รายละเอียดเร็ว ๆ นี้")
+// v7 (07-03): Lite รายรุ่น ครบ 7 รุ่น + เลิกแจก PDF ตรง → ขอรับผ่าน LINE (lead funnel) · ส่วนอื่นคงเดิม
 import { useState } from 'react'
+const LINE_OA_ID = '@440ifncj'
+const liteLineLink = (code: string) =>
+  `https://line.me/R/oaMessage/${encodeURIComponent(LINE_OA_ID)}/?${encodeURIComponent('ขอรับ eBook Lite รุ่น ' + code)}`
 const LITE = [
-  { code: 'W202', label: 'W202 — เบนซ์จิ้มลิ้ม (C-Class)', file: '/ebooks/W202_LITE.pdf' },
-  { code: 'W210', label: 'W210 — ตา 4 รู (E-Class)', file: '/ebooks/W210_LITE.pdf' },
+  { code: 'W123', label: 'W123 — เบนซ์ตาหวาน (ต้นตำรับ 70s–80s)' },
+  { code: 'W124', label: 'W124 — รถถังเยอรมัน (E-Class)' },
+  { code: 'W126', label: 'W126 — เจ้าพ่อเซี่ยงไฮ้ (S-Class)' },
+  { code: 'W140', label: 'W140 — ปลาวาฬ/หัวแตงโม (S-Class)' },
+  { code: 'W201', label: 'W201 — Baby Benz (190E)' },
+  { code: 'W202', label: 'W202 — เบนซ์จิ้มลิ้ม (C-Class)' },
+  { code: 'W210', label: 'W210 — ตา 4 รู (E-Class)' },
 ]
 const CLASSIC = [
   { id: 'w123-full', label: 'W123 — คลาสสิกต้นตำรับ ยุค 70s–80s', price: 199, status: 'พร้อมขาย' },
@@ -123,7 +132,6 @@ export default function EbooksClient() {
       <section className="container mx-auto px-4 max-w-5xl py-12">
         <h2 className="text-2xl font-serif font-medium text-gray-900 mb-2">📖 Free eBook — ดาวน์โหลดฟรี</h2>
         <p className="text-sm text-gray-500 mb-6">อ่านเพื่อประกอบการตัดสินใจ</p>
-
         {/* FEATURED — W140 Survival Pack (แจกฟรี) */}
         <div className="mb-6 rounded-xl p-5 bg-[#1C1D2C] text-[#F2EDE0] border border-[#C9A961]/50 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1">
@@ -134,15 +142,15 @@ export default function EbooksClient() {
           <a href="https://drive.google.com/file/d/10ZfK_ayKdJ5qjZspuZsg9bnG5GRO75g9/view" target="_blank" rel="noopener noreferrer"
             className="shrink-0 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-bold rounded-lg px-6 py-3 text-sm text-center">⬇ โหลดฟรี</a>
         </div>
-
-        <p className="text-sm font-medium text-gray-700 mb-3">📚 ฉบับ LITE รายรุ่น (ฟรี)</p>
+        <p className="text-sm font-medium text-gray-700 mb-3">📚 ฉบับ LITE รายรุ่น (ขอรับทาง LINE)</p>
         <div className="grid sm:grid-cols-2 gap-4">
           {LITE.map((b) => (
             <div key={b.code} className="border border-gray-200 rounded-xl p-5 bg-white">
               <p className="font-semibold text-gray-900">{b.label}</p>
-              <p className="text-xs text-gray-500 mt-1">ฉบับ LITE · PDF · ฟรี</p>
-              <a href={b.file} target="_blank" rel="noopener noreferrer"
-                className="inline-block mt-4 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium rounded-lg px-5 py-2.5 text-sm">⬇ ดาวน์โหลด Lite ฟรี</a>
+              <p className="text-xs text-gray-500 mt-1">ฉบับ LITE · PDF · ฟรี (รับทาง LINE)</p>
+              <a href={liteLineLink(b.code)} target="_blank" rel="noopener noreferrer"
+                className="inline-block mt-4 bg-[#06C755] hover:bg-[#05B04A] text-white font-medium rounded-lg px-5 py-2.5 text-sm">💬 ขอรับ eBook Lite ทาง LINE</a>
+              <p className="text-[11px] text-gray-500 mt-2">ทีมงานจะส่งลิงก์ PDF ให้ทาง LINE และแจ้งอัปเดตอะไหล่รุ่นนี้เป็นครั้งคราว</p>
             </div>
           ))}
         </div>
