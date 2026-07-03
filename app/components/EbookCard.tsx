@@ -1,16 +1,20 @@
 'use client'
 // app/components/EbookCard.tsx — การ์ด eBook + ยิง event นับยอด (ไม่ระบุตัวตน)
-// v2 (07-03): เลิกแจก PDF ตรง → กดการ์ดเปิด LINE ขอรับ Lite (lead funnel) · ปก/ดีไซน์คงเดิม
+// v2 (07-03): เลิกแจก PDF ตรง → ขอรับ Lite ผ่าน LINE (lead funnel) · ปก/ดีไซน์คงเดิม
+// v3 (07-03): มือถือ = เปิดแชท OA + ข้อความรุ่น prefill · เดสก์ท็อป = หน้าแอดเพื่อน OA (QR)
 import { useCallback } from 'react'
 const LINE_OA_ID = '@440ifncj'
-const liteLineLink = (code: string) =>
+// มือถือ: เปิดแชท OA พร้อมข้อความรุ่น (prefill) — ทำงานในแอป LINE
+const liteLineMessage = (code: string) =>
   `https://line.me/R/oaMessage/${encodeURIComponent(LINE_OA_ID)}/?${encodeURIComponent('ขอรับ eBook Lite รุ่น ' + code)}`
+// เดสก์ท็อป (default): หน้าแอดเพื่อน OA — โชว์ QR ให้สแกน / มือถือเปิด OA
+const LINE_ADD_FRIEND = `https://line.me/R/ti/p/${encodeURIComponent(LINE_OA_ID)}`
 type Book = { code: string; name: string; emoji: string; tagline: string }
 export default function EbookCard({ book }: { book: Book }) {
-  const logRequest = useCallback(() => {
+  const handleRequest = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    // นับยอด (fire-and-forget ไม่ระบุตัวตน)
     try {
       const payload = JSON.stringify({ code: book.code, version: 'LITE' })
-      // sendBeacon = fire-and-forget ไม่บล็อกการเปิด LINE
       if (navigator.sendBeacon) {
         navigator.sendBeacon('/api/ebook-download', new Blob([payload], { type: 'application/json' }))
       } else {
@@ -24,13 +28,23 @@ export default function EbookCard({ book }: { book: Book }) {
     } catch {
       /* ignore */
     }
+    // มือถือ → เปิดแชท OA พร้อมข้อความรุ่น (prefill) · เดสก์ท็อป → ปล่อยให้ href (แอดเพื่อน/QR) ทำงาน
+    try {
+      const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || ''
+      if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) {
+        e.preventDefault()
+        window.location.href = liteLineMessage(book.code)
+      }
+    } catch {
+      /* ignore → ใช้ href เดิม */
+    }
   }, [book.code])
   return (
     <a
-      href={liteLineLink(book.code)}
+      href={LINE_ADD_FRIEND}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={logRequest}
+      onClick={handleRequest}
       className="group bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
     >
       <div className="aspect-[3/4] bg-gray-100 overflow-hidden relative">
