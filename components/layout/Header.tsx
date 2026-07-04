@@ -13,7 +13,6 @@ const LINE_ADD = `https://line.me/R/ti/p/${encodeURIComponent(OA_ID)}`;
 
 const NAV = [
   { href: "/", key: "nav_home" },
-  { href: "/search", key: "nav_browse" },
   { href: "/ebooks", key: "nav_ebooks" },
   { href: "/vin-check", key: "nav_vin" },
   { href: "/articles", key: "nav_knowledge" },
@@ -46,7 +45,6 @@ export default function Header() {
         <div className="cbh-wrap">
           <span>{t("ship_top")}</span>
           <span className="cbh-util-r">
-            <a href="/intake">{t("diagnose")}</a>
             <a href={LINE_ADD} target="_blank" rel="noopener noreferrer">{t("contact")}</a>
             <span className="cbh-lang">
               <button className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>EN</button>
