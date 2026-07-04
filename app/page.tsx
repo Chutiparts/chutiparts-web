@@ -6,16 +6,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useLang } from "@/app/context/LanguageContext";
+import { createClient } from "@/utils/supabase/client";
 
 const OA_ID = "@440ifncj";
 const LINE_ADD = `https://line.me/R/ti/p/${encodeURIComponent(OA_ID)}`;
 
 const CHIPS = ["W124", "W126", "W140", "W201", "W202", "W210", "W220"];
 
-const MODELS = [
-  { m: "W124", n: 42 }, { m: "W140", n: 37 }, { m: "W126", n: 28 }, { m: "W202", n: 24 },
-  { m: "W210", n: 22 }, { m: "W201", n: 19 }, { m: "W220", n: 9 },
-];
+// ลำดับการ์ด "Shop by model" — จำนวนชิ้นดึงสดจาก Supabase (products.compatible_models)
+const MODEL_CODES = ["W124", "W140", "W126", "W202", "W210", "W201", "W220"];
 
 const EBOOKS = [
   { m: "W124", en: "The German Tank",      th: "รถถังเยอรมัน" },
@@ -37,12 +36,38 @@ const REVIEWS = [
 export default function HomePage() {
   const { lang, t } = useLang();
   const [slide, setSlide] = useState(0);
+  const [counts, setCounts] = useState<Record<string, number> | null>(null);
 
+  // slideshow auto-rotate
   useEffect(() => {
     const id = setInterval(() => setSlide((s) => (s + 1) % EBOOKS.length), 4500);
     return () => clearInterval(id);
   }, []);
   const go = (d: number) => setSlide((s) => (s + d + EBOOKS.length) % EBOOKS.length);
+
+  // live part counts per model from Supabase (published only)
+  useEffect(() => {
+    const sb = createClient();
+    sb.from("products")
+      .select("compatible_models")
+      .eq("is_published", true)
+      .then(({ data }) => {
+        const c: Record<string, number> = {};
+        for (const row of data ?? []) {
+          for (const m of (row.compatible_models as string[] | null) ?? []) {
+            c[m] = (c[m] ?? 0) + 1;
+          }
+        }
+        setCounts(c);
+      });
+  }, []);
+
+  const comingSoon = lang === "en" ? "Coming soon" : "เร็ว ๆ นี้";
+  const partLabel = (code: string) => {
+    if (counts === null) return "…";
+    const n = counts[code] ?? 0;
+    return n > 0 ? `${n} ${t("parts")}` : comingSoon;
+  };
 
   return (
     <div className="cb-home">
@@ -89,10 +114,10 @@ export default function HomePage() {
           <Link href="/search">{t("view_all")}</Link>
         </div>
         <div className="cb-cars">
-          {MODELS.map((c) => (
-            <Link className="cb-carcard" key={c.m} href={`/search?model=${c.m}`}>
+          {MODEL_CODES.map((code) => (
+            <Link className="cb-carcard" key={code} href={`/search?model=${code}`}>
               <div className="cb-carimg">🚗</div>
-              <div className="cb-cc"><div className="n">{c.m}</div><div className="p">{c.n} {t("parts")}</div></div>
+              <div className="cb-cc"><div className="n">{code}</div><div className="p">{partLabel(code)}</div></div>
             </Link>
           ))}
           <Link className="cb-carcard cb-allcard" href="/search">{t("all_models")}</Link>
