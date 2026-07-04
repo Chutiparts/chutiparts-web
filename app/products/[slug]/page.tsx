@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import AddToCartButton from '../../components/AddToCartButton'
-import L from '../../components/L'
+import L from '@/components/L'
 const SITE_URL = 'https://chutibenz.com'
 const LINE_OA = 'https://line.me/R/ti/p/%40440ifncj'
 
