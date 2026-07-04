@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import AddToCartButton from '../../components/AddToCartButton'
-
+import L from '../../components/L'
 const SITE_URL = 'https://chutibenz.com'
 const LINE_OA = 'https://line.me/R/ti/p/%40440ifncj'
 
@@ -195,7 +195,7 @@ export default async function ProductDetail({
                 </span>
                 {sideLabel && <span className="text-xs px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">ด้าน{sideLabel}</span>}
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{product.name}</h1>
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4"><L th={product.name} en={product.name_en} /></h1>
 
               {product.description && <p className="text-gray-700 mb-6 leading-relaxed">{product.description}</p>}
 
@@ -349,7 +349,7 @@ export default async function ProductDetail({
                     )}
                   </div>
                   <div className="p-4">
-                    <h3 className="font-bold text-gray-900 mb-2 line-clamp-2">{rp.name}</h3>
+                    <h3 className="font-bold text-gray-900 mb-2 line-clamp-2"><L th={rp.name} en={rp.name_en} /></h3>
                     {typeof rp.price === 'number' && rp.price > 0 ? (
                       <p className="text-2xl font-bold text-green-600">฿{rp.price.toLocaleString()}</p>
                     ) : (
