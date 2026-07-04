@@ -1,7 +1,9 @@
 // app/api/leads/route.ts
+// 2026-07-04: + rate-limit (5 ครั้ง / 10 นาที / IP) · honeypot+consent+validation เดิมคงไว้
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { notifyNewLead } from '@/lib/notify-lead'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,6 +19,12 @@ const s = (v: unknown, max: number): string =>
   typeof v === 'string' ? v.trim().slice(0, max) : ''
 
 export async function POST(req: NextRequest) {
+  // rate-limit: 5 ครั้ง / 10 นาที / IP (กันสคริปต์ยิงถล่ม → LINE เด้งรัว)
+  const ip = clientIp(req)
+  if (!(await rateLimit(`leads:${ip}`, 5, 600))) {
+    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+  }
+
   const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supaKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supaUrl || !supaKey) return NextResponse.json({ ok: false, error: 'server_misconfig' }, { status: 500 })
