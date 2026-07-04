@@ -1,260 +1,227 @@
-// app/page.tsx — Home (Server Component) — eBook-First Launch
-// v7 = เพิ่ม W202 + W210 (รวมเป็น 7 รุ่น) · โหลด LITE ฟรีทุกรุ่น · ฉบับเต็ม = ขายผ่านไลน์
-//      (replaces v6 — เพิ่ม 2 การ์ด + ปรับหัวข้อ 5→7 รุ่น)
-import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
-import { CHASSIS_MODELS, LINE_OA_URL } from '@/lib/constants'
-import EbookCard from './components/EbookCard'
-import HomePremiumParts from './components/HomePremiumParts'
+// app/page.tsx — ChutiBenz Home (redesign, Racing green + brass, TH/EN)
+// 2026-07-04: body only — global Header + SiteFooter มาจาก layout.tsx
+// Sections: hero (S70 AMG) · trust bar · shop by model · free eBooks slideshow · reviews
+"use client";
 
-export const revalidate = 300
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useLang } from "@/app/context/LanguageContext";
 
-export default async function HomePage() {
-  const supabase = await createClient()
+const OA_ID = "@440ifncj";
+const LINE_ADD = `https://line.me/R/ti/p/${encodeURIComponent(OA_ID)}`;
 
-  const articlesRes = await supabase
-    .from('content')
-    .select('*')
-    .eq('is_published', true)
-    .eq('type', 'knowledge')
-    .order('published_at', { ascending: false })
-    .limit(3)
+const CHIPS = ["W124", "W126", "W140", "W201", "W202", "W210", "W220"];
 
-  const articles = articlesRes.data ?? []
+const MODELS = [
+  { m: "W124", n: 42 }, { m: "W140", n: 37 }, { m: "W126", n: 28 }, { m: "W202", n: 24 },
+  { m: "W210", n: 22 }, { m: "W201", n: 19 }, { m: "W220", n: 9 },
+];
+
+const EBOOKS = [
+  { m: "W124", en: "The German Tank",      th: "รถถังเยอรมัน" },
+  { m: "W126", en: "The Godfather",         th: "เจ้าพ่อเซี่ยงไฮ้" },
+  { m: "W140", en: "The Whale",             th: "ปลาวาฬปราบเซียน" },
+  { m: "W123", en: "The Classic Beauty",    th: "เบนซ์ตาหวาน" },
+  { m: "W201", en: "The Baby-Benz",         th: "Baby-Benz" },
+  { m: "W202", en: "The Golden C-Class",    th: "C-Class ยุคทอง" },
+  { m: "W210", en: "The Twin-Oval E-Class", th: "ตาโปนคลาสสิก" },
+];
+
+/* reviews (mixed languages by design) */
+const REVIEWS = [
+  { text: "Exactly the right part for my W126, well packed and shipped to the UK fast. Will buy again.", who: "James P. · United Kingdom" },
+  { text: "ทักไลน์ถามอาการรถ ได้คำตอบตรงจุด อะไหล่แท้ราคาดี ประทับใจมากครับ", who: "คุณสมชาย · กรุงเทพฯ" },
+  { text: "Hard-to-find W140 trim, genuine and fairly priced. Mr.Chuti really knows these cars.", who: "Andreas K. · Germany" },
+];
+
+export default function HomePage() {
+  const { lang, t } = useLang();
+  const [slide, setSlide] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setSlide((s) => (s + 1) % EBOOKS.length), 4500);
+    return () => clearInterval(id);
+  }, []);
+  const go = (d: number) => setSlide((s) => (s + d + EBOOKS.length) % EBOOKS.length);
 
   return (
-    <>
-      {/* HERO — Split Layout Dark Premium */}
-      <section className="bg-[#1C1D2C] text-[#F2EDE0]">
-        <div className="container mx-auto px-4 max-w-7xl grid md:grid-cols-2 gap-8 py-12 md:py-16 items-center">
+    <div className="cb-home">
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
-          {/* LEFT: Content */}
-          <div>
-            <p className="text-[10px] md:text-xs tracking-[0.32em] text-[#C9A961] font-serif mb-5">
-              CLASSIC MERCEDES-BENZ
-            </p>
-
-            <h1 className="text-3xl md:text-5xl font-serif font-medium leading-tight tracking-tight">
-              อะไหล่ <span className="text-[#C9A961]">Mercedes-Benz</span>
-              <br />
-              คลาสสิก
-              <br />
-              <em className="text-[#B8B3A7] text-2xl md:text-4xl not-italic">จบในที่เดียว</em>
-            </h1>
-
-            {/* Chassis pills */}
-            <div className="flex flex-wrap gap-2 mt-6">
-              {CHASSIS_MODELS.map((m) => (
-                <Link
-                  key={m}
-                  href={`/search?model=${m}`}
-                  className="inline-block border border-[#C9A961] text-[#C9A961] hover:bg-[#C9A961] hover:text-[#1C1D2C] transition px-3 py-1.5 text-xs font-serif tracking-wider"
-                >
-                  {m}
-                </Link>
-              ))}
-            </div>
-
-            <p className="text-sm text-[#8E8F9E] mt-4">
-              OEM แท้ · รับประกัน 15 วัน · ส่งทั่วไทย
-            </p>
-
-            {/* CTA buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 mt-7">
-              <Link
-                href="/intake"
-                className="rounded-none bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium px-6 py-3.5 text-center tracking-wide transition"
-              >
-                📋 ส่งภาพอะไหล่ให้ประเมิน
-              </Link>
-              <Link
-                href="/search"
-                className="rounded-none border border-[#C9A961] text-[#C9A961] hover:bg-[#C9A961]/10 font-medium px-6 py-3.5 text-center tracking-wide transition"
-              >
-                ค้นหาอะไหล่ →
-              </Link>
-            </div>
-          </div>
-
-          {/* RIGHT: Hero image with glow */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(201,169,97,0.18)_0%,transparent_65%)] z-0"></div>
-            <div className="relative z-10 overflow-hidden border border-[#2E303F]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/hero-w140.jpg"
-                alt="Mercedes-Benz W140 S70 AMG — Mr.Chuti's collection"
-                className="w-full h-full object-cover aspect-[4/3]"
-              />
-            </div>
-            <p className="absolute bottom-3 right-3 text-[10px] text-[#C9A961] tracking-widest font-serif bg-[#1C1D2C]/80 px-2 py-1 z-20">
-              W140 · S70 AMG
-            </p>
-            {/* eBook CTA RIBBON — top-left */}
-            <a
-              href="#ebooks"
-              className="absolute top-4 left-4 z-20 bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] px-3 py-2 text-xs md:text-sm font-medium tracking-wide shadow-lg transition-all hover:scale-105 flex items-center gap-1.5"
-            >
-              📖 <span>eBook ฟรี 7 เล่ม</span>
-              <span className="text-[#1C1D2C]/70">↓</span>
-            </a>
-          </div>
-        </div>
-
-        {/* TRUST BADGES STRIP */}
-        <div className="border-t border-[#2E303F]">
-          <div className="container mx-auto px-4 max-w-7xl py-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="bg-white/[0.03] border border-[#C9A961]/25 px-5 py-3.5 flex items-start gap-3">
-                <span className="text-[#C9A961] text-lg font-serif">✓</span>
-                <div>
-                  <p className="text-xs font-medium text-[#C9A961] tracking-widest">OEM แท้ 100%</p>
-                  <p className="text-[11px] text-[#B8B3A7] mt-1">ของแท้ Mercedes-Benz · ผ่านการตรวจทุกชิ้น</p>
-                </div>
-              </div>
-              <div className="bg-white/[0.03] border border-[#C9A961]/25 px-5 py-3.5 flex items-start gap-3">
-                <span className="text-[#C9A961] text-lg font-serif">✓</span>
-                <div>
-                  <p className="text-xs font-medium text-[#C9A961] tracking-widest">ส่งทั่วไทย</p>
-                  <p className="text-[11px] text-[#B8B3A7] mt-1">EMS / Kerry / Flash</p>
-                </div>
-              </div>
-              <div className="bg-white/[0.03] border border-[#C9A961]/25 px-5 py-3.5 flex items-start gap-3">
-                <span className="text-[#C9A961] text-lg font-serif">✓</span>
-                <div>
-                  <p className="text-xs font-medium text-[#C9A961] tracking-widest">ติดต่อกลับโดยเร็ว</p>
-                  <p className="text-[11px] text-[#B8B3A7] mt-1">ทีม Mr.Chuti · เจ้าของรถ V12 ตัวจริง</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================ */}
-      {/* SECTION: eBook ฟรี — Hero Lead Magnet         */}
-      {/* ============================================ */}
-      <section id="ebooks" className="container mx-auto px-4 py-14 md:py-16 max-w-7xl scroll-mt-20">
-        <div className="text-center mb-10">
-          <p className="text-[10px] tracking-[0.32em] text-[#8B7355] font-serif mb-2">
-            FREE EBOOKS · MERCEDES-BENZ CLASSIC
-          </p>
-          <h2 className="text-3xl md:text-4xl font-serif font-medium text-gray-900">
-            📖 ดาวน์โหลด eBook ฟรี — 7 รุ่นในตำนาน (ฉบับ LITE)
-          </h2>
-          <p className="text-sm md:text-base text-gray-600 mt-4 max-w-2xl mx-auto leading-relaxed">
-            คู่มือฉบับ <strong className="text-[#C9A961]">คนเล่นจริง</strong> — เลือกซื้อให้เป็น ดูอาการให้ออก
-            <br className="hidden md:block" />
-            จากประสบการณ์ <strong className="text-[#C9A961]">10+ ปี</strong> ของ Mr.Chuti · ทุกรุ่นโหลดฉบับ LITE ฟรี · <strong className="text-[#C9A961]">ฉบับเต็ม</strong> สั่งซื้อทางไลน์
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-          {[
-            { code: 'W123', name: 'เบนซ์ตาหวาน', emoji: '👁', tagline: 'E-Class รุ่นต้น' },
-            { code: 'W124', name: 'รถถังเยอรมัน', emoji: '🛡', tagline: 'E-Class · E500' },
-            { code: 'W126', name: 'เจ้าพ่อเซี่ยงไฮ้', emoji: '👑', tagline: 'S-Class ตำนาน' },
-            { code: 'W140', name: 'ปลาวาฬปราบเสี่ย', emoji: '🐋', tagline: 'S-Class · S70 AMG' },
-            { code: 'W201', name: 'Baby-Benz', emoji: '👶', tagline: '190E คลาสสิคเริ่มต้น' },
-            { code: 'W202', name: 'เบนซ์จิ้มลิ้ม', emoji: '🚙', tagline: 'C-Class คันแรก' },
-            { code: 'W210', name: 'ตา 4 รู', emoji: '👀', tagline: 'E-Class ยุค 2000' },
-          ].map((book) => (
-            <EbookCard key={book.code} book={book} />
-          ))}
-        </div>
-
-        {/* LINE banner — FULL version = paid product */}
-        <div className="mt-8 bg-gray-50 border border-gray-200 p-4 md:p-6 flex flex-col sm:flex-row items-center gap-4">
-          <div className="flex-shrink-0 text-4xl">📚</div>
-          <div className="flex-1 text-center sm:text-left">
-            <p className="text-base font-medium text-gray-900">
-              ต้องการ <strong>eBook ฉบับเต็ม</strong> (เนื้อหาครบทุกบท + รูปประกอบเชิงลึก)?
-            </p>
-            <p className="text-sm text-gray-600 mt-1">
-              ฉบับเต็มมีจำหน่ายเฉพาะทางไลน์ — ทักไลน์{' '}
-              <a
-                href={LINE_OA_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#C9A961] hover:underline font-medium"
-              >
-                mr.chuti5988
-              </a>
-              {' '}เพื่อสั่งซื้อ / สอบถามราคา
-            </p>
-          </div>
-          <a
-            href={LINE_OA_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-[#06C755] hover:bg-[#05B04A] text-white font-medium px-6 py-3 text-sm whitespace-nowrap transition"
-          >
-            💬 สั่งซื้อเล่มเต็มทางไลน์
-          </a>
-        </div>
-      </section>
-
-      {/* ARTICLES */}
-      {articles.length > 0 && (
-        <section className="container mx-auto px-4 py-10 max-w-7xl border-t border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-serif font-medium text-gray-900">📖 บทความความรู้</h2>
-            <Link href="/articles" className="text-sm text-[#C9A961] hover:underline">ดูทั้งหมด →</Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {articles.map((a: any) => (
-              <Link
-                key={a.id}
-                href={`/articles/${a.slug}`}
-                className="block rounded-md bg-white border border-gray-200 hover:border-[#C9A961] hover:shadow-md transition overflow-hidden"
-              >
-                {a.cover_image && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.cover_image} alt={a.title} className="w-full h-40 object-cover" />
-                )}
-                <div className="p-4">
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {a.related_models?.slice(0, 3).map((m: string) => (
-                      <span key={m} className="text-xs bg-[#C9A961]/10 text-[#8B7355] border border-[#C9A961]/30 px-2 py-0.5">{m}</span>
-                    ))}
-                  </div>
-                  <h3 className="font-serif font-medium text-gray-900 line-clamp-2">{a.title}</h3>
-                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">{a.excerpt}</p>
-                </div>
+      {/* hero */}
+      <div className="cb-hero"><div className="cb-wrap cb-hero-grid">
+        <div>
+          <div className="cb-eyebrow">{t("eyebrow")}</div>
+          <h1 className="cb-h1">
+            {t("hero_h1_a")}<br />
+            {t("hero_h1_b")} <span className="g">{t("hero_h1_g")}</span>
+          </h1>
+          <div className="cb-chips">
+            {CHIPS.map((m, i) => (
+              <Link key={m} href={`/search?model=${m}`} className={"cb-chip" + (i === 0 ? " first" : "")}>
+                {m}{m === "W220" && <span className="cb-new">new</span>}
               </Link>
             ))}
           </div>
-        </section>
-      )}
-      <HomePremiumParts />
-      {/* CTA BANNER — dark premium */}
-      <section className="container mx-auto px-4 py-12 max-w-7xl">
-        <div className="bg-[#1C1D2C] text-[#F2EDE0] p-8 md:p-12 text-center">
-          <p className="text-[10px] tracking-[0.32em] text-[#C9A961] font-serif mb-3">CAN&apos;T FIND WHAT YOU NEED?</p>
-          <h2 className="text-2xl md:text-3xl font-serif font-medium mb-3">
-            ไม่รู้จะถามใคร? ไม่รู้จะเริ่มตรงไหน?
-          </h2>
-          <p className="text-base text-[#B8B3A7] mb-7">
-            ส่งอาการรถมาเลย — ทีมจะติดต่อกลับ<strong className="text-[#C9A961]">โดยเร็วที่สุด</strong>
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/intake"
-              className="bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium px-7 py-3.5 tracking-wide transition"
-            >
-              📋 ส่งอาการรถ
-            </Link>
-            <a
-              href={LINE_OA_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="border border-[#C9A961] text-[#C9A961] hover:bg-[#C9A961]/10 font-medium px-7 py-3.5 tracking-wide transition"
-            >
-              💬 ทักทาย LINE
-            </a>
+          <div className="cb-trustline">{t("trustline")}</div>
+          <div className="cb-cta">
+            <Link href="/search" className="cb-btn-gold">{t("cta_browse")}</Link>
           </div>
         </div>
-      </section>
-    </>
-  )
+        <div className="cb-hero-media">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/hero-s70.jpg" alt="Mercedes-Benz S70 AMG V12" />
+          <div className="cb-hero-cap"><b>S70 AMG · V12</b></div>
+        </div>
+      </div></div>
+
+      {/* trust bar */}
+      <div className="cb-tbar"><div className="cb-wrap cb-tbar-row">
+        <span>{t("tb_oem")}</span>
+        <span>{t("tb_ship")}</span>
+        <span>{t("tb_reply")}</span>
+      </div></div>
+
+      {/* shop by model */}
+      <section className="cb-blk"><div className="cb-wrap">
+        <div className="cb-sechead">
+          <h2>{t("shop_model")}</h2>
+          <Link href="/search">{t("view_all")}</Link>
+        </div>
+        <div className="cb-cars">
+          {MODELS.map((c) => (
+            <Link className="cb-carcard" key={c.m} href={`/search?model=${c.m}`}>
+              <div className="cb-carimg">🚗</div>
+              <div className="cb-cc"><div className="n">{c.m}</div><div className="p">{c.n} {t("parts")}</div></div>
+            </Link>
+          ))}
+          <Link className="cb-carcard cb-allcard" href="/search">{t("all_models")}</Link>
+        </div>
+      </div></section>
+
+      {/* free eBooks slideshow */}
+      <section className="cb-blk cb-blk-cream"><div className="cb-wrap">
+        <div className="cb-sechead cb-sechead-block">
+          <h2>{t("eb_head")}</h2>
+          <div className="cb-muted">{t("eb_sub")}</div>
+        </div>
+        <div className="cb-slidebox">
+          <button className="cb-sarrow l" onClick={() => go(-1)} aria-label="prev">‹</button>
+          <button className="cb-sarrow r" onClick={() => go(1)} aria-label="next">›</button>
+          {EBOOKS.map((e, i) => (
+            <div className={"cb-pick" + (i === slide ? " on" : "")} key={e.m}>
+              <div className="cb-pick-img">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/ebooks-covers/${e.m}.jpg`} alt={`${e.m} eBook`} loading="lazy" />
+              </div>
+              <div className="cb-pick-body">
+                <span className="cb-free-tag">{t("eb_free")}</span>
+                <h3>{e.m} — {lang === "en" ? e.en : e.th}</h3>
+                <div className="cb-pno">{t("eb_desc")}</div>
+                <div className="cb-pick-row">
+                  <a className="cb-btn-line" href={LINE_ADD} target="_blank" rel="noopener noreferrer">{t("eb_get")}</a>
+                  <span className="cb-muted cb-note">{t("eb_note")}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="cb-sdots">
+          {EBOOKS.map((_, i) => (
+            <button key={i} className={i === slide ? "on" : ""} onClick={() => setSlide(i)} aria-label={`slide ${i + 1}`} />
+          ))}
+        </div>
+      </div></section>
+
+      {/* reviews */}
+      <section className="cb-blk"><div className="cb-wrap">
+        <div className="cb-sechead">
+          <h2>{t("rev_head")}</h2>
+          <Link href="/articles">{t("rev_all")}</Link>
+        </div>
+        <div className="cb-revs">
+          {REVIEWS.map((r, i) => (
+            <div className="cb-rev" key={i}>
+              <div className="cb-stars">★★★★★</div>
+              <p>{r.text}</p>
+              <div className="cb-who">{r.who}</div>
+            </div>
+          ))}
+        </div>
+      </div></section>
+    </div>
+  );
 }
+
+const CSS = `
+.cb-home{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Sarabun","Noto Sans Thai",Tahoma,sans-serif;color:#1b2b20;background:#fff}
+.cb-home *{box-sizing:border-box}
+.cb-wrap{max-width:1160px;margin:0 auto;padding:0 22px}
+.cb-hero{background:#17301F;color:#F4EFE4;padding:54px 0 46px}
+.cb-hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:44px;align-items:center}
+.cb-eyebrow{color:#B8895A;font-size:12px;letter-spacing:4px;font-family:Georgia,serif;margin-bottom:14px}
+.cb-h1{font-family:Georgia,serif;font-weight:500;font-size:44px;line-height:1.12;margin:0 0 8px;max-width:15em}
+.cb-h1 .g{color:#B8895A}
+.cb-chips{display:flex;flex-wrap:wrap;gap:9px;margin:24px 0 14px}
+.cb-chip{border:1px solid #3c5343;color:#cdd8cd;font-family:Georgia,serif;font-size:15px;padding:7px 16px;border-radius:8px;cursor:pointer;position:relative;transition:.15s;text-decoration:none}
+.cb-chip:hover,.cb-chip.first{border-color:#B8895A;color:#e3c9a8}
+.cb-new{position:absolute;top:-8px;right:-8px;background:#B8895A;color:#17301F;font-family:sans-serif;font-size:9px;padding:0 5px;border-radius:7px;font-weight:600}
+.cb-trustline{color:#97a599;font-size:14px;margin:6px 0 22px}
+.cb-cta{display:flex;gap:12px;flex-wrap:wrap}
+.cb-btn-gold{background:#B8895A;color:#17301F;font-weight:600;font-size:14px;padding:11px 20px;border-radius:9px;text-decoration:none;display:inline-block}
+.cb-btn-gold:hover{background:#c99b70}
+.cb-hero-media{position:relative}
+.cb-hero-media img{width:100%;border-radius:14px;display:block;box-shadow:0 24px 60px rgba(0,0,0,.45);border:1px solid rgba(184,137,90,.35)}
+.cb-hero-cap{position:absolute;left:16px;bottom:16px;background:rgba(15,36,22,.82);backdrop-filter:blur(4px);border:1px solid rgba(184,137,90,.45);border-radius:10px;padding:8px 14px;line-height:1.35}
+.cb-hero-cap b{display:block;color:#B8895A;font-size:14px;letter-spacing:.5px}
+.cb-tbar{background:#0f2416;color:#b3c0b3}
+.cb-tbar-row{display:flex;gap:18px;flex-wrap:wrap;padding:14px 22px;font-size:13.5px;justify-content:space-between}
+.cb-blk{padding:44px 0}
+.cb-blk-cream{background:#f5f2e8;padding:40px 0}
+.cb-sechead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:20px}
+.cb-sechead-block{display:block;margin-bottom:16px}
+.cb-sechead h2{font-family:Georgia,serif;font-weight:500;font-size:26px;margin:0;color:#1b2b20}
+.cb-sechead a{color:#8a6038;font-size:14px;text-decoration:none}
+.cb-muted{color:#847f72;font-size:14px}
+.cb-cars{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.cb-carcard{border:.5px solid #e4e0d3;border-radius:12px;overflow:hidden;background:#fff;transition:.15s;cursor:pointer;text-decoration:none;color:inherit}
+.cb-carcard:hover{border-color:#B8895A;transform:translateY(-2px)}
+.cb-carimg{height:104px;background:#efeadd;display:flex;align-items:center;justify-content:center;font-size:42px}
+.cb-cc{padding:11px 12px;text-align:center}
+.cb-cc .n{font-size:16px;font-weight:600;color:#1b2b20}
+.cb-cc .p{font-size:12.5px;color:#847f72;margin-top:2px}
+.cb-allcard{display:flex;align-items:center;justify-content:center;color:#8a6038;font-size:14px}
+.cb-slidebox{position:relative}
+.cb-pick{display:none;gap:22px;border:.5px solid #e4e0d3;border-radius:16px;padding:18px;align-items:center;background:#fff;animation:cbfade .6s ease}
+.cb-pick.on{display:flex}
+@keyframes cbfade{from{opacity:.25}to{opacity:1}}
+.cb-pick-img{width:158px;height:222px;border-radius:10px;overflow:hidden;background:#e3ddcd;flex-shrink:0;box-shadow:0 8px 20px rgba(28,29,44,.18)}
+.cb-pick-img img{width:100%;height:100%;object-fit:cover}
+.cb-pick-body{flex:1}
+.cb-free-tag{display:inline-block;background:#B8895A;color:#3a2f12;font-size:12px;font-weight:700;letter-spacing:.3px;padding:3px 11px;border-radius:6px}
+.cb-pick-body h3{font-size:20px;font-weight:500;margin:9px 0 3px;color:#1b2b20}
+.cb-pno{font-size:13px;color:#847f72}
+.cb-pick-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+.cb-btn-line{background:#06C755;color:#fff;font-size:15px;font-weight:600;padding:11px 22px;border-radius:10px;text-decoration:none;display:inline-flex;align-items:center;gap:7px}
+.cb-note{font-size:13px}
+.cb-sdots{display:flex;gap:8px;justify-content:center;margin-top:16px}
+.cb-sdots button{width:9px;height:9px;border-radius:50%;background:#d8d0be;cursor:pointer;transition:.2s;border:none;padding:0}
+.cb-sdots button.on{background:#8a6038;width:26px;border-radius:5px}
+.cb-sarrow{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;border:.5px solid #e4e0d3;background:#fff;color:#17301F;font-size:18px;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center}
+.cb-sarrow.l{left:-14px}.cb-sarrow.r{right:-14px}
+.cb-revs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.cb-rev{border:.5px solid #e4e0d3;border-radius:12px;padding:16px;background:#fbf9f4}
+.cb-stars{color:#B8895A;font-size:14px;letter-spacing:2px}
+.cb-rev p{font-size:14px;line-height:1.6;margin:8px 0 10px;color:#3f3d36}
+.cb-who{font-size:12.5px;color:#847f72}
+@media(max-width:860px){
+  .cb-hero-grid{grid-template-columns:1fr;gap:26px}
+  .cb-hero-media{order:2}
+  .cb-h1{font-size:32px}
+  .cb-cars{grid-template-columns:repeat(2,1fr)}
+  .cb-revs{grid-template-columns:1fr}
+  .cb-pick{flex-direction:column;align-items:stretch}
+  .cb-pick-img{width:130px;height:182px;margin:0 auto}
+  .cb-sarrow{display:none}
+}
+`;
