@@ -1,9 +1,10 @@
 // app/api/vin-check/route.ts — POST endpoint V4
-// Phase 2 — 2026-05-31
+// Phase 2 — 2026-05-31 · 2026-07-04: + rate-limit (5 ครั้ง / 10 นาที / IP)
 // V4: Handles multipart form data with optional Data Card image upload
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { rateLimit, clientIp } from '@/lib/rate-limit'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,6 +16,12 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 export async function POST(request: NextRequest) {
+  // rate-limit: 5 ครั้ง / 10 นาที / IP
+  const ip = clientIp(request)
+  if (!(await rateLimit(`vin:${ip}`, 5, 600))) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
+  }
+
   try {
     // V4: Parse multipart form data instead of JSON
     const formData = await request.formData()
