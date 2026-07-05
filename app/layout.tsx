@@ -7,7 +7,7 @@ import './globals.css'
 import Header from '@/components/layout/Header'
 import SiteFooter from '@/components/layout/SiteFooter'
 import { CartProvider } from './context/CartContext'
-import { LanguageProvider } from './context/LanguageContext'
+import { LanguageProvider } from './context/LanguageContext' import { FlagsProvider } from './context/FlagsContext'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import ContactHub from '@/components/ContactHub'
@@ -103,7 +103,7 @@ export default function RootLayout({
     <html lang="th">
       <body className="min-h-screen bg-white text-gray-900 antialiased">
         <LanguageProvider>
-          <CartProvider>
+          <FlagsProvider>           <CartProvider>
             <Header />
             <main>{children}</main>
             <SiteFooter />
@@ -111,7 +111,7 @@ export default function RootLayout({
             <SpeedInsights />
             <ContactHub />
             <SalesChat />
-          </CartProvider>
+          </CartProvider>           </FlagsProvider>
         </LanguageProvider>
       </body>
     </html>
