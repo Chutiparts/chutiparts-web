@@ -14,7 +14,7 @@ const LINE_ADD = `https://line.me/R/ti/p/${encodeURIComponent(OA_ID)}`;
 const CHIPS = ["W124", "W126", "W140", "W201", "W202", "W210", "W220"];
 
 // ลำดับการ์ด "Shop by model" — จำนวนชิ้นดึงสดจาก Supabase (products.compatible_models)
-const MODEL_CODES = ["W124", "W140", "W126", "W202", "W210", "W201", "W220"];
+const MODEL_CODES = ["W124", "W140", "W126", "W202", "W210", "W201", "W220", "W123"];
 
 const EBOOKS = [
   { m: "W124", en: "The German Tank",      th: "รถถังเยอรมัน" },
@@ -116,7 +116,7 @@ export default function HomePage() {
         <div className="cb-cars">
           {MODEL_CODES.map((code) => (
             <Link className="cb-carcard" key={code} href={`/search?model=${code}`}>
-              <div className="cb-carimg">🚗</div>
+              <div className="cb-carimg"><img src={/models/${code}.jpg} alt={code} loading="lazy" /></div>
               <div className="cb-cc"><div className="n">{code}</div><div className="p">{partLabel(code)}</div></div>
             </Link>
           ))}
