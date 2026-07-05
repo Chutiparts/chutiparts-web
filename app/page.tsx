@@ -116,7 +116,7 @@ export default function HomePage() {
         <div className="cb-cars">
           {MODEL_CODES.map((code) => (
             <Link className="cb-carcard" key={code} href={`/search?model=${code}`}>
-              <div className="cb-carimg"><img src={/models/${code}.jpg} alt={code} loading="lazy" /></div>
+              <div className="cb-carimg"><img src={`/models/${code}.jpg`} alt={code} loading="lazy" /></div>
               <div className="cb-cc"><div className="n">{code}</div><div className="p">{partLabel(code)}</div></div>
             </Link>
           ))}
