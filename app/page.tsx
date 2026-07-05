@@ -90,7 +90,7 @@ export default function HomePage() {
           </div>
           <div className="cb-trustline">{t("trustline")}</div>
           <div className="cb-cta">
-            <Link href="/search" className="cb-btn-gold">{t("cta_browse")}</Link>
+            <Link href="/search" className="cb-btn-gold">{t("cta_browse")}</Link>             <Link href="/ask" style={{ display: 'inline-block', padding: '12px 22px', border: '1.5px solid #B8895A', color: '#F4EFE4', borderRadius: 8, textDecoration: 'none', fontWeight: 600, marginLeft: 10 }}>{lang === "en" ? "Ask for a part" : "ฝากคำถามหาอะไหล่"}</Link>
           </div>
         </div>
         <div className="cb-hero-media">
