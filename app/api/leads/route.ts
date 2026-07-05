@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     source,
     referrer: s(body?.referrer, MAX.referrer) || null,
     consent: true,
-    contact_value: (line_id || phone) || null,
+    contact_value: (line_id || phone) || null,     car_year: (() => { const n = parseInt(String(body?.car_year ?? ''), 10); return Number.isFinite(n) ? n : null })(),     part_wanted: s(body?.part_wanted, 120) || null,     photo_channel: s(body?.photo_channel, 40) || null,     priority: (body?.urgent === true || body?.priority === 'hot') ? 'hot' : null,     next_action: 'รอทีมตรวจสอบ',
   }
 
   const supa = createClient(supaUrl, supaKey, { auth: { persistSession: false } })
