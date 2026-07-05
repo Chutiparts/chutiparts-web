@@ -5,7 +5,7 @@
 // วางมุมซ้ายล่าง (ContactHub อยู่ขวาล่างแล้ว) · ใช้ได้ทั้ง TH/EN ผ่าน useLang
 
 import { useState, useRef, useEffect } from "react";
-import { useLang } from "@/app/context/LanguageContext";
+import { useLang } from "@/app/context/LanguageContext"; import { useFlag } from "@/app/context/FlagsContext";
 import { createClient } from "@/utils/supabase/client";
 
 const LINE_OA = "https://line.me/R/ti/p/%40440ifncj";
@@ -51,7 +51,7 @@ const T = {
 };
 
 export default function SalesChat() {
-  const { lang } = useLang();
+  const { lang } = useLang();   const salesChatOn = useFlag("sales_chat", true);
   const t = (k: keyof typeof T) => T[k][lang === "en" ? "en" : "th"];
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
