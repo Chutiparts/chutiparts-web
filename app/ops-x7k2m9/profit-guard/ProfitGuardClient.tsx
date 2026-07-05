@@ -15,6 +15,7 @@ export default function ProfitGuardClient() {
   const [tab, setTab] = useState<'calc' | 'deals' | 'set'>('calc')
   const [thGreen, setThGreen] = useState(20)
   const [thYellow, setThYellow] = useState(10)
+  const [target, setTarget] = useState('25')
   const [toast, setToast] = useState('')
   const [f, setF] = useState({ name: '', price: '', cost: '', imp: '', ship: '' })
   const [deals, setDeals] = useState<Deal[]>([])
@@ -152,13 +153,32 @@ export default function ProfitGuardClient() {
                   <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>ราคาเท่าทุน</div>
                 </div>
               </div>
-              <div style={{ background: '#f6ecdd', border: '1px solid #ecdcc4', borderRadius: 10, padding: '11px 12px', fontSize: 13, marginTop: 14, lineHeight: 1.7 }}>
+              {/* กำหนดกำไรเป้าหมาย → ราคาที่ควรขาย */}
+              <div style={{ background: '#fff', border: '2px solid ' + GOLD, borderRadius: 12, padding: '13px 14px', marginTop: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: GREEN }}>🎯 อยากได้กำไร</span>
+                  <input value={target} onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ''))} inputMode="decimal"
+                    style={{ width: 66, fontSize: 15, fontWeight: 700, textAlign: 'center', padding: '6px 8px', border: '1px solid #e7e1d2', borderRadius: 8, color: GREEN }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: GREEN }}>%</span>
+                </div>
+                <div style={{ marginTop: 10, textAlign: 'center' }}>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>ราคาที่ควรขาย</div>
+                  <div style={{ fontSize: 30, fontWeight: 800, color: r.costs > 0 ? GOLD : '#c9c2b4', lineHeight: 1.15 }}>
+                    {r.costs > 0 ? baht(minPrice(r.costs, numv(target))) : '—'}
+                  </div>
+                  {r.costs > 0 && numv(target) < 100 && (
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                      ต้นทุน {baht(r.costs)} → กำไร {baht(minPrice(r.costs, numv(target)) - r.costs)} ({numv(target)}%)
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ background: '#f6ecdd', border: '1px solid #ecdcc4', borderRadius: 10, padding: '11px 12px', fontSize: 13, marginTop: 10, lineHeight: 1.7 }}>
                 {r.costs > 0 ? (
-                  <>💡 <b style={{ color: GREEN }}>ราคาขายแนะนำขั้นต่ำ</b> (ตั้งราคาก่อน ค่อยขาย)<br />
+                  <>💡 <b style={{ color: GREEN }}>เทียบราคาขั้นต่ำ</b><br />
                     • เท่าทุน (ไม่ขาดทุน): <b>{baht(r.costs)}</b><br />
-                    • ให้ได้ margin {thYellow}%: <b>{baht(minPrice(r.costs, thYellow))}</b><br />
-                    • ให้ได้ margin {thGreen}%: <b>{baht(minPrice(r.costs, thGreen))}</b></>
-                ) : (<>💡 <b style={{ color: GREEN }}>ราคาขายแนะนำขั้นต่ำ</b><br />กรอกต้นทุนก่อน แล้วระบบจะบอกราคาต่ำสุดที่ยังได้กำไรตามเป้า</>)}
+                    • margin {thYellow}%: <b>{baht(minPrice(r.costs, thYellow))}</b> · margin {thGreen}%: <b>{baht(minPrice(r.costs, thGreen))}</b></>
+                ) : (<>💡 <b style={{ color: GREEN }}>ราคาขายแนะนำ</b><br />กรอกต้นทุนก่อน แล้วระบบจะบอกราคาที่ควรขายตามกำไรเป้าหมาย</>)}
               </div>
             </div>
           </div>
