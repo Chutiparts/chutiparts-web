@@ -11,7 +11,7 @@ import { LanguageProvider } from './context/LanguageContext'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import ContactHub from '@/components/ContactHub'
-
+import SalesChat from '@/components/SalesChat'
 const SITE_URL = 'https://chutibenz.com'
 const BRAND = 'ChutiBenz'
 
@@ -110,6 +110,7 @@ export default function RootLayout({
             <Analytics />
             <SpeedInsights />
             <ContactHub />
+            <SalesChat />
           </CartProvider>
         </LanguageProvider>
       </body>
