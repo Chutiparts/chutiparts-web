@@ -153,6 +153,7 @@ export default function SalesChat() {
 
   const GREEN = "#17301F", BRASS = "#B8895A", CREAM = "#F4EFE4";
 
+  if (!salesChatOn) return null;
   return (
     <>
       {/* launcher — bottom LEFT (ContactHub is bottom-right) */}
