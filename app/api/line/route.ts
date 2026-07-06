@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic'
 // ของเว็บหลัก mr.chuti5988 (@440ifncj) ที่ใช้แจ้งเตือน lead อยู่แล้ว
 const SECRET = process.env.LINE_OPS_CHANNEL_SECRET || ''
 const TOKEN = process.env.LINE_OPS_CHANNEL_ACCESS_TOKEN || ''
+const ADMIN_TO = process.env.LINE_ADMIN_TO || '' // กลุ่ม/แชทภายในทีม (forward ข้อความลูกค้าเข้ามาให้ทีมเห็น)
 
 function sb() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -106,6 +107,15 @@ async function replyLine(replyToken: string, text: string) {
     body: JSON.stringify({ replyToken, messages: [{ type: 'text', text: text.slice(0, 4900) }] }),
   }).catch(() => {})
 }
+// forward ข้อความลูกค้าเข้ากลุ่ม/แชทภายในทีม (push) เพื่อให้ทีมเห็นสด + เข้าไปช่วยต่อ
+async function notifyTeam(text: string) {
+  if (!ADMIN_TO || !TOKEN) return
+  await fetch('https://api.line.me/v2/bot/message/push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + TOKEN },
+    body: JSON.stringify({ to: ADMIN_TO, messages: [{ type: 'text', text: text.slice(0, 4900) }] }),
+  }).catch(() => {})
+}
 
 export async function GET() {
   return new Response('LINE webhook OK', { status: 200 })
@@ -130,20 +140,29 @@ export async function POST(req: Request) {
       continue
     }
     if (ev.type !== 'message' || !ev.replyToken) continue
+    // ตอบเฉพาะแชท 1:1 กับลูกค้า — ไม่ยุ่งข้อความในกลุ่มภายใน (กัน loop ตอบวนตัวเอง)
+    if (ev.source?.type !== 'user') continue
+    const uid = ev.source?.userId || '-'
     const msg = ev.message || {}
     if (msg.type === 'text') {
       const text = String(msg.text || '')
+      let note = ''
       if (isSmallTalk(text)) {
         await replyLine(ev.replyToken, HELP)
+        note = 'ทักทาย/คุยเล่น'
       } else {
         const items = await searchParts(text)
         await replyLine(ev.replyToken, buildReply(items))
+        note = items.length ? ('เจอ ' + items.length + ' รายการ') : 'ไม่เจอในสต็อก → แนะให้แอดไลน์'
       }
+      await notifyTeam(`📩 ลูกค้าทักบอต\nข้อความ: ${text}\nผล: ${note}\nuser: ${uid}`)
     } else if (msg.type === 'audio') {
       // เฟส 3 จะถอดเสียง — เฟสนี้ยังตอบแนะนำให้พิมพ์ / ทีมงานติดต่อกลับ
       await replyLine(ev.replyToken, 'รับข้อความเสียงแล้วค่ะ 🎙️ ตอนนี้ระบบยังตอบเสียงอัตโนมัติไม่ได้ — รบกวนพิมพ์ รุ่นรถ + อะไหล่ที่ต้องการมาได้เลยค่ะ หรือรอทีมงานติดต่อกลับค่ะ')
+      await notifyTeam(`📩 ลูกค้าส่งข้อความเสียง 🎙️ (รอทีมฟัง/ติดต่อกลับ)\nuser: ${uid}`)
     } else if (msg.type === 'image') {
       await replyLine(ev.replyToken, 'ได้รับรูปแล้วค่ะ 📷 รบกวนพิมพ์ รุ่นรถ + ชื่ออะไหล่ (หรือเลข part) ประกอบด้วยนะคะ เดี๋ยวทีมงานเช็คสต็อกให้ค่ะ')
+      await notifyTeam(`📩 ลูกค้าส่งรูป 📷 (รอทีมดู/ติดต่อกลับ)\nuser: ${uid}`)
     } else {
       await replyLine(ev.replyToken, GREETING)
     }
