@@ -76,7 +76,17 @@ async function searchParts(text: string) {
 }
 
 const GREETING = 'สวัสดีค่ะ 🙏 chutibenz ยินดีต้อนรับค่ะ\nต้องการอะไหล่รถรุ่นไหนคะ? พิมพ์ รุ่นรถ (เช่น W124) + ชื่ออะไหล่ หรือส่งเลข part / รูป มาได้เลยค่ะ'
+const HELP = 'ยินดีให้บริการค่ะ 😊 ต้องการอะไหล่รุ่นไหนคะ?\nพิมพ์ รุ่นรถ (เช่น W124) + ชื่ออะไหล่ หรือส่งเลข part / รูป มาได้เลยค่ะ'
 const WARRANTY_DAYS = 15 // มาตรฐานร้าน — ปรับได้
+
+// ทักทาย/คุยเล่น (ไม่ใช่ค้นอะไหล่) → ตอบชวนบอกอะไหล่ ไม่ขึ้น "ของหมด"
+// มีรุ่นรถ/เลข part = ถือว่าค้นจริงเสมอ (กันคำสุภาพ "...ครับ/ค่ะ" หลุด)
+function isSmallTalk(text: string): boolean {
+  if (extractCodes(text).length || extractPartNo(text)) return false
+  const t = text.trim().toLowerCase()
+  if (t.length > 24) return false
+  return /สวัสดี|หวัดดี|ดีครับ|ดีค่ะ|ดีคับ|โย่|hello|hi|hey|ขอบคุณ|ขอบใจ|thank|โอเค|^ok$|👍|🙏|😊/i.test(t)
+}
 
 function buildReply(items: any[]): string {
   if (!items.length) {
@@ -122,8 +132,13 @@ export async function POST(req: Request) {
     if (ev.type !== 'message' || !ev.replyToken) continue
     const msg = ev.message || {}
     if (msg.type === 'text') {
-      const items = await searchParts(String(msg.text || ''))
-      await replyLine(ev.replyToken, buildReply(items))
+      const text = String(msg.text || '')
+      if (isSmallTalk(text)) {
+        await replyLine(ev.replyToken, HELP)
+      } else {
+        const items = await searchParts(text)
+        await replyLine(ev.replyToken, buildReply(items))
+      }
     } else if (msg.type === 'audio') {
       // เฟส 3 จะถอดเสียง — เฟสนี้ยังตอบแนะนำให้พิมพ์ / ทีมงานติดต่อกลับ
       await replyLine(ev.replyToken, 'รับข้อความเสียงแล้วค่ะ 🎙️ ตอนนี้ระบบยังตอบเสียงอัตโนมัติไม่ได้ — รบกวนพิมพ์ รุ่นรถ + อะไหล่ที่ต้องการมาได้เลยค่ะ หรือรอทีมงานติดต่อกลับค่ะ')
