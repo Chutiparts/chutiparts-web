@@ -3,6 +3,7 @@
 // Desktop = เมนูซ้าย · Mobile = แท็บล่าง · ห่อทุกหน้า ops ผ่าน layout · ไม่แตะ logic/data/URL เดิม
 // เมนูเป็นแค่ลิงก์ไปหน้าเดิม (แต่ละหน้ายังโหลดข้อมูลตัวเอง) — รู้สึกเหมือนแอปเดียว
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 const BASE = '/ops-x7k2m9'
 type Item = { href: string; label: string; icon: string; match?: string }
@@ -40,7 +41,16 @@ const CSS = `
 
 export default function OpsShell({ children }: { children: React.ReactNode }) {
   const path = usePathname() || ''
-  const isActive = (it: Item) => { const m = it.match || it.href.split('?')[0]; return path === m || path.startsWith(m + '/') }
+  // ไฮไลต์ทีละปุ่มเดียว: parts-desk แยก Leads/Tasks ด้วย ?tab=tasks · หน้าอื่นเทียบ pathname ตรง ๆ
+  const [search, setSearch] = useState('')
+  useEffect(() => { setSearch(typeof window !== 'undefined' ? window.location.search : '') }, [path])
+  const activeHref = (() => {
+    const pd = `${BASE}/parts-desk`
+    if (path === pd || path.startsWith(pd + '/')) return search.includes('tab=tasks') ? `${pd}?tab=tasks` : pd
+    const hit = ITEMS.find((it) => { const b = it.href.split('?')[0]; return path === b || path.startsWith(b + '/') })
+    return hit ? hit.href : ''
+  })()
+  const isActive = (it: Item) => it.href === activeHref
   return (
     <div className="opsx-shell">
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
