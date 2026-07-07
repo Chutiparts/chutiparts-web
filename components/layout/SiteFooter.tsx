@@ -3,9 +3,11 @@
 
 import Link from "next/link";
 import { useLang } from "@/app/context/LanguageContext";
+import { CONTACT, contactOrder, primaryChannel } from "@/lib/contact-routing";
 
 export default function SiteFooter() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const primary = primaryChannel(lang === "en" ? "en" : "th");
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
@@ -25,8 +27,12 @@ export default function SiteFooter() {
             </div>
             <div>
               <h4>{t("ft_contact")}</h4>
-              <a href="https://line.me/R/ti/p/%40440ifncj" target="_blank" rel="noopener noreferrer">LINE: mr.chuti5988</a>
-              <a href="https://wa.me/66818285855" target="_blank" rel="noopener noreferrer">WhatsApp: +66 81-828-5855</a>
+              {contactOrder(lang === "en" ? "en" : "th").map((ch) => (
+                <a key={ch} href={CONTACT[ch].href} target="_blank" rel="noopener noreferrer"
+                  style={ch === primary ? { color: "#B8895A", fontWeight: 600 } : undefined}>
+                  {CONTACT[ch].labelFull}{ch === primary ? " ★" : ""}
+                </a>
+              ))}
               <a href="tel:0818285855">Tel: 081-828-5855</a>
             </div>
           </div>
