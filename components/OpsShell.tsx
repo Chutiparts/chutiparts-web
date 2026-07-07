@@ -13,6 +13,7 @@ const ITEMS: Item[] = [
   { href: `${BASE}/crm-retention`,label: 'CRM',          icon: '🤝' },
   { href: `${BASE}/risk-guard`,   label: 'Risk Guard',   icon: '🛡️' },
   { href: `${BASE}/profit-guard`, label: 'Profit Guard', icon: '📊' },
+  { href: `${BASE}/ledger`,       label: 'Ledger',       icon: '📒' },
   { href: `${BASE}/finance`,      label: 'Finance',      icon: '💰' },
   { href: `${BASE}/web-checker`,  label: 'Web Checker',  icon: '✅' },
 ]
