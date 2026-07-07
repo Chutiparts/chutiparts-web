@@ -27,7 +27,7 @@ async function loginOps(formData: FormData) {
   const pw = String(formData.get('pw') || '')
   const secret = process.env.ADMIN_OPS_SECRET
   if (secret && pw === secret) {
-    ;(await cookies()).set(COOKIE, secret, { httpOnly: true,secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 })
+    ;(await cookies()).set(COOKIE, secret, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 })
   }
   revalidatePath(PATH)
 }
@@ -38,8 +38,10 @@ async function updateLead(formData: FormData) {
   if (!(await authed())) return
   const id = String(formData.get('id') || '')
   if (!id) return
-  const patch: Record<string, unknown> = { last_activity_at: new Date().toISOString() }
-  const fields = ['status', 'priority', 'next_action', 'follow_due', 'last_note', 'owner']
+  const now = new Date().toISOString()
+  const patch: Record<string, unknown> = { last_activity_at: now, updated_at: now }
+  // P0 Lead & Follow-up: แก้ได้ status/owner/follow_due/note + part/รุ่น/part_number (priority/next_action คงเดิม)
+  const fields = ['status', 'priority', 'next_action', 'follow_due', 'last_note', 'owner', 'part_wanted', 'car_model', 'part_number']
   for (const f of fields) {
     const v = formData.get(f)
     if (v !== null) patch[f] = String(v) === '' ? null : String(v)
