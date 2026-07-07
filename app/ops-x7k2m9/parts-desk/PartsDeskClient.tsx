@@ -5,6 +5,7 @@
 //   แก้ owner/part/รุ่น · quick action · copy follow-up (TH/EN) · export CSV/TXT/JSON · ห้ามลบ/ห้ามส่งจริง
 import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import TaskOps from './TaskOps'
 
 type Lead = Record<string, any>
 const LINE_OA = 'https://line.me/R/ti/p/%40440ifncj'
@@ -73,10 +74,11 @@ function Badge({ label, bg, fg }: { label: string; bg: string; fg: string }) {
   return <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999 }}>{label}</span>
 }
 
-export default function PartsDeskClient({ leads, updateLead }: { leads: Lead[]; updateLead: (fd: FormData) => Promise<void> }) {
+export default function PartsDeskClient({ leads, tasks = [], updateLead, addTask, updateTask }:
+  { leads: Lead[]; tasks?: Lead[]; updateLead: (fd: FormData) => Promise<void>; addTask?: (fd: FormData) => Promise<void>; updateTask?: (fd: FormData) => Promise<void> }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [tab, setTab] = useState<'desk' | 'follow' | 'brief'>('desk')
+  const [tab, setTab] = useState<'desk' | 'follow' | 'brief' | 'tasks'>('desk')
   const [q, setQ] = useState('')
   const [quick, setQuick] = useState<'' | 'due_today' | 'overdue' | 'new' | 'no_owner'>('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -93,6 +95,18 @@ export default function PartsDeskClient({ leads, updateLead }: { leads: Lead[]; 
   function copy(text: string, msg = 'คัดลอกแล้ว') {
     navigator.clipboard?.writeText(text).then(() => { setToast(msg); setTimeout(() => setToast(''), 1500) })
   }
+  function flash(m: string) { setToast(m); setTimeout(() => setToast(''), 1600) }
+  // สร้าง task จาก lead — เติม title/linked_lead_id อัตโนมัติ (link from lead · P0)
+  function createTaskFromLead(l: Lead) {
+    if (!addTask) return
+    const fd = new FormData()
+    fd.set('title', `ตามลูกค้าเรื่อง ${l.part_wanted || l.part_number || 'อะไหล่'}${l.car_model ? ` (${l.car_model})` : ''}`)
+    fd.set('owner', l.owner || ''); fd.set('priority', 'medium'); fd.set('status', 'todo')
+    fd.set('task_type', 'ส่งรูป/ราคาให้ลูกค้า'); fd.set('linked_lead_id', l.id)
+    const d = new Date(); d.setDate(d.getDate() + 1); fd.set('due_date', d.toISOString().slice(0, 10))
+    start(async () => { await addTask(fd); router.refresh(); flash('สร้างงานจาก lead แล้ว → ดูแท็บ Task Ops') })
+  }
+  const openTasks = tasks.filter((t) => !['done', 'cancelled'].includes(t.status || 'todo')).length
 
   const carModels = useMemo(() => Array.from(new Set(leads.map((l) => l.car_model).filter(Boolean))).sort(), [leads])
 
@@ -167,6 +181,7 @@ export default function PartsDeskClient({ leads, updateLead }: { leads: Lead[]; 
     { k: 'desk', label: `Lead Desk (${leads.length})` },
     { k: 'follow', label: `Follow-up (${openLeads.length})` },
     { k: 'brief', label: 'Daily Brief' },
+    { k: 'tasks', label: `Task Ops (${openTasks})` },
   ] as const
 
   const QUICK = [
@@ -250,7 +265,7 @@ export default function PartsDeskClient({ leads, updateLead }: { leads: Lead[]; 
                     </div>
                     {l.last_note && <div style={{ fontSize: 11.5, color: '#777', marginTop: 3 }}>📝 {String(l.last_note).slice(0, 80)}</div>}
                   </div>
-                  {open && <EditPanel lead={l} onSave={(obj) => patch(l.id, obj)} onQuick={(obj) => patch(l.id, obj)} onCopy={copy} />}
+                  {open && <EditPanel lead={l} onSave={(obj) => patch(l.id, obj)} onQuick={(obj) => patch(l.id, obj)} onCopy={copy} onCreateTask={addTask ? () => createTaskFromLead(l) : undefined} />}
                 </div>
               )
             })}
@@ -311,6 +326,11 @@ export default function PartsDeskClient({ leads, updateLead }: { leads: Lead[]; 
             <BriefSection title="🧭 ต้องตัดสินใจ (ราคา/ของ/ปิดการขาย)" leads={decide} />
           </>
         )}
+
+        {/* ===== TASK OPS ===== */}
+        {tab === 'tasks' && addTask && updateTask && (
+          <TaskOps tasks={tasks} leads={leads} addTask={addTask} updateTask={updateTask} onToast={flash} />
+        )}
       </div>
 
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: GREEN, color: '#fff', padding: '8px 16px', borderRadius: 999, fontSize: 13, zIndex: 20 }}>{toast}</div>}
@@ -338,7 +358,7 @@ function BriefSection({ title, leads }: { title: string; leads: Lead[] }) {
   )
 }
 
-function EditPanel({ lead, onSave, onQuick, onCopy }: { lead: Lead; onSave: (obj: Record<string, string>) => void; onQuick: (obj: Record<string, string>) => void; onCopy: (t: string, m?: string) => void }) {
+function EditPanel({ lead, onSave, onQuick, onCopy, onCreateTask }: { lead: Lead; onSave: (obj: Record<string, string>) => void; onQuick: (obj: Record<string, string>) => void; onCopy: (t: string, m?: string) => void; onCreateTask?: () => void }) {
   const [f, setF] = useState({
     status: normStatus(lead.status),
     owner: lead.owner || '',
@@ -362,6 +382,7 @@ function EditPanel({ lead, onSave, onQuick, onCopy }: { lead: Lead; onSave: (obj
         <button onClick={() => onQuick({ status: 'won' })} style={{ ...qbtn, color: '#0F6E56', borderColor: '#0F6E56' }}>🎉 ปิดการขาย</button>
         <button onClick={() => onCopy(followMsgTH(lead), 'คัดลอกข้อความตาม (ไทย)')} style={qbtn}>คัดลอก follow-up TH</button>
         <button onClick={() => onCopy(followMsgEN(lead), 'คัดลอกข้อความตาม (EN)')} style={qbtn}>EN</button>
+        {onCreateTask && <button onClick={onCreateTask} style={{ ...qbtn, color: BRASS, borderColor: BRASS }}>➕ สร้าง task จาก lead</button>}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <label style={lbl}>สถานะ
