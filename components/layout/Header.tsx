@@ -7,9 +7,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useCart } from "@/app/context/CartContext";
 import { useLang } from "@/app/context/LanguageContext";
-
-const OA_ID = "@440ifncj";
-const LINE_ADD = `https://line.me/R/ti/p/${encodeURIComponent(OA_ID)}`;
+import { CONTACT, primaryChannel } from "@/lib/contact-routing";
 
 const NAV = [
   { href: "/", key: "nav_home" },
@@ -45,7 +43,7 @@ export default function Header() {
         <div className="cbh-wrap">
           <span>{t("ship_top")}</span>
           <span className="cbh-util-r">
-            <a href={LINE_ADD} target="_blank" rel="noopener noreferrer">{t("contact")}</a>
+            <a href={CONTACT[primaryChannel(lang === "en" ? "en" : "th")].href} target="_blank" rel="noopener noreferrer">{t("contact")}</a>
             <span className="cbh-lang">
               <button className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>EN</button>
               <button className={lang === "th" ? "on" : ""} onClick={() => setLang("th")}>TH</button>
