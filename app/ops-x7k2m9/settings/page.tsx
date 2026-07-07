@@ -24,7 +24,7 @@ async function loginOps(formData: FormData) {
   const pw = String(formData.get('pw') || '')
   const secret = process.env.ADMIN_OPS_SECRET
   if (secret && pw === secret) {
-    ;(await cookies()).set(COOKIE, secret, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 })
+    ;(await cookies()).set(COOKIE, secret, { httpOnly: true,secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 })
   }
   revalidatePath(PATH)
 }
