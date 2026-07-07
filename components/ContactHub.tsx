@@ -7,7 +7,7 @@ import {
   CONTACT, AUTO_REPLY, LEAD_TOPICS, CAR_MODELS,
 } from '@/lib/contact-config'
 import { useLang } from '@/app/context/LanguageContext'
-import { contactOrder, primaryChannel } from '@/lib/contact-routing'
+import { CONTACT as ROUTE, contactOrder, primaryChannel } from '@/lib/contact-routing'
 function detectSource(): string {
   if (typeof window === 'undefined') return 'direct'
   const p = new URLSearchParams(window.location.search)
@@ -86,7 +86,8 @@ export default function ContactHub() {
   const inputCls = 'w-full border border-gray-300 rounded px-3 py-2.5 text-sm focus:border-[#C9A961] focus:outline-none'
   // เมนูช่องแชต (LINE/WhatsApp) เรียงตามภาษา — ช่องหลักมาก่อน + เด่น
   const chatItem = (ch: 'line' | 'wa') => {
-    const href = ch === 'line' ? lineHref : waHref
+    // ใช้ href จาก contact-config ก่อน · ถ้าไม่มี (เช่น config ไม่ได้ตั้งเบอร์ WA) → fallback helper กลาง (โชว์ทั้ง 2 ช่องเสมอ)
+    const href = ch === 'line' ? (lineHref || ROUTE.line.href) : (waHref || ROUTE.wa.href)
     if (!href) return null
     const isP = ch === primary
     const icon = ch === 'line' ? '🟢' : '🟩'
