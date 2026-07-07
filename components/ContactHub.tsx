@@ -47,6 +47,8 @@ export default function ContactHub() {
   const { lang } = useLang()
   const L: 'th' | 'en' = lang === 'en' ? 'en' : 'th'
   const primary = primaryChannel(L)
+  const tContact = L === 'en' ? 'Contact us' : 'ติดต่อเรา'
+  const tHeader = L === 'en' ? 'Contact ChutiBenz' : 'ติดต่อ ChutiBenz'
   useEffect(() => {
     setSource(detectSource())
     setReferrer((typeof document !== 'undefined' ? document.referrer : '') || '')
@@ -105,18 +107,18 @@ export default function ContactHub() {
       {/* ปุ่มลอย — เหนือมุมขวาล่าง เลี่ยงชนปุ่มอื่น */}
       <button
         onClick={() => setOpen(true)}
-        aria-label="ติดต่อเรา"
+        aria-label={tContact}
         className="fixed z-[60] bottom-4 right-4 md:bottom-6 md:right-6 bg-[#C9A961] hover:bg-[#D8B872] text-white shadow-lg rounded-full pl-4 pr-5 py-3 text-sm font-medium flex items-center gap-2 active:scale-95 transition"
       >
         <span className="text-base">💬</span>
-        <span>ติดต่อเรา</span>
+        <span>{tContact}</span>
       </button>
       {open && (
         <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-black/40" onClick={close} />
           <div className="relative bg-white w-full md:max-w-md md:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-              <h2 className="font-serif text-lg text-gray-900">ติดต่อ ChutiBenz</h2>
+              <h2 className="font-serif text-lg text-gray-900">{tHeader}</h2>
               <button onClick={close} aria-label="ปิด" className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
             </div>
             {/* เมนูช่องทาง */}
