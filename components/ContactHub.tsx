@@ -53,7 +53,9 @@ export default function ContactHub() {
     setSource(detectSource())
     setReferrer((typeof document !== 'undefined' ? document.referrer : '') || '')
   }, [])
-  const lineHref = CONTACT.lineUrl
+  // ⚠️ FIX 7 ก.ค.: contact-config.lineUrl = @mr.chuti5988 → 404 (ลิงก์เสีย)
+  // ใช้ Basic ID จริงของ OA จาก contact-routing (@440ifncj) เป็นตัวเดียวทั้งเว็บ
+  const lineHref = ROUTE.line.href
   const telHref = `tel:${CONTACT.tel}`
   const waHref = CONTACT.whatsapp ? `https://wa.me/${CONTACT.whatsapp}` : ''
   const fbHref = CONTACT.messengerUrl
