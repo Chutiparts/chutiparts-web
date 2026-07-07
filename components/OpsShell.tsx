@@ -10,6 +10,7 @@ const ITEMS: Item[] = [
   { href: `${BASE}/daily-brief`,  label: 'Daily Brief',  icon: '☀️' },
   { href: `${BASE}/parts-desk`,   label: 'Leads',        icon: '📇' },
   { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk` },
+  { href: `${BASE}/crm-retention`,label: 'CRM',          icon: '🤝' },
   { href: `${BASE}/risk-guard`,   label: 'Risk Guard',   icon: '🛡️' },
   { href: `${BASE}/profit-guard`, label: 'Profit Guard', icon: '📊' },
   { href: `${BASE}/finance`,      label: 'Finance',      icon: '💰' },
