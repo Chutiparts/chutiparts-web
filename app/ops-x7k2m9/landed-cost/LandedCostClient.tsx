@@ -82,6 +82,8 @@ export default function LandedCostClient({ sales }: { sales: Row[] }) {
           <div>
             <div style={{ fontWeight: 700, fontSize: 18 }}>🧮 Landed Cost Guard</div>
             <div style={{ fontSize: 12, color: '#cbd8cf' }}>กำไรจริงหลังต้นทุนถึงมือ (ค่านำเข้า/ส่ง/ธรรมเนียม) · อ่านการขายจริงจาก Ledger · {new Date().toLocaleDateString('th-TH')}</div>
+            {/* P0.1 legend สีธง — ข้อความเดียวกันทุกหน้า */}
+            <div style={{ fontSize: 11.5, color: '#a9bfb1', marginTop: 4 }}>🔴 = ต้องทำทันที · 🟡 = ควรระวัง/ติดตาม · 🟢 = ปกติ/พอใช้</div>
           </div>
           <a href="/ops-x7k2m9/ledger" style={{ ...qbtn, textDecoration: 'none', background: 'rgba(255,255,255,.12)', color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>→ Ledger (บันทึกขาย)</a>
         </div>
