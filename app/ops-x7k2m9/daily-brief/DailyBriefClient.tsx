@@ -47,13 +47,35 @@ const taskOverdue = (t: Row) => taskOpen(t) && !!t.due_date && t.due_date < toda
 const taskDueToday = (t: Row) => taskOpen(t) && t.due_date === todayStr()
 const taskNoOwner = (t: Row) => taskOpen(t) && (!t.owner || !String(t.owner).trim())
 
+// ----- reorder helpers (สรุปย่อจาก Stock Source · เกณฑ์ default: ย้อนหลัง 90 วัน · ขายดี ≥2 · เหลือน้อย ≤1) -----
+const rNum = (v: any) => { const n = Number(v); return isNaN(n) ? 0 : n }
+const rNorm = (s?: any) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ')
+const rKey = (part: any, model: any) => rNorm(part) + '|' + rNorm(model)
+function reorderSignals(sales: Row[], stock: Row[]): Row[] {
+  const cutoff = shiftStr(-90)
+  const left: Record<string, number> = {}
+  stock.forEach((s) => { if (String(s.status || 'in_stock') === 'in_stock') { const k = rKey(s.part_name, s.car_model); left[k] = (left[k] || 0) + 1 } })
+  const g: Record<string, any> = {}
+  sales.forEach((r) => {
+    if (!r.sale_date || r.sale_date < cutoff) return
+    const k = rKey(r.part_sold, r.car_model)
+    if (!g[k]) g[k] = { key: k, part: r.part_sold || '(ไม่ระบุ)', model: r.car_model || '', sold: 0, sumProfit: 0 }
+    g[k].sold += 1; g[k].sumProfit += rNum(r.sale_price) - rNum(r.cost)
+  })
+  return Object.values(g)
+    .map((x: any) => ({ ...x, left: left[x.key] || 0 }))
+    .filter((x: any) => x.left <= 1)
+    .map((x: any) => ({ ...x, urgent: x.left === 0 && x.sold >= 2 }))
+    .sort((a: any, b: any) => (a.urgent === b.urgent ? b.sold - a.sold : a.urgent ? -1 : 1))
+}
+
 function Badge({ label, bg, fg }: { label: string; bg: string; fg: string }) {
   return <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999 }}>{label}</span>
 }
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e7e3d8', borderRadius: 8, padding: '9px 11px', marginBottom: 6 }
 const qbtn: React.CSSProperties = { background: '#fff', border: '1px solid #ddd', color: '#333', borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }
 
-export default function DailyBriefClient({ leads, tasks }: { leads: Row[]; tasks: Row[] }) {
+export default function DailyBriefClient({ leads, tasks, sales = [], stock = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[] }) {
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
   const copy = (text: string, m = 'คัดลอกแล้ว') => navigator.clipboard?.writeText(text).then(() => flash(m))
@@ -90,6 +112,8 @@ export default function DailyBriefClient({ leads, tasks }: { leads: Row[]; tasks
   }, [leads, tasks])
 
   const unassignedCount = B.unassignedLeads.length + B.unassignedTasks.length
+  const reorder = useMemo(() => reorderSignals(sales, stock), [sales, stock])
+  const reorderUrgent = reorder.filter((x) => x.urgent).length
 
   // ===== Copy Daily Brief (รูปแบบตามสเปก) =====
   function briefText() {
@@ -100,6 +124,9 @@ export default function DailyBriefClient({ leads, tasks }: { leads: Row[]; tasks
       ? B.todayTasks.map((t) => `- ${t.title || '(ไม่มีชื่องาน)'} / เจ้าของ: ${t.owner || 'ยังไม่มี'} / ความสำคัญ: ${TASK_PRIORITY[t.priority || 'medium'].th}`).join('\n')
       : '- ไม่มีรายการ'
     const dc = B.decide.length ? B.decide.map((d) => `- ${d.label} (${d.reason})`).join('\n') : '- ไม่มีรายการ'
+    const ro = reorder.length
+      ? reorder.slice(0, 5).map((x) => `- ${x.part}${x.model ? ` (${x.model})` : ''} — ขาย ${x.sold} ครั้ง/90วัน เหลือ ${x.left}${x.urgent ? ' 🔴 ควรหาด่วน' : ''}`).join('\n')
+      : '- ไม่มีรายการ'
     return [
       `สรุปงาน ChutiBenz วันนี้ (${new Date().toLocaleDateString('th-TH')})`, '',
       '1) ลูกค้าที่ต้องตามวันนี้', fl, '',
@@ -107,6 +134,7 @@ export default function DailyBriefClient({ leads, tasks }: { leads: Row[]; tasks
       '3) เกินกำหนด', `- Lead overdue: ${B.overdueLeads.length}`, `- Task overdue: ${B.overdueTasks.length}`, '',
       '4) งานยังไม่มีเจ้าของ', `- ${unassignedCount} รายการ`, '',
       '5) เรื่องที่ควรตัดสินใจ', dc, '',
+      '6) ของควรหา/สั่งเพิ่ม', ro, '',
       'หมายเหตุ: AI ช่วยสรุป เจ้าของเป็นผู้ตัดสินใจ',
     ].join('\n')
   }
@@ -115,7 +143,7 @@ export default function DailyBriefClient({ leads, tasks }: { leads: Row[]; tasks
   function dl(name: string, text: string, type: string) {
     const u = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u)
   }
-  function exportTxt() { dl(`daily-brief-${todayStr()}.txt`, '﻿' + briefText(), 'text/plain;charset=utf-8') }
+  function exportTxt() { dl(`daily-brief-${todayStr()}.txt`, '\uFEFF' + briefText(), 'text/plain;charset=utf-8') }
   function briefData() {
     return {
       generated_at: new Date().toISOString(),
@@ -143,7 +171,7 @@ export default function DailyBriefClient({ leads, tasks }: { leads: Row[]; tasks
     B.overdueLeads.forEach((l) => rows.push(['overdue_lead', l.name || '', l.owner || '', l.follow_due || '', leadStatusTh(l), partOf(l)]))
     B.todayTasks.forEach((t) => rows.push(['today_task', t.title || '', t.owner || '', t.due_date || '', TASK_STATUS[t.status || 'todo'], TASK_PRIORITY[t.priority || 'medium'].th]))
     B.overdueTasks.forEach((t) => rows.push(['overdue_task', t.title || '', t.owner || '', t.due_date || '', TASK_STATUS[t.status || 'todo'], TASK_PRIORITY[t.priority || 'medium'].th]))
-    dl(`daily-brief-${todayStr()}.csv`, '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n'), 'text/csv;charset=utf-8')
+    dl(`daily-brief-${todayStr()}.csv`, '\uFEFF' + rows.map((r) => r.map(esc).join(',')).join('\r\n'), 'text/csv;charset=utf-8')
   }
 
   // ===== Risk / Reminder =====
@@ -152,6 +180,7 @@ export default function DailyBriefClient({ leads, tasks }: { leads: Row[]; tasks
   if (B.overdueTasks.length) risks.push(`🔴 งานเกินกำหนด ${B.overdueTasks.length} รายการ`)
   if (unassignedCount) risks.push(`⚠️ งาน/ลูกค้ายังไม่มีเจ้าของ ${unassignedCount} รายการ`)
   if (B.decide.length) risks.push(`🧭 รอการตัดสินใจ ${B.decide.length} รายการ`)
+  if (reorderUrgent) risks.push(`🛒 ของขายดีแต่หมดสต็อก ${reorderUrgent} รายการ — ควรหาเพิ่ม`)
 
   const stat = (label: string, val: number, color: string) => (
     <div style={{ flex: 1, minWidth: 88, background: '#fff', borderRadius: 10, padding: '10px', textAlign: 'center', border: '1px solid #e7e3d8' }}>
@@ -272,6 +301,24 @@ export default function DailyBriefClient({ leads, tasks }: { leads: Row[]; tasks
               <div style={{ fontSize: 11.5, color: '#3C3489', marginTop: 2 }}>เหตุผล: {d.reason}</div>
             </div>
           ))}
+        </Section>
+
+        {/* 7) ควรสั่งเพิ่ม (จาก Stock Source) */}
+        <Section title="🛒 ของควรหา/สั่งเพิ่ม" count={reorder.length}>
+          {reorder.length === 0 ? <Empty /> : (
+            <>
+              {reorder.slice(0, 5).map((x) => (
+                <div key={x.key} style={{ ...card, borderLeft: `4px solid ${x.urgent ? '#A32D2D' : '#854F0B'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                    <b style={{ fontSize: 13.5 }}>{x.part}{x.model ? ` · ${x.model}` : ''}</b>
+                    <Badge label={x.urgent ? '🔴 ขายดี ของหมด' : '🟡 เหลือน้อย'} bg={x.urgent ? '#FCEBEB' : '#FAEEDA'} fg={x.urgent ? '#A32D2D' : '#854F0B'} />
+                  </div>
+                  <div style={{ fontSize: 12.5, color: '#555', marginTop: 2 }}>ขาย {x.sold} ครั้ง/90วัน · เหลือ {x.left} ชิ้น{x.sold > 0 && x.sumProfit > 0 ? ` · กำไรเฉลี่ย ฿${Math.round(x.sumProfit / x.sold).toLocaleString()}/ชิ้น` : ''}</div>
+                </div>
+              ))}
+              <a href="/ops-x7k2m9/stock-source" style={{ ...qbtn, display: 'inline-block', textDecoration: 'none', marginTop: 2 }}>→ ดูทั้งหมดที่ Stock Source</a>
+            </>
+          )}
         </Section>
 
         <div style={{ fontSize: 11, color: '#aaa', textAlign: 'center', padding: '10px 0 30px' }}>
