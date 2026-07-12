@@ -7,19 +7,34 @@ import { useState, useEffect } from 'react'
 
 const BASE = '/ops-x7k2m9'
 type Item = { href: string; label: string; icon: string; match?: string }
-const ITEMS: Item[] = [
-  { href: `${BASE}/daily-brief`,  label: 'Daily Brief',  icon: '☀️' },
-  { href: `${BASE}/parts-desk`,   label: 'Leads',        icon: '📇' },
-  { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk` },
-  { href: `${BASE}/crm-retention`,label: 'CRM',          icon: '🤝' },
-  { href: `${BASE}/risk-guard`,   label: 'Risk Guard',   icon: '🛡️' },
-  { href: `${BASE}/profit-guard`, label: 'Profit Guard', icon: '📊' },
-  { href: `${BASE}/ledger`,       label: 'Ledger',       icon: '📒' },
-  { href: `${BASE}/landed-cost`,  label: 'Landed Cost',  icon: '🧮' },
-  { href: `${BASE}/stock-source`, label: 'Stock Source', icon: '📦' },
-  { href: `${BASE}/finance`,      label: 'Finance',      icon: '💰' },
-  { href: `${BASE}/web-checker`,  label: 'Web Checker',  icon: '✅' },
+// P0.1: จัดกลุ่มเมนู 5 กลุ่ม (ลูกค้า/งาน/เงิน/สต็อก/ตรวจระบบ) — desktop โชว์หัวกลุ่ม · mobile แท็บล่างเรียงตามกลุ่มเดิม
+type Group = { title: string; items: Item[] }
+const GROUPS: Group[] = [
+  { title: 'ลูกค้า', items: [
+    { href: `${BASE}/parts-desk`,   label: 'Leads',        icon: '📇' },
+    { href: `${BASE}/crm-retention`,label: 'CRM',          icon: '🤝' },
+  ]},
+  { title: 'งาน', items: [
+    { href: `${BASE}/daily-brief`,  label: 'Daily Brief',  icon: '☀️' },
+    { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk` },
+  ]},
+  { title: 'เงิน', items: [
+    { href: `${BASE}/ledger`,       label: 'Ledger',       icon: '📒' },
+    { href: `${BASE}/landed-cost`,  label: 'Landed Cost',  icon: '🧮' },
+    { href: `${BASE}/profit-guard`, label: 'Profit Guard', icon: '📊' },
+    { href: `${BASE}/finance`,      label: 'Finance',      icon: '💰' },
+  ]},
+  { title: 'สต็อก', items: [
+    { href: `${BASE}/stock-source`, label: 'Stock Source', icon: '📦' },
+    { href: `${BASE}/risk-guard`,   label: 'Risk Guard',   icon: '🛡️' },
+  ]},
+  { title: 'ตรวจระบบ', items: [
+    { href: `${BASE}/web-checker`,  label: 'Web Checker',  icon: '✅' },
+  ]},
 ]
+const ITEMS: Item[] = GROUPS.flatMap((g) => g.items)
+// mobile: Daily Brief ขึ้นแท็บแรก (หน้าที่เปิดบ่อยสุด — ไม่ต้องเลื่อนหา) ที่เหลือเรียงตามกลุ่ม
+const MOBILE_ITEMS: Item[] = [...ITEMS.filter((i) => i.label === 'Daily Brief'), ...ITEMS.filter((i) => i.label !== 'Daily Brief')]
 
 const CSS = `
 .opsx-shell{--w:210px}
@@ -29,6 +44,7 @@ const CSS = `
 .opsx-link{display:flex;align-items:center;gap:9px;text-decoration:none;border-radius:10px;padding:10px 12px;font-size:14px;font-weight:600;color:#e8efe9;border:1px solid transparent}
 .opsx-link:hover{background:rgba(255,255,255,.07)}
 .opsx-link.active{background:#C9A961;color:#17301F}
+.opsx-ghead{color:#8fae99;font-size:10.5px;font-weight:700;letter-spacing:.08em;padding:12px 12px 3px;user-select:none}
 .opsx-main{margin-left:var(--w);min-height:100vh}
 .opsx-bottom{display:none}
 @media (max-width:768px){
@@ -60,16 +76,21 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
       {/* Desktop = เมนูซ้าย */}
       <aside className="opsx-side">
         <div className="opsx-brand">ChutiBenz<small>Mini ERP · Command Center</small></div>
-        {ITEMS.map((it) => (
-          <a key={it.label} href={it.href} className={`opsx-link${isActive(it) ? ' active' : ''}`}>
-            <span>{it.icon}</span><span>{it.label}</span>
-          </a>
+        {GROUPS.map((g) => (
+          <div key={g.title}>
+            <div className="opsx-ghead">{g.title}</div>
+            {g.items.map((it) => (
+              <a key={it.label} href={it.href} className={`opsx-link${isActive(it) ? ' active' : ''}`}>
+                <span>{it.icon}</span><span>{it.label}</span>
+              </a>
+            ))}
+          </div>
         ))}
       </aside>
 
       {/* Mobile = แท็บล่าง */}
       <nav className="opsx-bottom">
-        {ITEMS.map((it) => (
+        {MOBILE_ITEMS.map((it) => (
           <a key={it.label} href={it.href} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
             <span className="opsx-bicon">{it.icon}</span><span>{it.label}</span>
           </a>
