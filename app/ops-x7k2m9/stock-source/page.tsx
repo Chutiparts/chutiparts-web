@@ -1,6 +1,6 @@
-// app/ops-x7k2m9/stock-source/page.tsx — ChutiBenz Stock Source / Reorder Reminder P2
-// อ่าน sales_records + stock_records จาก Core Ledger → จับคู่ "ของที่ขายได้" vs "ของที่เหลือ" → เตือนของควรหา/สั่งเพิ่ม + ของค้างนาน
-// อ่านล้วน (read-only) · ไม่มีตารางใหม่/ไม่แก้ schema · pattern เดิม svc()+authed()+loginOps · ไม่แตะ Ledger/โมดูลอื่น
+// app/ops-x7k2m9/stock-source/page.tsx — ChutiBenz Stock Source / Reorder Reminder P2+P3
+// อ่าน sales_records + stock_records + contact_leads → จับคู่ demand↔supply + คำถามลูกค้า → เตือนของควรหา/สั่งเพิ่ม + ของค้างนาน
+// อ่านล้วน (read-only) · ไม่แก้ schema ในโค้ด (source มาจาก 05-add-source-column.sql) · pattern เดิม svc()+authed()+loginOps
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
@@ -47,9 +47,10 @@ export default async function StockSourcePage() {
     )
   }
 
-  const [salesRes, stockRes] = await Promise.all([
+  const [salesRes, stockRes, leadsRes] = await Promise.all([
     svc().from('sales_records').select('*').order('sale_date', { ascending: false }).limit(1000),
     svc().from('stock_records').select('*').order('date_in', { ascending: true }).limit(1000),
+    svc().from('contact_leads').select('*').order('created_at', { ascending: false }).limit(500),
   ])
-  return <StockSourceClient sales={salesRes.data || []} stock={stockRes.data || []} />
+  return <StockSourceClient sales={salesRes.data || []} stock={stockRes.data || []} leads={leadsRes.data || []} />
 }
