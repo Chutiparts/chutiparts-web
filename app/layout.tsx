@@ -11,6 +11,7 @@ import { LanguageProvider } from './context/LanguageContext'
 import { FlagsProvider } from './context/FlagsContext'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { GoogleAnalytics } from '@next/third-parties/google'
 import ContactHub from '@/components/ContactHub'
 import SalesChat from '@/components/SalesChat'
 const SITE_URL = 'https://chutibenz.com'
@@ -109,6 +110,7 @@ export default function RootLayout({
             <main>{children}</main>
             <SiteFooter />
             <Analytics />
+            <GoogleAnalytics gaId="G-D2J142YWNM" />
             <SpeedInsights />
             <ContactHub />
             <SalesChat />
