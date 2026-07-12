@@ -180,7 +180,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [] 
   if (B.overdueTasks.length) risks.push(`🔴 งานเกินกำหนด ${B.overdueTasks.length} รายการ`)
   if (unassignedCount) risks.push(`⚠️ งาน/ลูกค้ายังไม่มีเจ้าของ ${unassignedCount} รายการ`)
   if (B.decide.length) risks.push(`🧭 รอการตัดสินใจ ${B.decide.length} รายการ`)
-  if (reorderUrgent) risks.push(`🛒 ของขายดีแต่หมดสต็อก ${reorderUrgent} รายการ — ควรหาเพิ่ม`)
+  if (reorderUrgent) risks.push(`ของขายดีแต่หมดสต็อก ${reorderUrgent} รายการ — ควรหาเพิ่ม`)
 
   const stat = (label: string, val: number, color: string) => (
     <div style={{ flex: 1, minWidth: 88, background: '#fff', borderRadius: 10, padding: '10px', textAlign: 'center', border: '1px solid #e7e3d8' }}>
