@@ -97,8 +97,14 @@ async function runChecks() {
   // 6) หน้า ops สำคัญเปิดได้ (route ตอบ 200 = login form, ไม่ 404/500)
   {
     const t0 = Date.now()
-    const pages = ['/ops-x7k2m9/profit-guard', '/ops-x7k2m9/finance', '/ops-x7k2m9/settings', '/ops-x7k2m9/parts-desk', '/ops-x7k2m9/web-checker']
-    const bad: string[] = []
+    // ครอบคลุมทุกเมนู Command Center + settings (P0.1: เพิ่ม ledger/landed-cost/stock-source/daily-brief/crm/risk-guard)
+    const pages = [
+      '/ops-x7k2m9/daily-brief', '/ops-x7k2m9/parts-desk', '/ops-x7k2m9/crm-retention',
+      '/ops-x7k2m9/risk-guard', '/ops-x7k2m9/profit-guard', '/ops-x7k2m9/ledger',
+      '/ops-x7k2m9/landed-cost', '/ops-x7k2m9/stock-source', '/ops-x7k2m9/finance',
+      '/ops-x7k2m9/settings', '/ops-x7k2m9/web-checker',
+    ]
+      const bad: string[] = []
     for (const p of pages) { const r = await grab(p); if (!r.ok) bad.push(`${p.split('/').pop()}:${r.status}`) }
     push({ key: 'ops_routes', label: `หน้า ops สำคัญเปิดได้ (${pages.length})`, status: bad.length ? 'FAIL' : 'PASS', detail: bad.length ? `ผิดปกติ: ${bad.join(', ')}` : 'ทุกหน้า 200 (login gate)', ms: Date.now() - t0 })
   }
