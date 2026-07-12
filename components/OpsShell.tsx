@@ -15,6 +15,8 @@ const ITEMS: Item[] = [
   { href: `${BASE}/risk-guard`,   label: 'Risk Guard',   icon: '🛡️' },
   { href: `${BASE}/profit-guard`, label: 'Profit Guard', icon: '📊' },
   { href: `${BASE}/ledger`,       label: 'Ledger',       icon: '📒' },
+  { href: `${BASE}/landed-cost`,  label: 'Landed Cost',  icon: '🧮' },
+  { href: `${BASE}/stock-source`, label: 'Stock Source', icon: '📦' },
   { href: `${BASE}/finance`,      label: 'Finance',      icon: '💰' },
   { href: `${BASE}/web-checker`,  label: 'Web Checker',  icon: '✅' },
 ]
