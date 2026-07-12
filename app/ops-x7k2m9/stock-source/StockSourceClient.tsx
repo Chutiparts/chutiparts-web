@@ -254,7 +254,7 @@ export default function StockSourceClient({ sales, stock, leads = [] }: { sales:
         </>)}
 
         {tab === 'asks' && (<>
-          {asks.length === 0 && <div style={{ ...card, color: '#aaa', textAlign: 'center', padding: 24 }}>— ยังไม่มีลูกค้าถามหาอะไหล่ในช่วง {cfg.windowDays} วัน — คำถามจาก /ask และแชตจะโผล่ที่นี่เอง</div>}
+          {asks.length === 0 && <div style={{ ...card, color: '#aaa', textAlign: 'center', padding: 24 }}>— ยังไม่มีลูกค้าถามหาอะไหล่ในช่วง {cfg.windowDays} วัน — คำถามจากฟอร์ม /ask และ lead ที่บันทึกในระบบจะโผล่ที่นี่เอง</div>}
           {asks.map((x: any) => {
             const fg = ASK_FLAG[x.flag]
             return (
