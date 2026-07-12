@@ -54,7 +54,7 @@ export function buildDemand(sales: Row[], stock: Row[], cfg: Cfg, now?: Date) {
 const rank = (f: string) => (f === 'urgent' ? 0 : f === 'low' ? 1 : 2)
 
 // ของค้างนาน (in_stock อายุ ≥ เกณฑ์) — สัญญาณ "อย่าเพิ่งสั่งซ้ำ + ควรดันขาย"
-export function buildAging(stock: Row[], cfg: Cfg, now?: Date) {
+export function buildAging(stock: Row[], cfg: Cfg, now?: Date): Row[] {
   return stock
     .filter((s) => String(s.status || 'in_stock') === 'in_stock' && ageDays(s.date_in, now) >= cfg.ageDays)
     .map((s) => ({ ...s, age: ageDays(s.date_in, now) }))
