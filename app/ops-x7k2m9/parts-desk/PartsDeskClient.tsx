@@ -264,6 +264,10 @@ export default function PartsDeskClient({ leads, tasks = [], updateLead, addTask
                       {l.next_action && <span style={{ color: BRASS }}>▶ {l.next_action}</span>}
                     </div>
                     {l.last_note && <div style={{ fontSize: 11.5, color: '#777', marginTop: 3 }}>📝 {String(l.last_note).slice(0, 80)}</div>}
+                    {/* P0.1 ทดลอง memo แบบพิมพ์ตรงการ์ด (ทาง A) — ไม่ต้องเปิดฟอร์มแก้ไขเต็ม */}
+                    <div style={{ marginTop: 5 }}>
+                      <QuickMemo initial={l.last_note ? String(l.last_note) : ''} onSave={(v) => patch(l.id, { last_note: v })} />
+                    </div>
                   </div>
                   {open && <EditPanel lead={l} onSave={(obj) => patch(l.id, obj)} onQuick={(obj) => patch(l.id, obj)} onCopy={copy} onCreateTask={addTask ? () => createTaskFromLead(l) : undefined} />}
                 </div>
@@ -339,6 +343,26 @@ export default function PartsDeskClient({ leads, tasks = [], updateLead, addTask
 }
 
 const qbtn: React.CSSProperties = { background: '#fff', border: '1px solid #ddd', color: '#333', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }
+// P0.1: โน้ตด่วนบนการ์ด — แตะ → textarea โผล่ตรงการ์ด → บันทึก (font 16px กัน iOS ซูมเอง)
+function QuickMemo({ initial, onSave }: { initial: string; onSave: (v: string) => void }) {
+  const [openM, setOpenM] = useState(false)
+  const [v, setV] = useState(initial)
+  if (!openM) {
+    return <button onClick={(e) => { e.stopPropagation(); setV(initial); setOpenM(true) }}
+      style={{ background: '#fff', border: '1px solid #ddd', color: '#555', borderRadius: 999, padding: '3px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>📝 โน้ตด่วน</button>
+  }
+  return (
+    <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 4 }}>
+      <textarea value={v} onChange={(e) => setV(e.target.value)} rows={2} autoFocus placeholder="พิมพ์โน้ตสั้น ๆ…"
+        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: `1px solid ${BRASS}`, borderRadius: 8, fontSize: 16, resize: 'vertical' }} />
+      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+        <button onClick={() => { onSave(v.trim()); setOpenM(false) }}
+          style={{ background: GREEN, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>บันทึกโน้ต</button>
+        <button onClick={() => setOpenM(false)} style={qbtn}>ยกเลิก</button>
+      </div>
+    </div>
+  )
+}
 const sel: React.CSSProperties = { padding: '8px 10px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }
 const lbl: React.CSSProperties = { fontSize: 12, color: '#666', fontWeight: 600, display: 'block' }
 
