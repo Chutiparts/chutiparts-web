@@ -196,6 +196,8 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [] 
           <div>
             <div style={{ fontWeight: 700, fontSize: 18 }}>☀️ Daily Brief — Command Center</div>
             <div style={{ fontSize: 12, color: '#cbd8cf' }}>สรุปเช้า ChutiBenz · เปิดหน้าเดียวรู้ว่าต้องทำอะไรวันนี้ · {new Date().toLocaleDateString('th-TH')}</div>
+            {/* P0.1 legend สีธง — ข้อความเดียวกันทุกหน้า */}
+            <div style={{ fontSize: 11.5, color: '#a9bfb1', marginTop: 4 }}>🔴 = ต้องทำทันที · 🟡 = ควรระวัง/ติดตาม · 🟢 = ปกติ/พอใช้</div>
           </div>
           <a href="/ops-x7k2m9/parts-desk" style={{ ...qbtn, textDecoration: 'none', background: 'rgba(255,255,255,.12)', color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>→ ไป Parts Desk (จัดการ)</a>
         </div>
