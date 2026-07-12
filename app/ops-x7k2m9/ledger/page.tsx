@@ -1,6 +1,7 @@
 // app/ops-x7k2m9/ledger/page.tsx — ChutiBenz Core Ledger P0 (ฐานข้อมูลกลาง)
 // บันทึก Sales Record + Stock Record จริง → ให้ CRM/Profit/Stock/Risk Guard อ่านต้นทุน/กำไร/สต็อก
 // pattern เดิม: svc() + authed() (cookie ops_admin) + server actions · ไม่ลบ (ใช้ status) · ไม่แตะโมดูลอื่น
+// P3.3: รับ field "source" (แหล่งซื้อ) ทั้ง addStock + updateStock
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
@@ -70,6 +71,7 @@ async function addStock(formData: FormData) {
     part_name: s(formData, 'part_name'), car_model: s(formData, 'car_model'), date_in: s(formData, 'date_in'),
     cost: num(formData, 'cost'), set_price: num(formData, 'set_price'), status: s(formData, 'status') || 'in_stock',
     location: s(formData, 'location'), has_image: formData.get('has_image') === 'true', sku: s(formData, 'sku'), note: s(formData, 'note'),
+    source: s(formData, 'source'),
   })
   revalidatePath(PATH)
 }
@@ -78,7 +80,7 @@ async function updateStock(formData: FormData) {
   if (!(await authed())) return
   const id = String(formData.get('id') || ''); if (!id) return
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  for (const f of ['part_name', 'car_model', 'date_in', 'status', 'location', 'sku', 'note']) {
+  for (const f of ['part_name', 'car_model', 'date_in', 'status', 'location', 'sku', 'note', 'source']) {
     const v = formData.get(f); if (v !== null) patch[f] = String(v) === '' ? null : String(v)
   }
   for (const f of ['cost', 'set_price']) {
