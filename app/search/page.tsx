@@ -26,6 +26,19 @@ export default async function SearchPage({
   // Resolve aliases (e.g., ปลาวาฬ → W140)
   const resolvedQuery = await resolveAliases(q, supabase)
   const searchQuery = resolvedQuery.canonical || q
+  // P0.3: แตกคำค้นเป็นคำ ๆ + แปลงทีละคำผ่าน search_aliases (เช่น headlight → ไฟหน้า)
+  const rawTokens = searchQuery.split(/\s+/).filter((t: string) => t.length >= 2)
+  let tokens: string[] = rawTokens
+  if (rawTokens.length >= 2) {
+    const { data: tokenAliases } = await supabase
+      .from('search_aliases')
+      .select('alias, canonical')
+      .eq('active', true)
+      .in('alias', rawTokens.map((t: string) => t.toLowerCase()))
+    const aliasMap: Record<string, string> = {}
+    for (const row of tokenAliases ?? []) aliasMap[String(row.alias).toLowerCase()] = String(row.canonical)
+    tokens = rawTokens.map((t: string) => aliasMap[t.toLowerCase()] || t)
+  }
 
   // Search Products
   let productsQuery = supabase
@@ -49,7 +62,22 @@ export default async function SearchPage({
         `oem_number_norm.ilike.%${qNorm}%`
       )
     }
-    productsQuery = productsQuery.or(orParts.join(','))
+    if (tokens.length >= 2) {
+      // P0.3: หลายคำ = ทุกคำต้องเจอ (คำละช่องไหนก็ได้ ไม่ติดลำดับคำ)
+      for (const tok of tokens) {
+        const tokNorm = tok.replace(/[^a-zA-Z0-9]/g, '')
+        const tokParts = [
+          `name.ilike.%${tok}%`,
+          `description.ilike.%${tok}%`,
+          `part_number.ilike.%${tok}%`,
+          `oem_number.ilike.%${tok}%`,
+        ]
+        if (tokNorm) tokParts.push(`part_number_norm.ilike.%${tokNorm}%`, `oem_number_norm.ilike.%${tokNorm}%`)
+        productsQuery = productsQuery.or(tokParts.join(','))
+      }
+    } else {
+      productsQuery = productsQuery.or(orParts.join(','))
+    }
   }
   if (model) {
     productsQuery = productsQuery.contains('compatible_models', [model])
