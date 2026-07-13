@@ -198,7 +198,7 @@ const CSS = `
 .cb-chip{border:1px solid #4d685a;color:#D4AF37;font-weight:600;font-family:Georgia,serif;font-size:16px;padding:10px 20px;border-radius:9px;cursor:pointer;position:relative;transition:.15s;text-decoration:none}
 .cb-chip:hover,.cb-chip.first{border-color:#D4AF37;color:#F2D06B;background:rgba(212,175,55,.08)}
 .cb-herosearch{display:flex;gap:8px;margin:18px 0 6px;max-width:520px}
-.cb-herosearch input{flex:1;min-width:0;padding:13px 16px;border-radius:10px;border:1px solid rgba(184,137,90,.55);background:#fff;color:#1b2b20;font-size:16px}
+.cb-herosearch input{flex:1;min-width:0;padding:13px 16px;border-radius:10px;border:1px solid rgba(184,137,90,.55);background:#F5F2E8;color:#1b2b20;font-size:16px}
 .cb-herosearch input::placeholder{color:#8b877b}
 .cb-herosearch button{background:#B8895A;color:#17301F;font-weight:700;font-size:15px;border:none;border-radius:10px;padding:0 20px;cursor:pointer;white-space:nowrap}
 .cb-herosearch button:hover{background:#c99b70}
