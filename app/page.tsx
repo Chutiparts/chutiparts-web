@@ -88,6 +88,13 @@ export default function HomePage() {
               </Link>
             ))}
           </div>
+          {/* P0.2: ช่องค้นหาใหญ่ใน hero — ลูกค้าอะไหล่มาพร้อมชื่อชิ้นส่วนในใจ */}
+          <form className="cb-herosearch" action="/search" method="get">
+            <input name="q" type="search" autoComplete="off"
+              placeholder={lang === "en" ? "Search parts — e.g. W140 headlight" : "ค้นหาอะไหล่ เช่น ไฟหน้า W140"}
+              aria-label={lang === "en" ? "Search parts" : "ค้นหาอะไหล่"} />
+            <button type="submit">🔍 {lang === "en" ? "Search" : "ค้นหา"}</button>
+          </form>
           <div className="cb-trustline">{t("trustline")}</div>
           <div className="cb-cta">
             <Link href="/search" className="cb-btn-gold">{t("cta_browse")}</Link>             <Link href="/ask" style={{ display: 'inline-block', padding: '12px 22px', border: '1.5px solid #B8895A', color: '#F4EFE4', borderRadius: 8, textDecoration: 'none', fontWeight: 600, marginLeft: 10 }}>{lang === "en" ? "Ask for a part" : "ฝากคำถามหาอะไหล่"}</Link>
@@ -187,9 +194,14 @@ const CSS = `
 .cb-eyebrow{color:#B8895A;font-size:12px;letter-spacing:4px;font-family:Georgia,serif;margin-bottom:14px}
 .cb-h1{font-family:Georgia,serif;font-weight:500;font-size:44px;line-height:1.12;margin:0 0 8px;max-width:15em}
 .cb-h1 .g{color:#B8895A}
-.cb-chips{display:flex;flex-wrap:wrap;gap:9px;margin:24px 0 14px}
-.cb-chip{border:1px solid #3c5343;color:#cdd8cd;font-family:Georgia,serif;font-size:15px;padding:7px 16px;border-radius:8px;cursor:pointer;position:relative;transition:.15s;text-decoration:none}
-.cb-chip:hover,.cb-chip.first{border-color:#B8895A;color:#e3c9a8}
+.cb-chips{display:flex;flex-wrap:wrap;gap:12px;margin:24px 0 14px}
+.cb-chip{border:1px solid #4d685a;color:#D4AF37;font-weight:600;font-family:Georgia,serif;font-size:16px;padding:10px 20px;border-radius:9px;cursor:pointer;position:relative;transition:.15s;text-decoration:none}
+.cb-chip:hover,.cb-chip.first{border-color:#D4AF37;color:#F2D06B;background:rgba(212,175,55,.08)}
+.cb-herosearch{display:flex;gap:8px;margin:18px 0 6px;max-width:520px}
+.cb-herosearch input{flex:1;min-width:0;padding:13px 16px;border-radius:10px;border:1px solid rgba(184,137,90,.55);background:#fff;color:#1b2b20;font-size:16px}
+.cb-herosearch input::placeholder{color:#8b877b}
+.cb-herosearch button{background:#B8895A;color:#17301F;font-weight:700;font-size:15px;border:none;border-radius:10px;padding:0 20px;cursor:pointer;white-space:nowrap}
+.cb-herosearch button:hover{background:#c99b70}
 .cb-new{position:absolute;top:-8px;right:-8px;background:#B8895A;color:#17301F;font-family:sans-serif;font-size:9px;padding:0 5px;border-radius:7px;font-weight:600}
 .cb-trustline{color:#97a599;font-size:14px;margin:6px 0 22px}
 .cb-cta{display:flex;gap:12px;flex-wrap:wrap}
@@ -213,8 +225,8 @@ const CSS = `
 .cb-carcard:hover{border-color:#B8895A;transform:translateY(-2px)}
 .cb-carimg{height:104px;background:#efeadd;display:flex;align-items:center;justify-content:center;font-size:42px}
 .cb-cc{padding:11px 12px;text-align:center}
-.cb-cc .n{font-size:16px;font-weight:600;color:#1b2b20}
-.cb-cc .p{font-size:12.5px;color:#847f72;margin-top:2px}
+.cb-cc .n{font-size:18px;font-weight:700;color:#17301F}
+.cb-cc .p{font-size:13px;color:#6b675c;margin-top:2px}
 .cb-allcard{display:flex;align-items:center;justify-content:center;color:#8a6038;font-size:14px}
 .cb-slidebox{position:relative}
 .cb-pick{display:none;gap:22px;border:.5px solid #e4e0d3;border-radius:16px;padding:18px;align-items:center;background:#fff;animation:cbfade .6s ease}
@@ -237,8 +249,8 @@ const CSS = `
 .cb-revs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .cb-rev{border:.5px solid #e4e0d3;border-radius:12px;padding:16px;background:#fbf9f4}
 .cb-stars{color:#B8895A;font-size:14px;letter-spacing:2px}
-.cb-rev p{font-size:14px;line-height:1.6;margin:8px 0 10px;color:#3f3d36}
-.cb-who{font-size:12.5px;color:#847f72}
+.cb-rev p{font-size:15px;line-height:1.65;margin:8px 0 10px;color:#3f3d36}
+.cb-who{font-size:13.5px;color:#2B2B2B;font-weight:600}
 @media(max-width:860px){
   .cb-hero-grid{grid-template-columns:1fr;gap:26px}
   .cb-hero-media{order:2}
