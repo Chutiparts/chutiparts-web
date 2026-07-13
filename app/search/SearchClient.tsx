@@ -67,6 +67,11 @@ function lineAskUrl(productName: string, partNumber?: string): string {
 }
 
 function sortProducts(items: Product[], sort: string): Product[] {
+  // P0.4: มีรูปขึ้นก่อน ไร้รูปต่อท้าย (การเรียงเดิมยังอยู่ภายในแต่ละกลุ่ม)
+  const base = sortProductsBase(items, sort)
+  return base.sort((a, b) => (((b as any).image_url ? 1 : 0) - ((a as any).image_url ? 1 : 0)))
+}
+function sortProductsBase(items: Product[], sort: string): Product[] {
   const arr = [...items]
   switch (sort) {
     case 'price_asc':
