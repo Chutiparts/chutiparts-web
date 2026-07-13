@@ -107,8 +107,8 @@ const CSS = `
 .cbh-navrow{display:flex;align-items:center;gap:20px;height:60px}
 .cbh-logo{font-family:Georgia,serif;font-size:22px;font-weight:500;letter-spacing:.5px;white-space:nowrap;color:#F4EFE4;text-decoration:none}
 .cbh-logo b{color:#B8895A;font-weight:500}
-.cbh-menu{display:flex;gap:18px;flex:1;font-size:14.5px}
-.cbh-menu a{color:#cdd8cd;text-decoration:none;white-space:nowrap}
+.cbh-menu{display:flex;gap:18px;flex:1;font-size:15px}
+.cbh-menu a{color:#F5F5F0;font-weight:600;text-decoration:none;white-space:nowrap}
 .cbh-menu a:hover,.cbh-menu a.active{color:#B8895A}
 .cbh-right{display:flex;align-items:center;gap:10px}
 .cbh-cart{position:relative;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;color:#F4EFE4;text-decoration:none}
@@ -118,7 +118,7 @@ const CSS = `
 .cbh-cta:hover{background:#c99b70}
 .cbh-hamb{display:none;font-size:22px;background:none;border:none;color:#F4EFE4;cursor:pointer}
 .cbh-mobile{display:flex;flex-direction:column;padding:8px 22px 16px;gap:2px;background:#17301F;border-top:1px solid #244a32}
-.cbh-mobile a{color:#cdd8cd;text-decoration:none;padding:9px 4px;font-size:15px}
+.cbh-mobile a{color:#F5F5F0;font-weight:600;text-decoration:none;padding:9px 4px;font-size:15px}
 .cbh-mobile a:hover{color:#B8895A}
 .cbh-mobile-cta{background:#B8895A;color:#17301F!important;font-weight:600;border-radius:9px;text-align:center;margin-top:8px}
 @media(max-width:900px){
