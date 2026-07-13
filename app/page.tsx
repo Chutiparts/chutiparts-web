@@ -91,7 +91,7 @@ export default function HomePage() {
           {/* P0.2: ช่องค้นหาใหญ่ใน hero — ลูกค้าอะไหล่มาพร้อมชื่อชิ้นส่วนในใจ */}
           <form className="cb-herosearch" action="/search" method="get">
             <input name="q" type="search" autoComplete="off"
-              placeholder={lang === "en" ? "Search parts — e.g. W140 headlight" : "ค้นหาอะไหล่ เช่น ไฟหน้า W140"}
+              placeholder={lang === "en" ? "Search parts — e.g. W140, 140-001" : "ค้นหาอะไหล่ เช่น ไฟหน้า W140"}
               aria-label={lang === "en" ? "Search parts" : "ค้นหาอะไหล่"} />
             <button type="submit">🔍 {lang === "en" ? "Search" : "ค้นหา"}</button>
           </form>
