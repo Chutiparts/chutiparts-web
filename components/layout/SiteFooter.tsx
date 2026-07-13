@@ -47,13 +47,13 @@ export default function SiteFooter() {
 }
 
 const CSS = `
-.cbf{background:#17301F;color:#aeb2bd;padding:34px 0 24px;font-size:14px;margin-top:10px}
+.cbf{background:#17301F;color:#c7cfc7;padding:34px 0 24px;font-size:14px;margin-top:10px}
 .cbf-wrap{max-width:1160px;margin:0 auto;padding:0 22px}
 .cbf-cols{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:26px}
-.cbf h4{color:#F4EFE4;font-size:15px;font-weight:500;margin:0 0 10px}
-.cbf-about{margin:0;line-height:1.7;color:#9aa79b}
-.cbf a{display:block;color:#aeb2bd;padding:3px 0;text-decoration:none}
-.cbf a:hover{color:#B8895A}
+.cbf h4{color:#C9A961;font-size:15px;font-weight:700;margin:0 0 10px}
+.cbf-about{margin:0;line-height:1.7;color:#b5c2b6}
+.cbf a{display:block;color:#F5F5F0;padding:3px 0;text-decoration:none}
+.cbf a:hover{color:#C9A961;text-decoration:underline}
 .cbf-b{border-top:1px solid #244a32;margin-top:22px;padding-top:14px;font-size:12.5px;color:#7f8492;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 @media(max-width:860px){.cbf-cols{grid-template-columns:1fr}}
 `;
