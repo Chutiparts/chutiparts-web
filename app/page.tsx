@@ -223,7 +223,7 @@ const CSS = `
 .cb-cars{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .cb-carcard{border:.5px solid #e4e0d3;border-radius:12px;overflow:hidden;background:#fff;transition:.15s;cursor:pointer;text-decoration:none;color:inherit}
 .cb-carcard:hover{border-color:#B8895A;transform:translateY(-2px)}
-.cb-carimg{height:104px;background:#efeadd;display:flex;align-items:center;justify-content:center;font-size:42px}
+.cb-carimg{height:150px;background:#efeadd;display:flex;align-items:center;justify-content:center;font-size:42px;overflow:hidden}.cb-carimg img{width:100%;height:100%;object-fit:cover;display:block}
 .cb-cc{padding:11px 12px;text-align:center}
 .cb-cc .n{font-size:18px;font-weight:700;color:#17301F}
 .cb-cc .p{font-size:13px;color:#6b675c;margin-top:2px}
