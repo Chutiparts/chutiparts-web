@@ -6,6 +6,7 @@
 import { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import TaskOps from './TaskOps'
+import CrmClient from '../crm-retention/CrmClient' // Level B: reuse CRM เป็นแท็บในหน้านี้
 
 type Lead = Record<string, any>
 const LINE_OA = 'https://line.me/R/ti/p/%40440ifncj'
@@ -78,7 +79,7 @@ export default function PartsDeskClient({ leads, tasks = [], updateLead, addTask
   { leads: Lead[]; tasks?: Lead[]; updateLead: (fd: FormData) => Promise<void>; addTask?: (fd: FormData) => Promise<void>; updateTask?: (fd: FormData) => Promise<void> }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [tab, setTab] = useState<'desk' | 'follow' | 'brief' | 'tasks'>('desk')
+  const [tab, setTab] = useState<'desk' | 'follow' | 'brief' | 'tasks' | 'crm'>('desk')
   const [q, setQ] = useState('')
   const [quick, setQuick] = useState<'' | 'due_today' | 'overdue' | 'new' | 'no_owner'>('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -182,6 +183,7 @@ export default function PartsDeskClient({ leads, tasks = [], updateLead, addTask
     { k: 'follow', label: `Follow-up (${openLeads.length})` },
     { k: 'brief', label: 'Daily Brief' },
     { k: 'tasks', label: `Task Ops (${openTasks})` },
+    { k: 'crm', label: '🤝 ลูกค้าเก่า/CRM' },
   ] as const
 
   const QUICK = [
@@ -334,6 +336,11 @@ export default function PartsDeskClient({ leads, tasks = [], updateLead, addTask
         {/* ===== TASK OPS ===== */}
         {tab === 'tasks' && addTask && updateTask && (
           <TaskOps tasks={tasks} leads={leads} addTask={addTask} updateTask={updateTask} onToast={flash} />
+        )}
+
+        {/* ===== CRM / ลูกค้าเก่า (Level B merge — reuse CrmClient · props เดียวกัน) ===== */}
+        {tab === 'crm' && addTask && (
+          <CrmClient leads={leads} updateLead={updateLead} addTask={addTask} />
         )}
       </div>
 
