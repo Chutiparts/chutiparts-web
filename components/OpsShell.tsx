@@ -7,29 +7,23 @@ import { useState, useEffect } from 'react'
 
 const BASE = '/ops-x7k2m9'
 type Item = { href: string; label: string; icon: string; match?: string }
-// P0.1: จัดกลุ่มเมนู 5 กลุ่ม (ลูกค้า/งาน/เงิน/สต็อก/ตรวจระบบ) — desktop โชว์หัวกลุ่ม · mobile แท็บล่างเรียงตามกลุ่มเดิม
+// P0.2 Lean: regroup เป็น Lean 8 · Daily Brief = home · ซ่อนเมนูเดี่ยว CRM/RiskGuard/Finance/ProfitGuard
+//   (หน้าเดิมยังเปิดได้ตรง URL — แค่ไม่อยู่ top-level · Level B ค่อยรวมเนื้อหาเข้าโมดูลแม่)
+//   #7 AI Search = หน้า public /search (ไม่อยู่เมนู ops · roadmap เดือน 3) · WebChecker → System Monitor (#8)
 type Group = { title: string; items: Item[] }
 const GROUPS: Group[] = [
-  { title: 'ลูกค้า', items: [
-    { href: `${BASE}/parts-desk`,   label: 'Leads',        icon: '📇' },
-    { href: `${BASE}/crm-retention`,label: 'CRM',          icon: '🤝' },
+  { title: 'หลัก', items: [
+    { href: `${BASE}/daily-brief`,          label: 'Daily Brief', icon: '☀️' },
+    { href: `${BASE}/parts-desk`,           label: 'Leads',       icon: '📇' },
+    { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks',       icon: '🗂️', match: `${BASE}/parts-desk` },
   ]},
-  { title: 'งาน', items: [
-    { href: `${BASE}/daily-brief`,  label: 'Daily Brief',  icon: '☀️' },
-    { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk` },
+  { title: 'เงิน & สต็อก', items: [
+    { href: `${BASE}/ledger`,       label: 'Ledger',      icon: '📒' },
+    { href: `${BASE}/landed-cost`,  label: 'Landed Cost', icon: '🧮' },
+    { href: `${BASE}/stock-source`, label: 'Stock',       icon: '📦' },
   ]},
-  { title: 'เงิน', items: [
-    { href: `${BASE}/ledger`,       label: 'Ledger',       icon: '📒' },
-    { href: `${BASE}/landed-cost`,  label: 'Landed Cost',  icon: '🧮' },
-    { href: `${BASE}/profit-guard`, label: 'Profit Guard', icon: '📊' },
-    { href: `${BASE}/finance`,      label: 'Finance',      icon: '💰' },
-  ]},
-  { title: 'สต็อก', items: [
-    { href: `${BASE}/stock-source`, label: 'Stock Source', icon: '📦' },
-    { href: `${BASE}/risk-guard`,   label: 'Risk Guard',   icon: '🛡️' },
-  ]},
-  { title: 'ตรวจระบบ', items: [
-    { href: `${BASE}/web-checker`,  label: 'Web Checker',  icon: '✅' },
+  { title: 'ระบบ', items: [
+    { href: `${BASE}/web-checker`,  label: 'Monitor',     icon: '🩺' },
   ]},
 ]
 const ITEMS: Item[] = GROUPS.flatMap((g) => g.items)
