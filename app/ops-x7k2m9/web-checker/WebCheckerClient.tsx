@@ -20,7 +20,9 @@ const COLOR: Record<Status, { bg: string; fg: string; label: string }> = {
   FAIL: { bg: '#FDE7E7', fg: '#B3261E', label: '❌ FAIL' },
 }
 
-export default function WebCheckerClient({ runChecks, site }: { runChecks: () => Promise<RunResult>; site: string }) {
+type Health = { productsPub: number; complete: number; noImg: number; noPrice: number; healthPct: number; leadsNoOwner: number; overdueLeads: number; overdueTasks: number }
+
+export default function WebCheckerClient({ runChecks, site, health }: { runChecks: () => Promise<RunResult>; site: string; health?: Health }) {
   const [loading, setLoading] = useState(false)
   const [res, setRes] = useState<RunResult | null>(null)
   const [err, setErr] = useState('')
@@ -66,14 +68,41 @@ export default function WebCheckerClient({ runChecks, site }: { runChecks: () =>
       <div style={{ maxWidth: 860, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <h1 style={{ margin: 0, color: GREEN, fontSize: 22, fontWeight: 800 }}>🔍 ChutiBenz Web Checker</h1>
-            <div style={{ color: '#6b6a63', fontSize: 13, marginTop: 2 }}>ตรวจสถานะเว็บ/ฟีเจอร์แบบ read-only · {site}</div>
+            <h1 style={{ margin: 0, color: GREEN, fontSize: 22, fontWeight: 800 }}>🩺 System Monitor</h1>
+            <div style={{ color: '#6b6a63', fontSize: 13, marginTop: 2 }}>สุขภาพข้อมูล + ตรวจเว็บ (read-only) · เปิดหน้าเดียวรู้ระบบปกติไหม · {site}</div>
           </div>
           <button onClick={run} disabled={loading}
             style={{ background: loading ? '#9aa79d' : GREEN, color: '#fff', border: 'none', borderRadius: 10, padding: '11px 20px', fontSize: 15, fontWeight: 700, cursor: loading ? 'default' : 'pointer' }}>
             {loading ? 'กำลังตรวจ…' : '▶ Run Check'}
           </button>
         </div>
+
+        {/* Level B #5: Data Health at-a-glance */}
+        {health && (
+          <div style={{ marginTop: 18, background: '#fff', border: '1px solid #E7E0D0', borderRadius: 12, padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1, color: health.healthPct >= 80 ? '#1B7F3B' : health.healthPct >= 50 ? '#9A6A00' : '#B3261E' }}>{health.healthPct}%</div>
+              <div>
+                <div style={{ fontWeight: 700, color: GREEN, fontSize: 15 }}>คะแนนสุขภาพข้อมูลสินค้า</div>
+                <div style={{ fontSize: 12.5, color: '#6b6a63', marginTop: 2 }}>สินค้าเผยแพร่ {health.productsPub} ชิ้น · ข้อมูลครบ {health.complete} ชิ้น</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <MiniStat n={health.noImg} label="ไม่มีรูป" />
+              <MiniStat n={health.noPrice} label="ไม่มีราคา" />
+              <MiniStat n={health.leadsNoOwner} label="lead ไม่มีเจ้าของ" />
+              <MiniStat n={health.overdueLeads} label="lead เกินกำหนด" />
+              <MiniStat n={health.overdueTasks} label="งานเกินกำหนด" />
+            </div>
+            {(health.noImg || health.leadsNoOwner || health.overdueLeads || health.overdueTasks) ? (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {health.noImg > 0 && <div style={alertLine}>🖼️ {health.noImg} ชิ้นไม่มีรูป — ขายบนเว็บยาก (คิวถ่ายรูป)</div>}
+                {health.leadsNoOwner > 0 && <div style={alertLine}>👤 {health.leadsNoOwner} lead ยังไม่มีเจ้าของ — มอบหมายที่ Parts Desk</div>}
+                {(health.overdueLeads > 0 || health.overdueTasks > 0) && <div style={alertLine}>🔴 เกินกำหนด: lead {health.overdueLeads} · งาน {health.overdueTasks} — ดู Daily Brief</div>}
+              </div>
+            ) : <div style={{ marginTop: 12, color: '#1B7F3B', fontSize: 13, fontWeight: 600 }}>✅ ข้อมูลสุขภาพดี ไม่มีสัญญาณเตือน</div>}
+          </div>
+        )}
 
         {err && <div style={{ marginTop: 16, background: '#FDE7E7', color: '#B3261E', padding: '10px 14px', borderRadius: 10, fontSize: 14 }}>{err}</div>}
 
@@ -118,6 +147,17 @@ export default function WebCheckerClient({ runChecks, site }: { runChecks: () =>
 }
 
 const btn: React.CSSProperties = { background: '#fff', color: GREEN, border: `1px solid ${BRASS}`, borderRadius: 10, padding: '9px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
+const alertLine: React.CSSProperties = { background: '#FFF6E0', color: '#7a5b00', fontSize: 12.5, padding: '7px 11px', borderRadius: 8 }
+
+function MiniStat({ n, label }: { n: number; label: string }) {
+  const warn = n > 0
+  return (
+    <div style={{ flex: 1, minWidth: 82, textAlign: 'center', background: warn ? '#FFF6E0' : '#F1F6F2', border: `1px solid ${warn ? '#EAD9A6' : '#DCE7DE'}`, borderRadius: 10, padding: '8px 6px' }}>
+      <div style={{ fontSize: 18, fontWeight: 800, color: warn ? '#9A6A00' : '#1B7F3B' }}>{n}</div>
+      <div style={{ fontSize: 11, color: '#6b6a63' }}>{label}</div>
+    </div>
+  )
+}
 
 function Chip({ label, status, big }: { label: string; status: Status; big?: boolean }) {
   const c = COLOR[status]
