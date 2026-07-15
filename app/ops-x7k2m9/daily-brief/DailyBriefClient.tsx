@@ -69,13 +69,25 @@ function reorderSignals(sales: Row[], stock: Row[]): Row[] {
     .sort((a: any, b: any) => (a.urgent === b.urgent ? b.sold - a.sold : a.urgent ? -1 : 1))
 }
 
+// ----- product helpers (Level B: merge สัญญาณเสี่ยงจาก Risk Guard · อ่าน defensive) -----
+const pName = (p: Row) => p.name || p.name_en || p.title || '(ไม่มีชื่อ)'
+const pPart = (p: Row) => p.part_number || p.sku || p.oem_number || p.oem || p.part_no || ''
+const pModel = (p: Row) => p.car_model || (Array.isArray(p.compatible_models) ? p.compatible_models.join('/') : p.compatible_models) || ''
+const pPrice = (p: Row) => { const n = Number(p.price); return isNaN(n) ? 0 : n }
+const pImg = (p: Row) => p.image_url || p.image || p.cover_image || ''
+const pPublished = (p: Row) => p.is_published === true || p.is_published === 'true' || p.published === true
+const pCreated = (p: Row) => p.created_at || null
+const pUpdated = (p: Row) => p.updated_at || p.created_at || null
+const pDaysSince = (d?: string | null) => { if (!d) return null; const t = new Date(d).getTime(); if (isNaN(t)) return null; return Math.floor((Date.now() - t) / 86400000) }
+const AGED_DAYS = 60, STALE_DAYS = 45 // เกณฑ์ default เดียวกับ Risk Guard (ปรับเกณฑ์ละเอียดที่หน้า Risk Guard)
+
 function Badge({ label, bg, fg }: { label: string; bg: string; fg: string }) {
   return <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999 }}>{label}</span>
 }
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e7e3d8', borderRadius: 8, padding: '9px 11px', marginBottom: 6 }
 const qbtn: React.CSSProperties = { background: '#fff', border: '1px solid #ddd', color: '#333', borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }
 
-export default function DailyBriefClient({ leads, tasks, sales = [], stock = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[] }) {
+export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[] }) {
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
   const copy = (text: string, m = 'คัดลอกแล้ว') => navigator.clipboard?.writeText(text).then(() => flash(m))
@@ -115,6 +127,18 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [] 
   const reorder = useMemo(() => reorderSignals(sales, stock), [sales, stock])
   const reorderUrgent = reorder.filter((x) => x.urgent).length
 
+  // ===== Product risk buckets (Level B: merge จาก Risk Guard) =====
+  const P = useMemo(() => {
+    const pub = products.filter(pPublished)
+    const aged = pub.filter((p) => { const d = pDaysSince(pCreated(p)); return d !== null && d >= AGED_DAYS })
+      .sort((a, b) => (pDaysSince(pCreated(b)) || 0) - (pDaysSince(pCreated(a)) || 0))
+    const stale = pub.filter((p) => { const d = pDaysSince(pUpdated(p)); return d !== null && d >= STALE_DAYS })
+      .sort((a, b) => (pDaysSince(pUpdated(b)) || 0) - (pDaysSince(pUpdated(a)) || 0))
+    const incomplete = pub.filter((p) => !pImg(p) || pPrice(p) <= 0)
+    return { pubCount: pub.length, aged, stale, incomplete }
+  }, [products])
+  const stockRiskCount = P.aged.length + P.stale.length + P.incomplete.length
+
   // ===== Copy Daily Brief (รูปแบบตามสเปก) =====
   function briefText() {
     const fl = B.todayFollow.length
@@ -135,6 +159,8 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [] 
       '4) งานยังไม่มีเจ้าของ', `- ${unassignedCount} รายการ`, '',
       '5) เรื่องที่ควรตัดสินใจ', dc, '',
       '6) ของควรหา/สั่งเพิ่ม', ro, '',
+      '7) สต็อกเสี่ยง (Risk Guard)',
+      `- ค้างนาน ≥${AGED_DAYS}วัน: ${P.aged.length} · ไม่อัปเดต ≥${STALE_DAYS}วัน: ${P.stale.length} · ข้อมูลไม่ครบ: ${P.incomplete.length}`, '',
       'หมายเหตุ: AI ช่วยสรุป เจ้าของเป็นผู้ตัดสินใจ',
     ].join('\n')
   }
@@ -181,6 +207,8 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [] 
   if (unassignedCount) risks.push(`⚠️ งาน/ลูกค้ายังไม่มีเจ้าของ ${unassignedCount} รายการ`)
   if (B.decide.length) risks.push(`🧭 รอการตัดสินใจ ${B.decide.length} รายการ`)
   if (reorderUrgent) risks.push(`ของขายดีแต่หมดสต็อก ${reorderUrgent} รายการ — ควรหาเพิ่ม`)
+  if (P.aged.length) risks.push(`📦 ของค้างนาน ≥${AGED_DAYS} วัน ${P.aged.length} รายการ — เงินจม`)
+  if (P.incomplete.length) risks.push(`🖼️ ข้อมูลไม่ครบ (ไม่มีรูป/ราคา) ${P.incomplete.length} รายการ — ขายยากบนเว็บ`)
 
   const stat = (label: string, val: number, color: string) => (
     <div style={{ flex: 1, minWidth: 88, background: '#fff', borderRadius: 10, padding: '10px', textAlign: 'center', border: '1px solid #e7e3d8' }}>
@@ -212,6 +240,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [] 
           {stat('Task เกิน', B.overdueTasks.length, '#A32D2D')}
           {stat('ไม่มีเจ้าของ', unassignedCount, '#854F0B')}
           {stat('ต้องตัดสินใจ', B.decide.length, '#3C3489')}
+          {stat('สต็อกเสี่ยง', P.aged.length + P.incomplete.length, '#7A4E12')}
         </div>
 
         {/* quick actions */}
@@ -323,6 +352,18 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [] 
           )}
         </Section>
 
+        {/* 8) สต็อกเสี่ยง — Level B merge จาก Risk Guard */}
+        <Section title="🛡️ สต็อกเสี่ยง (Risk Guard)" count={stockRiskCount}>
+          {stockRiskCount === 0 ? <Empty /> : (
+            <>
+              <RiskMini title="📦 ค้างนาน" items={P.aged} kind="aged" />
+              <RiskMini title="🖼️ ข้อมูลไม่ครบ" items={P.incomplete} kind="incomplete" />
+              <RiskMini title="🕸️ ไม่อัปเดตนาน" items={P.stale} kind="stale" />
+              <a href="/ops-x7k2m9/risk-guard" style={{ ...qbtn, display: 'inline-block', textDecoration: 'none', marginTop: 2 }}>→ ดูทั้งหมด/ปรับเกณฑ์ที่ Risk Guard</a>
+            </>
+          )}
+        </Section>
+
         <div style={{ fontSize: 11, color: '#aaa', textAlign: 'center', padding: '10px 0 30px' }}>
           AI ช่วยสรุป · เจ้าของเป็นผู้ตัดสินใจ · หน้านี้อ่านอย่างเดียว จัดการงานจริงที่ Parts Desk
         </div>
@@ -342,6 +383,28 @@ function Section({ title, count, children }: { title: string; count: number; chi
   )
 }
 function Empty() { return <div style={{ ...card, color: '#aaa', fontSize: 12.5 }}>— ไม่มีรายการ —</div> }
+
+// Level B: มินิรายการสัญญาณเสี่ยงสต็อก (โชว์ 3 อันแรก + ลิงก์ไป Risk Guard)
+function RiskMini({ title, items, kind }: { title: string; items: Row[]; kind: 'aged' | 'stale' | 'incomplete' }) {
+  if (!items.length) return null
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#7A4E12', margin: '4px 0 3px' }}>{title} ({items.length})</div>
+      {items.slice(0, 3).map((p, i) => (
+        <div key={p.id || i} style={{ ...card, marginBottom: 4, borderLeft: '4px solid #854F0B' }}>
+          <b style={{ fontSize: 13 }}>{pName(p)}</b>
+          <span style={{ fontSize: 12, color: '#666' }}>
+            {pPart(p) ? ` [${pPart(p)}]` : ''}{pModel(p) ? ` · ${pModel(p)}` : ''}
+            {kind === 'aged' ? ` · ค้าง ${pDaysSince(pCreated(p))} วัน`
+              : kind === 'stale' ? ` · อัปเดตล่าสุด ${pDaysSince(pUpdated(p))} วัน`
+              : (!pImg(p) ? ' · ไม่มีรูป' : ' · ไม่มีราคา')}
+          </span>
+        </div>
+      ))}
+      {items.length > 3 && <div style={{ fontSize: 11.5, color: '#999', paddingLeft: 2 }}>…และอีก {items.length - 3} รายการ</div>}
+    </div>
+  )
+}
 
 function TaskRow({ t, overdue, leadModelPart }: { t: Row; overdue?: boolean; leadModelPart: (id?: string) => string }) {
   const pr = TASK_PRIORITY[t.priority || 'medium']
