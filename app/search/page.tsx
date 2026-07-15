@@ -118,12 +118,26 @@ export default async function SearchPage({
     bizQuery,
   ])
 
-  // Log analytics
+  // Log analytics (เดิม)
   if (q) {
     await supabase.from('events').insert({
       event_name: 'search_query',
       event_data: { q, resolved: searchQuery, model, cat },
     }).then(() => {})
+  }
+
+  // P0a: log ทุกการค้นหาเข้า search_queries (demand tracking · ไม่สร้าง lead)
+  // graceful: ถ้าตารางยังไม่ถูกสร้าง insert จะ error แต่ถูกกลืน ไม่กระทบผลค้นหา
+  if (q) {
+    const productCount = productsRes.data?.length || 0
+    await supabase.from('search_queries').insert({
+      query_text: q,
+      resolved: searchQuery,
+      model: model || null,
+      channel: 'web',
+      result_count: productCount,
+      had_results: productCount > 0,
+    }).then(() => {}, () => {})
   }
 
   return (
