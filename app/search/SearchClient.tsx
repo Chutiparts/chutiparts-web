@@ -1,4 +1,8 @@
-// app/search/SearchClient.tsx — UX v7 (P0a AI Search Assistant)
+// app/search/SearchClient.tsx — UX v8 (P0a + TH/EN i18n)
+// 2026-07-15 v8: หน้า /search รองรับสองภาษาจริง (เดิม EN toggle ไม่เปลี่ยนเนื้อหา)
+//               - import useLang → อ่าน lang · สตริง UI ทั้งหมดผ่าน local dict L[lang]
+//               - หมวดหมู่ใช้ label_en จาก constants (เพิ่มใน 06-constants patch)
+//               - ข้อความ pre-fill LINE เป็นสองภาษาด้วย · ชื่อสินค้า/บทความ = ตามข้อมูล DB (ภาษาเดียว ตามเฟสปัจจุบัน)
 // 2026-07-14 P0a: confidence banner (ตรงมาก/ใกล้เคียง/ต้องเช็ก) + human-confirm copy
 //               + per-card "ถามทาง LINE" CTA + strengthen empty state (no-hallucination)
 //               กฎ: ไม่เดา part number · ผลจากคลังจริง · คนยืนยันก่อนเสมอ
@@ -12,6 +16,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
 import { CHASSIS_MODELS, PARTS_CATEGORIES, LINE_OA_URL } from '@/lib/constants'
 import { useCart } from '@/app/context/CartContext'
+import { useLang, type Lang } from '@/app/context/LanguageContext'
 
 type Product = any
 type Article = any
@@ -28,18 +33,79 @@ type Props = {
   resolved: { canonical?: string; type?: string } | null
 }
 
+/* ---------- i18n dictionary (UI chrome เท่านั้น · ข้อมูลสินค้าอิง DB) ---------- */
+const L = {
+  th: {
+    ph_search: 'ค้นหาอะไหล่ เช่น ไฟท้าย, W140, ECU, ปลาวาฬ',
+    clear_search: 'ล้างคำค้นหา',
+    interpreted: 'ตีความเป็น:',
+    model: '🚗 รุ่น:',
+    category: '🏷 หมวด:',
+    tab_all: 'ทั้งหมด', tab_products: 'อะไหล่', tab_articles: 'บทความ', tab_businesses: 'อู่/ร้าน',
+    sort_label: 'เรียง:',
+    sort_latest: 'ล่าสุด', sort_price_asc: 'ราคาต่ำ→สูง', sort_price_desc: 'ราคาสูง→ต่ำ', sort_in_stock: 'มีของก่อน',
+    clear_all: 'ล้างทั้งหมด',
+    sec_parts: '🛒 อะไหล่', sec_articles: '📖 บทความ', sec_shops: '🔨 อู่/ร้าน',
+    biz_garage: '🔨 อู่', biz_shop: '🛒 ร้านอะไหล่',
+    ask_image: 'ขอภาพได้',
+    in_stock: '✓ มีของ', backorder: 'ขอเช็ก/สั่งจอง',
+    price_tbc: 'ราคา TBC', price_line: '💬 ติดต่อ LINE เช็คราคา',
+    add_cart: '🛒 ใส่ตะกร้า', added: '✓ เพิ่มแล้ว',
+    ask_line_card: '💬 ถามชิ้นนี้ทาง LINE',
+    // confidence
+    cf_exact: 'ตรงมาก', cf_near: 'ใกล้เคียง', cf_check: 'ต้องเช็ก',
+    cf_foot: '🔎 ผลจากคลังจริงของ ChutiBenz · ทีมยืนยันของและราคาก่อนเสมอ (ระบบไม่คาดเดารหัสอะไหล่)',
+    // bottom CTA
+    bc_title: 'ไม่เจอที่ต้องการ?',
+    bc_sub: 'ให้ทีม ChutiBenz ช่วยหา — ทัก LINE หรือฝากให้ทีมเช็ก (มีคนตอบจริง)',
+    bc_line: '💬 ปรึกษาใน LINE', bc_intake: '📋 ให้ทีมเช็กให้',
+    // empty state
+    es_badge: '🔵 ต้องเช็ก', es_head: 'ยังไม่พบในฐานข้อมูล',
+    es_body_1: 'ระบบไม่คาดเดารหัสอะไหล่ — ชิ้นนี้ยังไม่มีในคลัง ChutiBenz ตอนนี้',
+    es_body_2: 'ขอให้ทีมเช็กให้ หรือลองพิมพ์ชื่อ/รุ่นที่ต่างออกไป',
+    es_line: '💬 ทักทาย LINE', es_intake: '📋 ให้ทีม ChutiBenz เช็กให้',
+  },
+  en: {
+    ph_search: 'Search parts — e.g. taillight, W140, ECU',
+    clear_search: 'Clear search',
+    interpreted: 'Interpreted as:',
+    model: '🚗 Model:',
+    category: '🏷 Category:',
+    tab_all: 'All', tab_products: 'Parts', tab_articles: 'Articles', tab_businesses: 'Shops',
+    sort_label: 'Sort:',
+    sort_latest: 'Latest', sort_price_asc: 'Price low→high', sort_price_desc: 'Price high→low', sort_in_stock: 'In stock first',
+    clear_all: 'Clear all',
+    sec_parts: '🛒 Parts', sec_articles: '📖 Articles', sec_shops: '🔨 Garages & shops',
+    biz_garage: '🔨 Garage', biz_shop: '🛒 Parts shop',
+    ask_image: 'Photo on request',
+    in_stock: '✓ In stock', backorder: 'Check / backorder',
+    price_tbc: 'Price TBC', price_line: '💬 Ask price on LINE',
+    add_cart: '🛒 Add to cart', added: '✓ Added',
+    ask_line_card: '💬 Ask about this on LINE',
+    cf_exact: 'Exact match', cf_near: 'Close match', cf_check: 'Needs checking',
+    cf_foot: '🔎 Results from ChutiBenz real inventory · our team confirms availability & price first (the system never guesses part numbers)',
+    bc_title: "Can't find what you need?",
+    bc_sub: 'Let the ChutiBenz team help — message on LINE or ask us to check (a real person replies)',
+    bc_line: '💬 Ask on LINE', bc_intake: '📋 Ask the team to check',
+    es_badge: '🔵 Needs checking', es_head: 'Not found in our database yet',
+    es_body_1: "The system never guesses part numbers — this item isn't in ChutiBenz inventory right now.",
+    es_body_2: 'Ask our team to check, or try a different name/model.',
+    es_line: '💬 Message on LINE', es_intake: '📋 Ask ChutiBenz to check',
+  },
+} as const
+
 const TABS = [
-  { value: 'all', label: 'ทั้งหมด' },
-  { value: 'products', label: 'อะไหล่' },
-  { value: 'articles', label: 'บทความ' },
-  { value: 'businesses', label: 'อู่/ร้าน' },
+  { value: 'all', key: 'tab_all' as const },
+  { value: 'products', key: 'tab_products' as const },
+  { value: 'articles', key: 'tab_articles' as const },
+  { value: 'businesses', key: 'tab_businesses' as const },
 ]
 
 const SORT_OPTIONS = [
-  { value: 'latest', label: 'ล่าสุด' },
-  { value: 'price_asc', label: 'ราคาต่ำ→สูง' },
-  { value: 'price_desc', label: 'ราคาสูง→ต่ำ' },
-  { value: 'in_stock', label: 'มีของก่อน' },
+  { value: 'latest', key: 'sort_latest' as const },
+  { value: 'price_asc', key: 'sort_price_asc' as const },
+  { value: 'price_desc', key: 'sort_price_desc' as const },
+  { value: 'in_stock', key: 'sort_in_stock' as const },
 ]
 
 // Detect placeholder pricing (default values from Excel V11 bulk-add)
@@ -60,13 +126,16 @@ function highlightTerm(text: string, term: string): React.ReactNode {
   )
 }
 
-function lineAskMessage(productName: string, partNumber?: string): string {
+// pre-fill LINE message — สองภาษา (ผู้รับ = Chuti อ่านได้ทั้งคู่)
+function lineAskMessage(lang: Lang, productName: string, partNumber?: string): string {
   const code = partNumber ? ` (${partNumber})` : ''
-  return `สวัสดีพี่ Chuti อยากสอบถามราคา/รูป "${productName}${code}" ครับ`
+  return lang === 'en'
+    ? `Hi Chuti, I'd like to ask the price/photo of "${productName}${code}".`
+    : `สวัสดีพี่ Chuti อยากสอบถามราคา/รูป "${productName}${code}" ครับ`
 }
 
-function lineAskUrl(productName: string, partNumber?: string): string {
-  return `${LINE_OA_URL}?text=${encodeURIComponent(lineAskMessage(productName, partNumber))}`
+function lineAskUrl(lang: Lang, productName: string, partNumber?: string): string {
+  return `${LINE_OA_URL}?text=${encodeURIComponent(lineAskMessage(lang, productName, partNumber))}`
 }
 
 // P0a: จัดระดับความมั่นใจของผลค้น — ไม่เดา ตัดสินจากข้อมูลจริงเท่านั้น
@@ -115,6 +184,8 @@ export default function SearchClient({
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
+  const { lang } = useLang()
+  const tr = L[lang]
   const [q, setQ] = useState(initialQuery)
   const [model, setModel] = useState(initialModel)
   const [cat, setCat] = useState(initialCategory)
@@ -160,21 +231,21 @@ export default function SearchClient({
             type="text"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="ค้นหาอะไหล่ เช่น ไฟท้าย, W140, ECU, ปลาวาฬ"
+            placeholder={tr.ph_search}
             className="w-full rounded-xl border-2 border-gray-300 bg-white py-4 pl-12 pr-12 text-lg focus:border-yellow-500 focus:outline-none"
           />
           {q && (
             <button
               onClick={() => setQ('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xl"
-              aria-label="ล้างคำค้นหา"
+              aria-label={tr.clear_search}
             >✕</button>
           )}
         </div>
 
         {resolved?.canonical && resolved.canonical !== q && (
           <p className="text-sm text-gray-600 mt-2">
-            💡 ตีความเป็น: <strong className="text-yellow-700">{resolved.canonical}</strong> ({resolved.type})
+            💡 {tr.interpreted} <strong className="text-yellow-700">{resolved.canonical}</strong> ({resolved.type})
           </p>
         )}
       </div>
@@ -182,7 +253,7 @@ export default function SearchClient({
       {/* Filters */}
       <div className="mb-6 space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold text-gray-600">🚗 รุ่น:</span>
+          <span className="text-sm font-semibold text-gray-600">{tr.model}</span>
           {CHASSIS_MODELS.map((m) => (
             <button
               key={m}
@@ -198,8 +269,8 @@ export default function SearchClient({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold text-gray-600">🏷 หมวด:</span>
-          {PARTS_CATEGORIES.slice(0, 8).map((c) => (
+          <span className="text-sm font-semibold text-gray-600">{tr.category}</span>
+          {PARTS_CATEGORIES.slice(0, 8).map((c: any) => (
             <button
               key={c.value}
               onClick={() => setCat(cat === c.value ? '' : c.value)}
@@ -209,7 +280,7 @@ export default function SearchClient({
                   ? 'bg-blue-500 text-white border-blue-500'
                   : 'bg-white border-gray-200 hover:border-blue-400',
               ].join(' ')}
-            >{c.label}</button>
+            >{lang === 'en' ? (c.label_en ?? c.label) : c.label}</button>
           ))}
         </div>
       </div>
@@ -225,32 +296,36 @@ export default function SearchClient({
                 'rounded-md px-4 py-2 text-sm font-semibold transition',
                 tab === t.value ? 'bg-white text-gray-900 shadow' : 'text-gray-600',
               ].join(' ')}
-            >{t.label}</button>
+            >{tr[t.key]}</button>
           ))}
         </div>
         <div className="flex items-center gap-3 text-sm flex-wrap">
           {(tab === 'all' || tab === 'products') && products.length > 1 && (
             <div className="flex items-center gap-2">
-              <label className="text-gray-600">เรียง:</label>
+              <label className="text-gray-600">{tr.sort_label}</label>
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value)}
                 className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm focus:border-yellow-500 focus:outline-none"
               >
                 {SORT_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
+                  <option key={s.value} value={s.value}>{tr[s.key]}</option>
                 ))}
               </select>
             </div>
           )}
-          <span>พบ <strong>{totalCount}</strong> รายการ</span>
+          <span>
+            {lang === 'en'
+              ? <><strong>{totalCount}</strong> results</>
+              : <>พบ <strong>{totalCount}</strong> รายการ</>}
+          </span>
           {hasFilters && (
             <button
               onClick={() => {
                 setQ(''); setModel(''); setCat(''); setTab('all')
               }}
               className="text-yellow-700 underline"
-            >ล้างทั้งหมด</button>
+            >{tr.clear_all}</button>
           )}
         </div>
       </div>
@@ -266,7 +341,7 @@ export default function SearchClient({
           {/* Products */}
           {filteredByTab.p.length > 0 && (
             <section className="mb-8">
-              <h2 className="text-lg font-bold mb-3">🛒 อะไหล่ ({products.length})</h2>
+              <h2 className="text-lg font-bold mb-3">{tr.sec_parts} ({products.length})</h2>
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {filteredByTab.p.map((p: any) => (
                   <ProductCard key={p.id} p={p} highlight={highlightWord} />
@@ -278,7 +353,7 @@ export default function SearchClient({
           {/* Articles */}
           {filteredByTab.a.length > 0 && (
             <section className="mb-8">
-              <h2 className="text-lg font-bold mb-3">📖 บทความ ({articles.length})</h2>
+              <h2 className="text-lg font-bold mb-3">{tr.sec_articles} ({articles.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {filteredByTab.a.map((a: any) => (
                   <Link key={a.id} href={`/articles/${a.slug}`}
@@ -295,7 +370,7 @@ export default function SearchClient({
           {/* Businesses */}
           {filteredByTab.b.length > 0 && (
             <section className="mb-8">
-              <h2 className="text-lg font-bold mb-3">🔨 อู่/ร้าน ({businesses.length})</h2>
+              <h2 className="text-lg font-bold mb-3">{tr.sec_shops} ({businesses.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {filteredByTab.b.map((b: any) => (
                   <Link key={b.id} href={`/businesses/${b.slug}`}
@@ -305,7 +380,7 @@ export default function SearchClient({
                       <h3 className="font-bold">{b.name}</h3>
                       {b.verified && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">✓ Verified</span>}
                     </div>
-                    <p className="text-xs text-gray-600">{b.type === 'garage' ? '🔨 อู่' : '🛒 ร้านอะไหล่'} · {b.province}</p>
+                    <p className="text-xs text-gray-600">{b.type === 'garage' ? tr.biz_garage : tr.biz_shop} · {b.province}</p>
                   </Link>
                 ))}
               </div>
@@ -323,12 +398,21 @@ export default function SearchClient({
 /* ---------- Confidence banner (P0a) ---------- */
 
 function ConfidenceBanner({ level, count, query }: { level: 'exact' | 'near' | 'check'; count: number; query: string }) {
+  const { lang } = useLang()
+  const tr = L[lang]
+  const descExact = lang === 'en' ? `${count} exact match(es) by code/model` : `เจอตรงรหัส/รุ่น ${count} รายการ`
+  const descNear = lang === 'en'
+    ? `${count} close result(s) — our team can confirm availability & price`
+    : `เจอ ${count} รายการที่ใกล้เคียง — ทีมช่วยยืนยันของ/ราคาให้ได้`
+  const descCheck = lang === 'en'
+    ? 'Not found in our database yet — let the ChutiBenz team check for you'
+    : 'ยังไม่พบตรงในฐานข้อมูล — ขอให้ทีม ChutiBenz เช็กให้'
   const cfg =
     level === 'exact'
-      ? { wrap: 'bg-green-50 border-green-200', dot: '🟢', title: 'text-green-800', label: 'ตรงมาก', desc: `เจอตรงรหัส/รุ่น ${count} รายการ` }
+      ? { wrap: 'bg-green-50 border-green-200', dot: '🟢', title: 'text-green-800', label: tr.cf_exact, desc: descExact }
       : level === 'near'
-      ? { wrap: 'bg-amber-50 border-amber-200', dot: '🟡', title: 'text-amber-800', label: 'ใกล้เคียง', desc: `เจอ ${count} รายการที่ใกล้เคียง — ทีมช่วยยืนยันของ/ราคาให้ได้` }
-      : { wrap: 'bg-blue-50 border-blue-200', dot: '🔵', title: 'text-blue-800', label: 'ต้องเช็ก', desc: 'ยังไม่พบตรงในฐานข้อมูล — ขอให้ทีม ChutiBenz เช็กให้' }
+      ? { wrap: 'bg-amber-50 border-amber-200', dot: '🟡', title: 'text-amber-800', label: tr.cf_near, desc: descNear }
+      : { wrap: 'bg-blue-50 border-blue-200', dot: '🔵', title: 'text-blue-800', label: tr.cf_check, desc: descCheck }
   return (
     <div className={`mb-4 rounded-xl border p-3 ${cfg.wrap}`}>
       <div className="flex items-center gap-2 flex-wrap">
@@ -336,7 +420,7 @@ function ConfidenceBanner({ level, count, query }: { level: 'exact' | 'near' | '
         <span className="text-sm text-gray-600">· {cfg.desc}</span>
       </div>
       <p className="text-xs text-gray-500 mt-1">
-        🔎 ผลจากคลังจริงของ ChutiBenz · ทีมยืนยันของและราคาก่อนเสมอ (ระบบไม่คาดเดารหัสอะไหล่)
+        {tr.cf_foot}
       </p>
     </div>
   )
@@ -346,6 +430,8 @@ function ConfidenceBanner({ level, count, query }: { level: 'exact' | 'near' | '
 
 function ProductCard({ p, highlight }: { p: any; highlight: string }) {
   const { addItem } = useCart()
+  const { lang } = useLang()
+  const tr = L[lang]
   const [added, setAdded] = useState(false)
   const placeholder = isPlaceholderPrice(p)
   const stock = p.stock ?? 0
@@ -371,7 +457,7 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
   const handleAskLine = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    window.open(lineAskUrl(p.name, p.part_number), '_blank', 'noopener,noreferrer')
+    window.open(lineAskUrl(lang, p.name, p.part_number), '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -391,7 +477,7 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
             <div className="text-3xl sm:text-4xl mb-1 opacity-60">⚙️</div>
             <div className="text-xs sm:text-sm font-bold text-gray-600 px-2 text-center line-clamp-2">{chassis || 'ChutiBenz'}</div>
             <div className="absolute top-2 right-2 text-[10px] sm:text-xs bg-white/80 backdrop-blur text-gray-500 px-2 py-0.5 rounded-full">
-              ขอภาพได้
+              {tr.ask_image}
             </div>
           </div>
         )}
@@ -411,11 +497,11 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
             )}
             {inStock ? (
               <span className="text-[10px] sm:text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                ✓ มีของ
+                {tr.in_stock}
               </span>
             ) : (
               <span className="text-[10px] sm:text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
-                ขอเช็ก/สั่งจอง
+                {tr.backorder}
               </span>
             )}
           </div>
@@ -426,8 +512,8 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
           {/* Price */}
           {placeholder ? (
             <div className="mt-auto">
-              <p className="text-amber-600 font-bold text-sm">ราคา TBC</p>
-              <p className="text-[11px] text-gray-500">💬 ติดต่อ LINE เช็คราคา</p>
+              <p className="text-amber-600 font-bold text-sm">{tr.price_tbc}</p>
+              <p className="text-[11px] text-gray-500">{tr.price_line}</p>
             </div>
           ) : (
             <p className="text-green-600 font-bold mt-auto">
@@ -440,7 +526,7 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
             <button
               type="button"
               onClick={handleAdd}
-              aria-label={`ใส่ตะกร้า ${p.name}`}
+              aria-label={`${tr.add_cart} ${p.name}`}
               className={[
                 'mt-3 w-full py-2 text-sm font-semibold rounded-lg transition flex items-center justify-center gap-1.5',
                 added
@@ -448,7 +534,7 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
                   : 'bg-gray-900 hover:bg-gray-800 text-white',
               ].join(' ')}
             >
-              {added ? '✓ เพิ่มแล้ว' : '🛒 ใส่ตะกร้า'}
+              {added ? tr.added : tr.add_cart}
             </button>
           )}
 
@@ -456,10 +542,10 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
           <button
             type="button"
             onClick={handleAskLine}
-            aria-label={`ถามทาง LINE ${p.name}`}
+            aria-label={`${tr.ask_line_card} ${p.name}`}
             className="mt-2 w-full py-2 text-sm font-semibold rounded-lg border border-green-500 text-green-700 hover:bg-green-50 transition flex items-center justify-center gap-1.5"
           >
-            💬 ถามชิ้นนี้ทาง LINE
+            {tr.ask_line_card}
           </button>
         </div>
       </article>
@@ -470,16 +556,18 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
 /* ---------- Bottom CTA (after results) ---------- */
 
 function BottomCta({ query }: { query: string }) {
-  const txt = query
-    ? `สวัสดีพี่ Chuti ค้นหา "${query}" บนเว็บแล้ว อยากให้พี่ช่วยเช็คเพิ่มครับ`
-    : 'สวัสดีพี่ Chuti อยากปรึกษาเรื่องอะไหล่ครับ'
+  const { lang } = useLang()
+  const tr = L[lang]
+  const txt = lang === 'en'
+    ? (query ? `Hi Chuti, I searched "${query}" on the site — could you help check further?` : "Hi Chuti, I'd like to ask about a part.")
+    : (query ? `สวัสดีพี่ Chuti ค้นหา "${query}" บนเว็บแล้ว อยากให้พี่ช่วยเช็คเพิ่มครับ` : 'สวัสดีพี่ Chuti อยากปรึกษาเรื่องอะไหล่ครับ')
   const intakeHref = query ? `/intake?q=${encodeURIComponent(query)}` : '/intake'
   return (
     <div className="mt-8 bg-gradient-to-r from-yellow-50 to-green-50 rounded-2xl p-5 sm:p-6 border border-yellow-200">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
         <div>
-          <p className="font-bold text-gray-800">ไม่เจอที่ต้องการ?</p>
-          <p className="text-sm text-gray-600">ให้ทีม ChutiBenz ช่วยหา — ทัก LINE หรือฝากให้ทีมเช็ก (มีคนตอบจริง)</p>
+          <p className="font-bold text-gray-800">{tr.bc_title}</p>
+          <p className="text-sm text-gray-600">{tr.bc_sub}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <a
@@ -487,11 +575,11 @@ function BottomCta({ query }: { query: string }) {
             target="_blank"
             rel="noopener noreferrer"
             className="rounded-lg bg-green-500 hover:bg-green-600 text-white px-5 py-3 font-semibold text-center whitespace-nowrap"
-          >💬 ปรึกษาใน LINE</a>
+          >{tr.bc_line}</a>
           <Link
             href={intakeHref}
             className="rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 font-semibold text-center whitespace-nowrap"
-          >📋 ให้ทีมเช็กให้</Link>
+          >{tr.bc_intake}</Link>
         </div>
       </div>
     </div>
@@ -501,21 +589,23 @@ function BottomCta({ query }: { query: string }) {
 /* ---------- Empty state ---------- */
 
 function EmptyState({ query }: { query: string }) {
-  const txt = query
-    ? `สวัสดีพี่ Chuti ค้นหา "${query}" ในเว็บไม่เจอ ขอให้ช่วยหาให้ครับ`
-    : 'สวัสดีพี่ Chuti อยากปรึกษาเรื่องอะไหล่ครับ'
+  const { lang } = useLang()
+  const tr = L[lang]
+  const txt = lang === 'en'
+    ? (query ? `Hi Chuti, I searched "${query}" but couldn't find it — could you help me find it?` : "Hi Chuti, I'd like to ask about a part.")
+    : (query ? `สวัสดีพี่ Chuti ค้นหา "${query}" ในเว็บไม่เจอ ขอให้ช่วยหาให้ครับ` : 'สวัสดีพี่ Chuti อยากปรึกษาเรื่องอะไหล่ครับ')
   const intakeHref = query ? `/intake?q=${encodeURIComponent(query)}` : '/intake'
   return (
     <div className="text-center py-16 bg-white rounded-2xl">
       <div className="text-7xl mb-4">🔍</div>
       <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 mb-3">
-        <span className="text-sm font-bold text-blue-800">🔵 ต้องเช็ก</span>
+        <span className="text-sm font-bold text-blue-800">{tr.es_badge}</span>
       </div>
-      <h2 className="text-xl font-bold text-gray-800 mb-2">ยังไม่พบในฐานข้อมูล</h2>
+      <h2 className="text-xl font-bold text-gray-800 mb-2">{tr.es_head}</h2>
       <p className="text-gray-600 mb-6 max-w-md mx-auto">
-        ระบบไม่คาดเดารหัสอะไหล่ — ชิ้นนี้ยังไม่มีในคลัง ChutiBenz ตอนนี้
+        {tr.es_body_1}
         <br />
-        ขอให้ทีมเช็กให้ หรือลองพิมพ์ชื่อ/รุ่นที่ต่างออกไป
+        {tr.es_body_2}
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <a
@@ -523,10 +613,10 @@ function EmptyState({ query }: { query: string }) {
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-lg bg-green-500 hover:bg-green-600 text-white px-6 py-3 font-semibold"
-        >💬 ทักทาย LINE</a>
+        >{tr.es_line}</a>
         <Link href={intakeHref}
           className="rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 font-semibold"
-        >📋 ให้ทีม ChutiBenz เช็กให้</Link>
+        >{tr.es_intake}</Link>
       </div>
     </div>
   )
