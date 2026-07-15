@@ -3,6 +3,7 @@
 // อ่านการขายจริงจาก Ledger → บวก "ต้นทุนแฝง" (ค่านำเข้า/ค่าเงิน % · ค่าส่ง/แพ็ก ฿ · ค่าธรรมเนียม %) → กำไรจริง
 // ปัจจัย + เกณฑ์บาง จำใน localStorage · อ่านล้วน ไม่แก้ Ledger · ธง ขาดทุนจริง/บาง/ok
 import { useMemo, useState, useEffect } from 'react'
+import ProfitGuardClient from '../profit-guard/ProfitGuardClient' // Level B: Profit Guard เป็นแท็บในหน้านี้
 
 type Row = Record<string, any>
 const GREEN = '#17301F', BRASS = '#B8895A', CREAM = '#F4EFE4'
@@ -34,6 +35,7 @@ const finp: React.CSSProperties = { width: 74, padding: '6px 8px', border: '1px 
 
 export default function LandedCostClient({ sales }: { sales: Row[] }) {
   const [f, setF] = useState(DEFAULTS)
+  const [tab, setTab] = useState<'landed' | 'profit'>('landed')
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1500) }
   useEffect(() => { try { const s = localStorage.getItem(LS_KEY); if (s) setF({ ...DEFAULTS, ...JSON.parse(s) }) } catch {} }, [])
@@ -89,7 +91,16 @@ export default function LandedCostClient({ sales }: { sales: Row[] }) {
         </div>
       </div>
 
-      <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
+      {/* Level B: tab Landed Cost / Profit Guard */}
+      <div style={{ display: 'flex', gap: 6, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e7e3d8', flexWrap: 'wrap' }}>
+        {([['landed', '🧮 Landed Cost'], ['profit', '📊 Profit Guard (ก่อนขาย)']] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setTab(k)} style={{ border: `1px solid ${tab === k ? GREEN : '#ddd'}`, background: tab === k ? GREEN : '#fff', color: tab === k ? '#fff' : GREEN, borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'profit' && <ProfitGuardClient />}
+
+      {tab === 'landed' && <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
         {/* ปัจจัยต้นทุนแฝง */}
         <div style={{ ...card, background: '#fbfaf6' }}>
           <div style={{ fontWeight: 700, color: GREEN, fontSize: 13, marginBottom: 8 }}>⚙️ ตั้งค่าต้นทุนแฝง (จำอัตโนมัติ · ปรับตามจริงของร้าน)</div>
@@ -139,7 +150,7 @@ export default function LandedCostClient({ sales }: { sales: Row[] }) {
         <div style={{ fontSize: 11, color: '#aaa', textAlign: 'center', padding: '10px 0 30px' }}>
           กำไรจริง = ราคาขาย − (ต้นทุน + ค่านำเข้า% + ค่าส่ง + ค่าธรรมเนียม%) · ตั้งค่าปัจจัยตามจริงของร้าน · อ่านจาก Ledger ไม่แก้ข้อมูล
         </div>
-      </div>
+      </div>}
 
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: GREEN, color: '#fff', padding: '8px 16px', borderRadius: 999, fontSize: 13, zIndex: 20 }}>{toast}</div>}
     </div>
