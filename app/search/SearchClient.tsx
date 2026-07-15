@@ -1,5 +1,8 @@
-// app/search/SearchClient.tsx — UX v6
-// 2026-06-10: เพิ่มปุ่ม "ใส่ตะกร้า" ในการ์ดสินค้า (เชื่อม CartContext)
+// app/search/SearchClient.tsx — UX v7 (P0a AI Search Assistant)
+// 2026-07-14 P0a: confidence banner (ตรงมาก/ใกล้เคียง/ต้องเช็ก) + human-confirm copy
+//               + per-card "ถามทาง LINE" CTA + strengthen empty state (no-hallucination)
+//               กฎ: ไม่เดา part number · ผลจากคลังจริง · คนยืนยันก่อนเสมอ
+// 2026-06-10 v6: เพิ่มปุ่ม "ใส่ตะกร้า" ในการ์ดสินค้า (เชื่อม CartContext)
 // เดิม v5: smart price, branded placeholder, sort, highlight, LINE CTA
 
 'use client'
@@ -66,6 +69,22 @@ function lineAskUrl(productName: string, partNumber?: string): string {
   return `${LINE_OA_URL}?text=${encodeURIComponent(lineAskMessage(productName, partNumber))}`
 }
 
+// P0a: จัดระดับความมั่นใจของผลค้น — ไม่เดา ตัดสินจากข้อมูลจริงเท่านั้น
+// exact = คำค้นตรงรหัส part/OEM ของสินค้าที่เจอ · near = เจอแต่ไม่ตรงรหัสเป๊ะ · check = ไม่เจอ
+function classifyConfidence(query: string, products: any[]): 'exact' | 'near' | 'check' {
+  if (!products || products.length === 0) return 'check'
+  const qn = query.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+  if (qn.length >= 3) {
+    const exact = products.some((p) => {
+      const pn = String(p.part_number || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+      const on = String(p.oem_number || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+      return (pn && pn === qn) || (on && on === qn)
+    })
+    if (exact) return 'exact'
+  }
+  return 'near'
+}
+
 function sortProducts(items: Product[], sort: string): Product[] {
   // P0.4: มีรูปขึ้นก่อน ไร้รูปต่อท้าย (การเรียงเดิมยังอยู่ภายในแต่ละกลุ่ม)
   const base = sortProductsBase(items, sort)
@@ -120,6 +139,7 @@ export default function SearchClient({
   const hasFilters = q || model || cat
 
   const sortedProducts = useMemo(() => sortProducts(products, sort), [products, sort])
+  const confidence = useMemo(() => classifyConfidence(initialQuery, products), [initialQuery, products])
 
   const filteredByTab = (() => {
     if (tab === 'products') return { p: sortedProducts, a: [], b: [] }
@@ -240,6 +260,9 @@ export default function SearchClient({
         <EmptyState query={q} />
       ) : (
         <>
+          {/* P0a: confidence banner + human-confirm (แสดงเมื่อมีคำค้น) */}
+          {q && <ConfidenceBanner level={confidence} count={products.length} query={q} />}
+
           {/* Products */}
           {filteredByTab.p.length > 0 && (
             <section className="mb-8">
@@ -297,6 +320,28 @@ export default function SearchClient({
   )
 }
 
+/* ---------- Confidence banner (P0a) ---------- */
+
+function ConfidenceBanner({ level, count, query }: { level: 'exact' | 'near' | 'check'; count: number; query: string }) {
+  const cfg =
+    level === 'exact'
+      ? { wrap: 'bg-green-50 border-green-200', dot: '🟢', title: 'text-green-800', label: 'ตรงมาก', desc: `เจอตรงรหัส/รุ่น ${count} รายการ` }
+      : level === 'near'
+      ? { wrap: 'bg-amber-50 border-amber-200', dot: '🟡', title: 'text-amber-800', label: 'ใกล้เคียง', desc: `เจอ ${count} รายการที่ใกล้เคียง — ทีมช่วยยืนยันของ/ราคาให้ได้` }
+      : { wrap: 'bg-blue-50 border-blue-200', dot: '🔵', title: 'text-blue-800', label: 'ต้องเช็ก', desc: 'ยังไม่พบตรงในฐานข้อมูล — ขอให้ทีม ChutiBenz เช็กให้' }
+  return (
+    <div className={`mb-4 rounded-xl border p-3 ${cfg.wrap}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`text-sm font-bold ${cfg.title}`}>{cfg.dot} {cfg.label}</span>
+        <span className="text-sm text-gray-600">· {cfg.desc}</span>
+      </div>
+      <p className="text-xs text-gray-500 mt-1">
+        🔎 ผลจากคลังจริงของ ChutiBenz · ทีมยืนยันของและราคาก่อนเสมอ (ระบบไม่คาดเดารหัสอะไหล่)
+      </p>
+    </div>
+  )
+}
+
 /* ---------- ProductCard ---------- */
 
 function ProductCard({ p, highlight }: { p: any; highlight: string }) {
@@ -320,6 +365,13 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
     }, 1)
     setAdded(true)
     window.setTimeout(() => setAdded(false), 1500)
+  }
+
+  // P0a: ถามชิ้นนี้ทาง LINE (การ์ดทั้งใบเป็น Link → ใช้ window.open เลี่ยง anchor ซ้อน)
+  const handleAskLine = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    window.open(lineAskUrl(p.name, p.part_number), '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -362,8 +414,8 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
                 ✓ มีของ
               </span>
             ) : (
-              <span className="text-[10px] sm:text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
-                สั่งจอง
+              <span className="text-[10px] sm:text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
+                ขอเช็ก/สั่งจอง
               </span>
             )}
           </div>
@@ -383,7 +435,7 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
             </p>
           )}
 
-          {/* Add to cart */}
+          {/* Add to cart (in stock only) */}
           {inStock && (
             <button
               type="button"
@@ -399,6 +451,16 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
               {added ? '✓ เพิ่มแล้ว' : '🛒 ใส่ตะกร้า'}
             </button>
           )}
+
+          {/* P0a: ถามชิ้นนี้ทาง LINE (ทุกการ์ด · ให้คนยืนยัน) */}
+          <button
+            type="button"
+            onClick={handleAskLine}
+            aria-label={`ถามทาง LINE ${p.name}`}
+            className="mt-2 w-full py-2 text-sm font-semibold rounded-lg border border-green-500 text-green-700 hover:bg-green-50 transition flex items-center justify-center gap-1.5"
+          >
+            💬 ถามชิ้นนี้ทาง LINE
+          </button>
         </div>
       </article>
     </Link>
@@ -411,19 +473,26 @@ function BottomCta({ query }: { query: string }) {
   const txt = query
     ? `สวัสดีพี่ Chuti ค้นหา "${query}" บนเว็บแล้ว อยากให้พี่ช่วยเช็คเพิ่มครับ`
     : 'สวัสดีพี่ Chuti อยากปรึกษาเรื่องอะไหล่ครับ'
+  const intakeHref = query ? `/intake?q=${encodeURIComponent(query)}` : '/intake'
   return (
     <div className="mt-8 bg-gradient-to-r from-yellow-50 to-green-50 rounded-2xl p-5 sm:p-6 border border-yellow-200">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
         <div>
           <p className="font-bold text-gray-800">ไม่เจอที่ต้องการ?</p>
-          <p className="text-sm text-gray-600">พี่ Chuti ช่วยหาอะไหล่หายากให้ — ทักทาย LINE ได้เลย</p>
+          <p className="text-sm text-gray-600">ให้ทีม ChutiBenz ช่วยหา — ทัก LINE หรือฝากให้ทีมเช็ก (มีคนตอบจริง)</p>
         </div>
-        <a
-          href={`${LINE_OA_URL}?text=${encodeURIComponent(txt)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-lg bg-green-500 hover:bg-green-600 text-white px-5 py-3 font-semibold text-center whitespace-nowrap"
-        >💬 ปรึกษาใน LINE</a>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <a
+            href={`${LINE_OA_URL}?text=${encodeURIComponent(txt)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg bg-green-500 hover:bg-green-600 text-white px-5 py-3 font-semibold text-center whitespace-nowrap"
+          >💬 ปรึกษาใน LINE</a>
+          <Link
+            href={intakeHref}
+            className="rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 font-semibold text-center whitespace-nowrap"
+          >📋 ให้ทีมเช็กให้</Link>
+        </div>
       </div>
     </div>
   )
@@ -435,14 +504,18 @@ function EmptyState({ query }: { query: string }) {
   const txt = query
     ? `สวัสดีพี่ Chuti ค้นหา "${query}" ในเว็บไม่เจอ ขอให้ช่วยหาให้ครับ`
     : 'สวัสดีพี่ Chuti อยากปรึกษาเรื่องอะไหล่ครับ'
+  const intakeHref = query ? `/intake?q=${encodeURIComponent(query)}` : '/intake'
   return (
     <div className="text-center py-16 bg-white rounded-2xl">
       <div className="text-7xl mb-4">🔍</div>
-      <h2 className="text-xl font-bold text-gray-800 mb-2">ไม่พบรายการที่ค้น</h2>
+      <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 mb-3">
+        <span className="text-sm font-bold text-blue-800">🔵 ต้องเช็ก</span>
+      </div>
+      <h2 className="text-xl font-bold text-gray-800 mb-2">ยังไม่พบในฐานข้อมูล</h2>
       <p className="text-gray-600 mb-6 max-w-md mx-auto">
-        ลองพิมพ์ชื่อ ชิ้นส่วน หรือรุ่นรถที่ต่างออกไป
+        ระบบไม่คาดเดารหัสอะไหล่ — ชิ้นนี้ยังไม่มีในคลัง ChutiBenz ตอนนี้
         <br />
-        หรือบอกเราใน LINE เราจะช่วยหาให้
+        ขอให้ทีมเช็กให้ หรือลองพิมพ์ชื่อ/รุ่นที่ต่างออกไป
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <a
@@ -451,9 +524,9 @@ function EmptyState({ query }: { query: string }) {
           rel="noopener noreferrer"
           className="rounded-lg bg-green-500 hover:bg-green-600 text-white px-6 py-3 font-semibold"
         >💬 ทักทาย LINE</a>
-        <Link href="/intake"
+        <Link href={intakeHref}
           className="rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 font-semibold"
-        >📋 ส่งอาการรถ</Link>
+        >📋 ให้ทีม ChutiBenz เช็กให้</Link>
       </div>
     </div>
   )
