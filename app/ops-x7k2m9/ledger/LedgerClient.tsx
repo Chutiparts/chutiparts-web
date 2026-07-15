@@ -4,6 +4,7 @@
 // P3.3: เพิ่มช่อง "แหล่งซื้อ" (stock_records.source) — ฟอร์มเพิ่ม/แก้ + การ์ด + export
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import FinanceClient from '../finance/FinanceClient' // Level B: Finance Lite เป็นแท็บในหน้านี้
 
 type Row = Record<string, any>
 const GREEN = '#17301F', BRASS = '#B8895A', CREAM = '#F4EFE4'
@@ -50,11 +51,11 @@ const inp: React.CSSProperties = { width: '100%', padding: '7px 9px', border: '1
 function dl(name: string, text: string, type: string) { const u = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u) }
 const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`
 
-export default function LedgerClient({ sales, stock, addSale, updateSale, addStock, updateStock }:
-  { sales: Row[]; stock: Row[]; addSale: (fd: FormData) => Promise<void>; updateSale: (fd: FormData) => Promise<void>; addStock: (fd: FormData) => Promise<void>; updateStock: (fd: FormData) => Promise<void> }) {
+export default function LedgerClient({ sales, stock, addSale, updateSale, addStock, updateStock, entries = [], addEntry, deleteEntry }:
+  { sales: Row[]; stock: Row[]; addSale: (fd: FormData) => Promise<void>; updateSale: (fd: FormData) => Promise<void>; addStock: (fd: FormData) => Promise<void>; updateStock: (fd: FormData) => Promise<void>; entries?: Row[]; addEntry?: (fd: FormData) => Promise<void>; deleteEntry?: (fd: FormData) => Promise<void> }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [tab, setTab] = useState<'sales' | 'stock'>('sales')
+  const [tab, setTab] = useState<'sales' | 'stock' | 'finance'>('sales')
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
 
@@ -70,7 +71,7 @@ export default function LedgerClient({ sales, stock, addSale, updateSale, addSto
       </div>
 
       <div style={{ display: 'flex', gap: 6, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e7e3d8', flexWrap: 'wrap' }}>
-        {([['sales', `Sales Record (${sales.length})`], ['stock', `Stock Record (${stock.length})`]] as const).map(([k, label]) => (
+        {([['sales', `Sales Record (${sales.length})`], ['stock', `Stock Record (${stock.length})`], ['finance', `💰 Finance Lite (${entries.length})`]] as const).map(([k, label]) => (
           <button key={k} onClick={() => setTab(k)}
             style={{ border: `1px solid ${tab === k ? GREEN : '#ddd'}`, background: tab === k ? GREEN : '#fff', color: tab === k ? '#fff' : GREEN, borderRadius: 999, padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{label}</button>
         ))}
@@ -80,7 +81,9 @@ export default function LedgerClient({ sales, stock, addSale, updateSale, addSto
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
         {tab === 'sales'
           ? <SalesTab rows={sales} onAdd={(fd, d) => submit(addSale, fd, 'บันทึกการขายแล้ว', d)} onSave={(fd) => submit(updateSale, fd, 'อัปเดตแล้ว')} flash={flash} />
-          : <StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} />}
+          : tab === 'stock'
+          ? <StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} />
+          : (addEntry && deleteEntry ? <FinanceClient entries={entries} addEntry={addEntry} deleteEntry={deleteEntry} /> : <div style={{ ...card, padding: 16, color: '#999' }}>Finance Lite ไม่พร้อมใช้</div>)}
       </div>
 
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: GREEN, color: '#fff', padding: '8px 16px', borderRadius: 999, fontSize: 13, zIndex: 20 }}>{toast}</div>}
