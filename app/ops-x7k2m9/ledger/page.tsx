@@ -91,6 +91,31 @@ async function updateStock(formData: FormData) {
   revalidatePath(PATH)
 }
 
+// Level B: Finance Lite (finance_entries) — reuse pattern จาก finance เดิม (เงินเข้า-ออกพื้นฐาน · ไม่ทำบัญชีเต็ม)
+async function addEntry(formData: FormData) {
+  'use server'
+  if (!(await authed())) return
+  const type = String(formData.get('type') || '')
+  const amount = parseFloat(String(formData.get('amount') || '0'))
+  if (!['income', 'expense'].includes(type) || !(amount > 0)) return
+  await svc().from('finance_entries').insert({
+    type, amount,
+    category: String(formData.get('category') || '') || null,
+    note: String(formData.get('note') || '') || null,
+    ref: String(formData.get('ref') || '') || null,
+    entry_date: String(formData.get('entry_date') || '') || undefined,
+  })
+  revalidatePath(PATH)
+}
+async function deleteEntry(formData: FormData) {
+  'use server'
+  if (!(await authed())) return
+  const id = String(formData.get('id') || '')
+  if (!id) return
+  await svc().from('finance_entries').delete().eq('id', id)
+  revalidatePath(PATH)
+}
+
 export default async function LedgerPage() {
   if (!(await authed())) {
     return (
@@ -106,12 +131,14 @@ export default async function LedgerPage() {
     )
   }
 
-  const [salesRes, stockRes] = await Promise.all([
+  const [salesRes, stockRes, financeRes] = await Promise.all([
     svc().from('sales_records').select('*').order('sale_date', { ascending: false }).limit(1000),
     svc().from('stock_records').select('*').order('date_in', { ascending: false }).limit(2000),
+    svc().from('finance_entries').select('*').order('entry_date', { ascending: false }).order('id', { ascending: false }).limit(1000),
   ])
 
   return <LedgerClient
-    sales={salesRes.data || []} stock={stockRes.data || []}
-    addSale={addSale} updateSale={updateSale} addStock={addStock} updateStock={updateStock} />
+    sales={salesRes.data || []} stock={stockRes.data || []} entries={financeRes.data || []}
+    addSale={addSale} updateSale={updateSale} addStock={addStock} updateStock={updateStock}
+    addEntry={addEntry} deleteEntry={deleteEntry} />
 }
