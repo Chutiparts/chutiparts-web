@@ -48,13 +48,14 @@ export default async function DailyBriefPage() {
     )
   }
 
-  // อ่านล้วน — leads 500 + tasks 500 + sales/stock (สำหรับ section ควรสั่งเพิ่ม จาก Stock Source)
-  const [leadsRes, tasksRes, salesRes, stockRes] = await Promise.all([
+  // อ่านล้วน — leads 500 + tasks 500 + sales/stock + products (Level B: Risk section merge)
+  const [leadsRes, tasksRes, salesRes, stockRes, productsRes] = await Promise.all([
     svc().from('contact_leads').select('*').order('created_at', { ascending: false }).limit(500),
     svc().from('ops_tasks').select('*').order('created_at', { ascending: false }).limit(500),
     svc().from('sales_records').select('*').order('sale_date', { ascending: false }).limit(1000),
     svc().from('stock_records').select('*').order('date_in', { ascending: true }).limit(1000),
+    svc().from('products').select('*').limit(2000),
   ])
 
-  return <DailyBriefClient leads={leadsRes.data || []} tasks={tasksRes.data || []} sales={salesRes.data || []} stock={stockRes.data || []} />
+  return <DailyBriefClient leads={leadsRes.data || []} tasks={tasksRes.data || []} sales={salesRes.data || []} stock={stockRes.data || []} products={productsRes.data || []} />
 }
