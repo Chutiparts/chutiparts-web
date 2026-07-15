@@ -93,7 +93,7 @@ export const SYMPTOM_CATEGORIES = [
   { value: 'other', label: '❓ อื่นๆ', alias: [] },
 ] as const
 
-export const 06-constants-add-label_en.txt = [
+export const PARTS_CATEGORIES = [
   { value: 'engine', label: 'เครื่องยนต์' },
   { value: 'transmission', label: 'เกียร์' },
   { value: 'ecu_electrical', label: 'ECU/กล่องไฟฟ้า' },
