@@ -190,5 +190,25 @@ export default async function WebCheckerPage() {
     )
   }
 
-  return <WebCheckerClient runChecks={runChecks} site={SITE} />
+  // Level B #5: Data Health at-a-glance (อ่านล้วน · คำนวณสุขภาพข้อมูล ตอนโหลด · ไม่แตะข้อมูล)
+  const [prodH, leadsH, tasksH] = await Promise.all([
+    svc().from('products').select('image_url,price,is_published').limit(5000),
+    svc().from('contact_leads').select('status,owner,follow_due').limit(2000),
+    svc().from('ops_tasks').select('status,due_date').limit(2000),
+  ])
+  const today = new Date().toISOString().slice(0, 10)
+  const normS = (s: string) => (({ contacted: 'quoted', waiting: 'deciding' } as Record<string, string>)[s] || s || 'new')
+  const pubP = (prodH.data || []).filter((p: any) => p.is_published === true || p.is_published === 'true')
+  const noImg = pubP.filter((p: any) => !p.image_url).length
+  const noPrice = pubP.filter((p: any) => !(Number(p.price) > 0)).length
+  const complete = pubP.filter((p: any) => p.image_url && Number(p.price) > 0).length
+  const healthPct = pubP.length ? Math.round((complete / pubP.length) * 100) : 100
+  const openLead = (l: any) => !['won', 'lost'].includes(normS(l.status))
+  const leadsNoOwner = (leadsH.data || []).filter((l: any) => openLead(l) && (!l.owner || !String(l.owner).trim())).length
+  const overdueLeads = (leadsH.data || []).filter((l: any) => openLead(l) && l.follow_due && l.follow_due < today).length
+  const openTask = (t: any) => !['done', 'cancelled'].includes(t.status || 'todo')
+  const overdueTasks = (tasksH.data || []).filter((t: any) => openTask(t) && t.due_date && t.due_date < today).length
+  const health = { productsPub: pubP.length, complete, noImg, noPrice, healthPct, leadsNoOwner, overdueLeads, overdueTasks }
+
+  return <WebCheckerClient runChecks={runChecks} site={SITE} health={health} />
 }
