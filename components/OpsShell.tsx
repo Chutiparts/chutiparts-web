@@ -21,6 +21,7 @@ const GROUPS: Group[] = [
     { href: `${BASE}/ledger`,       label: 'Ledger',      icon: '📒' },
     { href: `${BASE}/landed-cost`,  label: 'Landed Cost', icon: '🧮' },
     { href: `${BASE}/stock-source`, label: 'Stock',       icon: '📦' },
+    { href: `${BASE}/sourcing.html`, label: 'หาของ',      icon: '🔧' },
   ]},
   { title: 'ระบบ', items: [
     { href: `${BASE}/web-checker`,  label: 'Monitor',     icon: '🩺' },
@@ -74,7 +75,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
           <div key={g.title}>
             <div className="opsx-ghead">{g.title}</div>
             {g.items.map((it) => (
-              <a key={it.label} href={it.href} className={`opsx-link${isActive(it) ? ' active' : ''}`}>
+              <a key={it.label} href={it.href} target={it.href.endsWith('.html') ? '_blank' : undefined} rel={it.href.endsWith('.html') ? 'noopener' : undefined} className={`opsx-link${isActive(it) ? ' active' : ''}`}>
                 <span>{it.icon}</span><span>{it.label}</span>
               </a>
             ))}
@@ -85,7 +86,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
       {/* Mobile = แท็บล่าง */}
       <nav className="opsx-bottom">
         {MOBILE_ITEMS.map((it) => (
-          <a key={it.label} href={it.href} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
+          <a key={it.label} href={it.href} target={it.href.endsWith('.html') ? '_blank' : undefined} rel={it.href.endsWith('.html') ? 'noopener' : undefined} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
             <span className="opsx-bicon">{it.icon}</span><span>{it.label}</span>
           </a>
         ))}
