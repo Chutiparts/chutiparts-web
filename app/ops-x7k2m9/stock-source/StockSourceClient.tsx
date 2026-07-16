@@ -178,8 +178,11 @@ export default function StockSourceClient({ sales, stock, leads = [] }: { sales:
   const exportTxt = () => dl(`stock-source-${todayStr()}.txt`, '\uFEFF' + buyList() + `\n${'─'.repeat(40)}\n📦 ของค้างนาน ≥${cfg.ageDays} วัน (อย่าเพิ่งสั่งซ้ำ · ควรดันขาย): ${aging.length} ชิ้น · ทุนจม ${baht(D.agingCost)}\n` + aging.map((s) => `▪ ${s.part_name || '(ไม่ระบุ)'}${s.car_model ? ` (${s.car_model})` : ''} — ค้าง ${s.age} วัน · ทุน ${baht(s.cost)} · ตั้งขาย ${baht(s.set_price)}${s.location ? ` · ${s.location}` : ''}`).join('\n'), 'text/plain;charset=utf-8')
   const exportJson = () => dl(`stock-source-${todayStr()}.json`, JSON.stringify({ cfg, summary: D, reorder: demand.map((x: any) => ({ part: x.part, model: x.model, sold: x.sold, left: x.left, avg_price: Math.round(x.avgPrice), avg_profit: Math.round(x.avgProfit), last_sold: x.lastSold, flag: x.flag, source: srcOf(x.key), buy_cost: memo[x.key]?.buy || '' })), customer_asks: asks.map((x: any) => ({ part: x.part, model: x.model, asks: x.asks, in_stock: x.left, last_asked: x.lastAsked, flag: x.flag })), aging: aging.map((s) => ({ part: s.part_name, model: s.car_model, age_days: s.age, cost: num(s.cost), set_price: num(s.set_price), location: s.location || '', source: s.source || '' })) }, null, 2), 'application/json')
 
-  const stat = (label: string, val: string, color: string) => (
-    <div style={{ flex: 1, minWidth: 100, background: '#fff', borderRadius: 10, padding: '10px', textAlign: 'center', border: '1px solid #e7e3d8' }}>
+  const stat = (label: string, val: string, color: string, go?: () => void) => (
+    <div onClick={go} title={go ? 'กดเพื่อดูรายละเอียด' : undefined}
+      style={{ flex: 1, minWidth: 100, background: '#fff', borderRadius: 10, padding: '10px', textAlign: 'center', border: '1px solid #e7e3d8', cursor: go ? 'pointer' : 'default', transition: 'box-shadow .15s,transform .15s' }}
+      onMouseEnter={go ? (e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 3px 10px rgba(0,0,0,.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)' } : undefined}
+      onMouseLeave={go ? (e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; (e.currentTarget as HTMLDivElement).style.transform = 'none' } : undefined}>
       <div style={{ fontSize: 18, fontWeight: 700, color }}>{val}</div><div style={{ fontSize: 10.5, color: '#777' }}>{label}</div></div>
   )
   const tbtn = (id: 'reorder' | 'aging' | 'asks', label: string) => (
@@ -216,12 +219,12 @@ export default function StockSourceClient({ sales, stock, leads = [] }: { sales:
 
         {/* dashboard */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-          {stat('ควรหาด่วน', String(D.urgent), '#A32D2D')}
-          {stat('เหลือน้อย', String(D.low), '#854F0B')}
-          {stat('ถามหาแต่ไม่มีของ', String(D.wanted), '#A32D2D')}
-          {stat('รายการขายในช่วง', String(D.groups), GREEN)}
-          {stat(`ค้าง ≥${cfg.ageDays} วัน`, String(D.aging), '#854F0B')}
-          {stat('ทุนจมของค้าง', baht(D.agingCost), '#A32D2D')}
+          {stat('ควรหาด่วน', String(D.urgent), '#A32D2D', () => setTab('reorder'))}
+          {stat('เหลือน้อย', String(D.low), '#854F0B', () => setTab('reorder'))}
+          {stat('ถามหาแต่ไม่มีของ', String(D.wanted), '#A32D2D', () => setTab('asks'))}
+          {stat('รายการขายในช่วง', String(D.groups), GREEN, () => setTab('reorder'))}
+          {stat(`ค้าง ≥${cfg.ageDays} วัน`, String(D.aging), '#854F0B', () => setTab('aging'))}
+          {stat('ทุนจมของค้าง', baht(D.agingCost), '#A32D2D', () => setTab('aging'))}
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           {tbtn('reorder', `🛒 ควรหา/สั่งเพิ่ม (${D.urgent + D.low})`)}
