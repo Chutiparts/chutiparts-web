@@ -196,8 +196,10 @@ export default function StockSourceClient({ sales, stock, leads = [] }: { sales:
             {/* P0.1 legend สีธง — ข้อความเดียวกันทุกหน้า */}
             <div style={{ fontSize: 11.5, color: '#a9bfb1', marginTop: 4 }}>🔴 = ต้องทำทันที · 🟡 = ควรระวัง/ติดตาม · 🟢 = ปกติ/พอใช้</div>
           </div>
-          <a href="/ops-x7k2m9/ledger" style={{ ...qbtn, textDecoration: 'none', background: 'rgba(255,255,255,.12)', color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>→ Ledger (บันทึกขาย/สต็อก)</a>
-        </div>
+<div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <a href="/ops-x7k2m9/stock-source/demand" style={{ ...qbtn, textDecoration: 'none', background: BRASS, color: '#fff', borderColor: BRASS }}>🔎 คำค้นดีมานด์</a>
+            <a href="/ops-x7k2m9/ledger" style={{ ...qbtn, textDecoration: 'none', background: 'rgba(255,255,255,.12)', color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}>→ Ledger (บันทึกขาย/สต็อก)</a>
+          </div>        </div>
       </div>
 
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
