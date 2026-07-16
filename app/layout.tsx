@@ -1,19 +1,18 @@
 // app/layout.tsx — ChutiBenz root layout
+// 2026-07-16: header/footer/contact เว็บลูกค้า gate ผ่าน <SiteHeader/> + <SiteChromeBottom/>
+//             (ซ่อนบนหน้า /ops-* ที่มี OpsShell ของตัวเอง · Analytics/GA/SpeedInsights คงทุกหน้า)
 // 2026-07-04: + <LanguageProvider> (TH/EN site-wide) · footer → <SiteFooter/>
-// (metadata block UNCHANGED — ถ้าไม่แน่ใจ ให้คงของเดิม แล้วแก้แค่ 3 จุดตาม README)
+// (metadata block UNCHANGED)
 
 import type { Metadata } from 'next'
 import './globals.css'
-import Header from '@/components/layout/Header'
-import SiteFooter from '@/components/layout/SiteFooter'
+import { SiteHeader, SiteChromeBottom } from '@/components/layout/SiteChrome'
 import { CartProvider } from './context/CartContext'
-import { LanguageProvider } from './context/LanguageContext' 
+import { LanguageProvider } from './context/LanguageContext'
 import { FlagsProvider } from './context/FlagsContext'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { GoogleAnalytics } from '@next/third-parties/google'
-import ContactHub from '@/components/ContactHub'
-import SalesChat from '@/components/SalesChat'
 const SITE_URL = 'https://chutibenz.com'
 const BRAND = 'ChutiBenz'
 
@@ -106,14 +105,12 @@ export default function RootLayout({
       <body className="min-h-screen bg-white text-gray-900 antialiased">
         <LanguageProvider>
           <FlagsProvider>           <CartProvider>
-            <Header />
+            <SiteHeader />
             <main>{children}</main>
-            <SiteFooter />
             <Analytics />
             <GoogleAnalytics gaId="G-D2J142YWNM" />
             <SpeedInsights />
-            <ContactHub />
-            <SalesChat />
+            <SiteChromeBottom />
           </CartProvider>           </FlagsProvider>
         </LanguageProvider>
       </body>
