@@ -210,8 +210,18 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   if (P.aged.length) risks.push(`📦 ของค้างนาน ≥${AGED_DAYS} วัน ${P.aged.length} รายการ — เงินจม`)
   if (P.incomplete.length) risks.push(`🖼️ ข้อมูลไม่ครบ (ไม่มีรูป/ราคา) ${P.incomplete.length} รายการ — ขายยากบนเว็บ`)
 
-  const stat = (label: string, val: number, color: string) => (
-    <div style={{ flex: 1, minWidth: 88, background: '#fff', borderRadius: 10, padding: '10px', textAlign: 'center', border: '1px solid #e7e3d8' }}>
+  const goto = (anchor: string) => {
+    if (anchor.startsWith('/')) { window.location.href = anchor; return }
+    document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  const stat = (label: string, val: number, color: string, anchor?: string) => (
+    <div
+      onClick={anchor ? () => goto(anchor) : undefined}
+      title={anchor ? 'กดเพื่อดูรายละเอียด' : undefined}
+      style={{ flex: 1, minWidth: 88, background: '#fff', borderRadius: 10, padding: '10px', textAlign: 'center', border: '1px solid #e7e3d8', cursor: anchor ? 'pointer' : 'default', transition: 'box-shadow .15s,transform .15s' }}
+      onMouseEnter={anchor ? (e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 3px 10px rgba(0,0,0,.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)' } : undefined}
+      onMouseLeave={anchor ? (e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'; (e.currentTarget as HTMLDivElement).style.transform = 'none' } : undefined}
+    >
       <div style={{ fontSize: 22, fontWeight: 700, color }}>{val}</div>
       <div style={{ fontSize: 11, color: '#777' }}>{label}</div>
     </div>
@@ -234,13 +244,13 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
         {/* stat strip */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-          {stat('ตามวันนี้', B.todayFollow.length, '#0C447C')}
-          {stat('งานวันนี้', B.todayTasks.length, GREEN)}
-          {stat('Lead เกิน', B.overdueLeads.length, '#A32D2D')}
-          {stat('Task เกิน', B.overdueTasks.length, '#A32D2D')}
-          {stat('ไม่มีเจ้าของ', unassignedCount, '#854F0B')}
-          {stat('ต้องตัดสินใจ', B.decide.length, '#3C3489')}
-          {stat('สต็อกเสี่ยง', P.aged.length + P.incomplete.length, '#7A4E12')}
+          {stat('ตามวันนี้', B.todayFollow.length, '#0C447C', 'sec-today-follow')}
+          {stat('งานวันนี้', B.todayTasks.length, GREEN, 'sec-today-tasks')}
+          {stat('Lead เกิน', B.overdueLeads.length, '#A32D2D', 'sec-overdue-leads')}
+          {stat('Task เกิน', B.overdueTasks.length, '#A32D2D', 'sec-overdue-tasks')}
+          {stat('ไม่มีเจ้าของ', unassignedCount, '#854F0B', 'sec-unassigned')}
+          {stat('ต้องตัดสินใจ', B.decide.length, '#3C3489', 'sec-decide')}
+          {stat('สต็อกเสี่ยง', P.aged.length + P.incomplete.length, '#7A4E12', 'sec-stock-risk')}
         </div>
 
         {/* quick actions */}
@@ -259,7 +269,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
         </Section>
 
         {/* 1) Today Follow-ups */}
-        <Section title="📅 ลูกค้าที่ต้องตามวันนี้" count={B.todayFollow.length}>
+        <Section id="sec-today-follow" title="📅 ลูกค้าที่ต้องตามวันนี้" count={B.todayFollow.length}>
           {B.todayFollow.length === 0 ? <Empty /> : B.todayFollow.map((l) => (
             <div key={l.id} style={card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
@@ -277,7 +287,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
         </Section>
 
         {/* 2) Overdue Leads */}
-        <Section title="🔴 Lead เกินกำหนดตาม" count={B.overdueLeads.length}>
+        <Section id="sec-overdue-leads" title="🔴 Lead เกินกำหนดตาม" count={B.overdueLeads.length}>
           {B.overdueLeads.length === 0 ? <Empty /> : B.overdueLeads.map((l) => (
             <div key={l.id} style={{ ...card, borderLeft: '4px solid #A32D2D' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
@@ -295,17 +305,17 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
         </Section>
 
         {/* 3) Today Tasks */}
-        <Section title="🗂️ งานที่ต้องทำวันนี้" count={B.todayTasks.length}>
+        <Section id="sec-today-tasks" title="🗂️ งานที่ต้องทำวันนี้" count={B.todayTasks.length}>
           {B.todayTasks.length === 0 ? <Empty /> : B.todayTasks.map((t) => <TaskRow key={t.id} t={t} leadModelPart={leadModelPart} />)}
         </Section>
 
         {/* 4) Overdue Tasks */}
-        <Section title="🔴 งานเกินกำหนด" count={B.overdueTasks.length}>
+        <Section id="sec-overdue-tasks" title="🔴 งานเกินกำหนด" count={B.overdueTasks.length}>
           {B.overdueTasks.length === 0 ? <Empty /> : B.overdueTasks.map((t) => <TaskRow key={t.id} t={t} overdue leadModelPart={leadModelPart} />)}
         </Section>
 
         {/* 5) Unassigned Work */}
-        <Section title="🧑‍🔧 งานยังไม่มีเจ้าของ" count={unassignedCount}>
+        <Section id="sec-unassigned" title="🧑‍🔧 งานยังไม่มีเจ้าของ" count={unassignedCount}>
           {unassignedCount === 0 ? <Empty /> : (
             <>
               {B.unassignedLeads.map((l) => (
@@ -325,7 +335,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
         </Section>
 
         {/* 6) Decision Needed */}
-        <Section title="🧭 เรื่องที่ควรตัดสินใจวันนี้" count={B.decide.length}>
+        <Section id="sec-decide" title="🧭 เรื่องที่ควรตัดสินใจวันนี้" count={B.decide.length}>
           {B.decide.length === 0 ? <Empty /> : B.decide.map((d) => (
             <div key={d.key} style={{ ...card, borderLeft: '4px solid #3C3489' }}>
               <b style={{ fontSize: 13.5 }}>{d.label}</b>
@@ -353,7 +363,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
         </Section>
 
         {/* 8) สต็อกเสี่ยง — Level B merge จาก Risk Guard */}
-        <Section title="🛡️ สต็อกเสี่ยง (Risk Guard)" count={stockRiskCount}>
+        <Section id="sec-stock-risk" title="🛡️ สต็อกเสี่ยง (Risk Guard)" count={stockRiskCount}>
           {stockRiskCount === 0 ? <Empty /> : (
             <>
               <RiskMini title="📦 ค้างนาน" items={P.aged} kind="aged" />
@@ -374,9 +384,9 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   )
 }
 
-function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+function Section({ title, count, children, id }: { title: string; count: number; children: React.ReactNode; id?: string }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div id={id} style={{ marginBottom: 16, scrollMarginTop: 12 }}>
       <div style={{ fontWeight: 700, fontSize: 15, color: GREEN, marginBottom: 6 }}>{title} <span style={{ color: '#999', fontWeight: 400 }}>({count})</span></div>
       {children}
     </div>
