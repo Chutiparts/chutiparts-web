@@ -21,7 +21,7 @@ const GROUPS: Group[] = [
     { href: `${BASE}/ledger`,       label: 'Ledger',      icon: '📒' },
     { href: `${BASE}/landed-cost`,  label: 'Landed Cost', icon: '🧮' },
     { href: `${BASE}/stock-source`, label: 'Stock',       icon: '📦' },
-    { href: `${BASE}/sourcing.html`, label: 'หาของ',      icon: '🔧' },
+    { href: `${BASE}/sourcing`, label: 'หาของ',      icon: '🔧' },
   ]},
   { title: 'ระบบ', items: [
     { href: `${BASE}/web-checker`,  label: 'Monitor',     icon: '🩺' },
