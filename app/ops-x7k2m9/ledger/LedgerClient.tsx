@@ -188,6 +188,11 @@ function SaleEdit({ r, onSave }: { r: Row; onSave: (fd: FormData) => void }) {
         <span style={{ width: 8 }} />
         {DELIV_ORDER.map((d) => <button key={d} type="submit" name="delivery_status" value={d} style={{ ...qbtn, ...(( r.delivery_status || 'pending') === d ? { background: DELIV[d].bg, color: DELIV[d].fg, borderColor: DELIV[d].fg } : {}) }}>{DELIV[d].th}</button>)}
       </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+        <label style={lbl}>ลูกค้า<input name="customer" defaultValue={r.customer || ''} style={inp} /></label>
+        <label style={lbl}>รุ่น<input name="car_model" defaultValue={r.car_model || ''} style={inp} /></label>
+        <label style={{ ...lbl, gridColumn: '1 / -1' }}>สินค้า/อะไหล่<input name="part_sold" defaultValue={r.part_sold || ''} style={inp} /></label>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <label style={lbl}>ราคาขาย<input name="sale_price" type="number" defaultValue={r.sale_price ?? ''} style={inp} /></label>
         <label style={lbl}>ต้นทุน<input name="cost" type="number" defaultValue={r.cost ?? ''} style={inp} /></label>
