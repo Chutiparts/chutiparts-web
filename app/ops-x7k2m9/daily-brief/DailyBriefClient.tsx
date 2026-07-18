@@ -342,15 +342,17 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   const hiVal = (m?: string) => /W140|W126|W120|W119|M104|M119|M120|เครื่อง|ล้อ|AMG/i.test(String(m || ''))
   type TopItem = { key: string; icon: string; color: string; bg: string; title: string; detail: string; action: string; owner: string; score: number; copyText?: string }
   const topItems: TopItem[] = []
+  const seenLead = new Set<string>(); const seenTask = new Set<string>()
   if (lossSales.length) topItems.push({ key: 'loss', icon: '💰', color: '#A32D2D', bg: '#FCEBEB', title: `ขายขาดทุน ${lossSales.length} รายการ (90 วัน)`, detail: 'ราคาต่ำกว่าต้นทุน — เช็คต้นทุน/การตั้งราคา', action: 'เช็คต้นทุน', owner: 'wait', score: 1000 + Math.min(lossSales.length * 10, 150) })
   else if (thinSales.length) topItems.push({ key: 'thin', icon: '💰', color: '#854F0B', bg: '#FAEEDA', title: `กำไรบางผิดปกติ ${thinSales.length} รายการ (<15%)`, detail: 'อาจมีต้นทุนแฝงตกหล่น — เช็ค landed cost', action: 'เช็คต้นทุน', owner: 'wait', score: 940 })
   crisisLead.forEach((l) => {
     const d = daysSinceContact(l); const v = hiVal(l.car_model) || hiVal(partOf(l))
     topItems.push({ key: 'L' + l.id, icon: '📞', color: '#0C447C', bg: '#E6F1FB', title: `ตามลูกค้า: ${l.name || '(ไม่ระบุ)'}`, detail: `${partOf(l)}${l.car_model ? ` · ${l.car_model}` : ''} · ค้าง ${d} วัน · ${contactOf(l)}`, action: 'โทร/ทักกลับ', owner: leadNoOwner(l) ? 'none' : (l.owner || ''), score: 800 + Math.min(d * 5, 100) + (v ? 60 : 0), copyText: followMsgTH(l) })
+    seenLead.add(String(l.id))
   })
-  B.unassignedLeads.forEach((l) => topItems.push({ key: 'UL' + l.id, icon: '🧑‍🔧', color: '#A32D2D', bg: '#FCEBEB', title: `lead ไม่มีเจ้าของ: ${l.name || '(ไม่ระบุ)'}`, detail: `${partOf(l)}${l.car_model ? ` · ${l.car_model}` : ''}`, action: 'Assign owner', owner: 'none', score: 600 }))
-  B.unassignedTasks.forEach((t) => topItems.push({ key: 'UT' + t.id, icon: '🧑‍🔧', color: '#A32D2D', bg: '#FCEBEB', title: `งานไม่มีเจ้าของ: ${t.title || '(ไม่มีชื่องาน)'}`, detail: t.task_type || 'งาน', action: 'Assign owner', owner: 'none', score: 590 }))
-  B.overdueTasks.forEach((t) => topItems.push({ key: 'OT' + t.id, icon: '⏰', color: '#854F0B', bg: '#FAEEDA', title: `งานเกินกำหนด: ${t.title || '(ไม่มีชื่องาน)'}`, detail: `กำหนด ${fmtDate(t.due_date)}`, action: 'ปิดงาน/เลื่อน', owner: (t.owner && String(t.owner).trim()) ? t.owner : 'none', score: 400 + Math.min(daysSince(t.due_date) * 3, 100) }))
+  B.unassignedLeads.forEach((l) => { if (seenLead.has(String(l.id))) return; topItems.push({ key: 'UL' + l.id, icon: '🧑‍🔧', color: '#A32D2D', bg: '#FCEBEB', title: `lead ไม่มีเจ้าของ: ${l.name || '(ไม่ระบุ)'}`, detail: `${partOf(l)}${l.car_model ? ` · ${l.car_model}` : ''}`, action: 'Assign owner', owner: 'none', score: 600 }) })
+  B.unassignedTasks.forEach((t) => { seenTask.add(String(t.id)); topItems.push({ key: 'UT' + t.id, icon: '🧑‍🔧', color: '#A32D2D', bg: '#FCEBEB', title: `งานไม่มีเจ้าของ: ${t.title || '(ไม่มีชื่องาน)'}`, detail: t.task_type || 'งาน', action: 'Assign owner', owner: 'none', score: 590 }) })
+  B.overdueTasks.forEach((t) => { if (seenTask.has(String(t.id))) return; topItems.push({ key: 'OT' + t.id, icon: '⏰', color: '#854F0B', bg: '#FAEEDA', title: `งานเกินกำหนด: ${t.title || '(ไม่มีชื่องาน)'}`, detail: `กำหนด ${fmtDate(t.due_date)}`, action: 'ปิดงาน/เลื่อน', owner: (t.owner && String(t.owner).trim()) ? t.owner : 'none', score: 400 + Math.min(daysSince(t.due_date) * 3, 100) }) })
   sheetStock.filter((x) => x.qty === 0).forEach((x) => { const dem = demandByModel[String(x.model).toUpperCase()] || 0; topItems.push({ key: 'S' + x.sku, icon: '📦', color: '#A32D2D', bg: '#FCEBEB', title: `สต็อกหมด: ${x.name}`, detail: `${x.model} · SKU ${x.sku}${dem ? ` · มีคนถาม/ค้น ${dem}` : ''}`, action: dem ? 'หาเพิ่มด่วน' : 'หาเพิ่ม/ถ่ายรูป', owner: 'wait', score: 200 + (dem ? 80 : 0) }) })
   const top5 = [...topItems].sort((a, b) => b.score - a.score).slice(0, 5)
   const dhLeadNoNext = leads.filter((l) => leadOpen(l) && !l.follow_due).length
