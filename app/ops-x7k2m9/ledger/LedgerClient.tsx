@@ -213,7 +213,7 @@ function StockTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
   const inStock = rows.filter((r) => (r.status || 'in_stock') === 'in_stock')
   const stockValue = inStock.reduce((a, r) => a + num(r.cost), 0)
   const noImage = inStock.filter((r) => !r.has_image).length
-  const aged = inStock.filter((r) => (ageOf(r) || 0) >= 60).length
+  const aged = inStock.filter((r) => (ageOf(r) || 0) >= 365).length
 
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase()
@@ -236,7 +236,7 @@ function StockTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
         <Stat label="มีของ (ชิ้น)" val={String(inStock.length)} color={GREEN} />
         <Stat label="มูลค่าสต็อก(ทุน)" val={baht(stockValue)} color="#854F0B" />
         <Stat label="ไม่มีรูป" val={String(noImage)} color="#0C447C" />
-        <Stat label="ค้าง ≥60วัน" val={String(aged)} color="#A32D2D" />
+        <Stat label="ค้าง ≥365วัน" val={String(aged)} color="#A32D2D" />
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => setShowAdd((v) => !v)} style={{ background: GREEN, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{showAdd ? '× ปิดฟอร์ม' : '+ เพิ่มสต็อก'}</button>
@@ -279,7 +279,7 @@ function StockTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
                 </div>
               </div>
               <div style={{ fontSize: 13, color: '#444', marginTop: 3 }}>ทุน {baht(r.cost)} · ตั้งขาย {baht(r.set_price)}{r.location ? ` · 📍${r.location}` : ''}{r.source ? ` · 🏬 ${r.source}` : ''}</div>
-              <div style={{ fontSize: 11.5, color: '#999', marginTop: 3 }}>เข้า {fmtDate(r.date_in)}{age !== null && <span style={{ color: age >= 60 ? '#A32D2D' : '#999' }}> · อายุ {age} วัน{age >= 60 ? ' (ค้างนาน)' : ''}</span>}{r.sku ? ` · ${r.sku}` : ''}</div>
+              <div style={{ fontSize: 11.5, color: '#999', marginTop: 3 }}>เข้า {fmtDate(r.date_in)}{age !== null && <span style={{ color: age >= 365 ? '#A32D2D' : '#999' }}> · อายุ {age} วัน{age >= 365 ? ' (ค้างนาน)' : ''}</span>}{r.sku ? ` · ${r.sku}` : ''}</div>
             </div>
             {open && <StockEdit r={r} onSave={onSave} />}
           </div>
