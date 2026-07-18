@@ -197,6 +197,10 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
 
   const unassignedCount = B.unassignedLeads.length + B.unassignedTasks.length
   const reorder = useMemo(() => reorderSignals(sales, stock), [sales, stock])
+  // 📦 คงเหลือจากชีต (stock_records.qty ที่ sync จากแท็บ Stock) — อ่านตรงตาม SKU ไม่พึ่งชื่อยอดขาย
+  const sheetStock = useMemo(() => stock.filter((s) => s.qty != null && !isNaN(Number(s.qty))).map((s) => ({ sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', qty: Number(s.qty), location: s.location || '' })), [stock])
+  const lowStock = useMemo(() => sheetStock.filter((x) => x.qty <= 1).sort((a, b) => a.qty - b.qty), [sheetStock])
+  const totalUnits = useMemo(() => sheetStock.reduce((s, x) => s + x.qty, 0), [sheetStock])
   const reorderUrgent = reorder.filter((x) => x.urgent).length
 
   // ===== Product risk buckets (Level B: merge จาก Risk Guard) =====
@@ -400,6 +404,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
           {stat('ไม่มีเจ้าของ', unassignedCount, '#854F0B', 'sec-unassigned')}
           {stat('ต้องตัดสินใจ', B.decide.length, '#3C3489', 'sec-decide')}
           {stat('สต็อกเสี่ยง', P.aged.length + P.incomplete.length, '#7A4E12', 'sec-stock-risk')}
+          {sheetStock.length > 0 && stat('คงเหลือน้อย/หมด', lowStock.length, '#A32D2D', 'sec-sheet-stock')}
         </div>
 
         {/* quick actions */}
@@ -510,6 +515,22 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
             </>
           )}
         </Section>
+
+        {/* 📦 คงเหลือจากชีต (SKU) — คงเหลือน้อย/หมด · อ่านจาก stock_records.qty ที่ sync จากแท็บ Stock */}
+        {sheetStock.length > 0 && (
+          <Section id="sec-sheet-stock" title="📦 คงเหลือน้อย/หมด (จากชีต · ตาม SKU)" count={lowStock.length}>
+            <div style={{ fontSize: 11.5, color: '#888', marginBottom: 6 }}>ของในคลังรวม {totalUnits} ชิ้น · แสดงเฉพาะคงเหลือ ≤ 1 (จาก stock ที่ sync จากแท็บ Stock)</div>
+            {lowStock.length === 0 ? <div style={{ ...card, color: '#0F6E56', fontSize: 12.5 }}>✅ ไม่มีรายการคงเหลือน้อย/หมด</div> : lowStock.map((x) => (
+              <div key={x.sku} style={{ ...card, borderLeft: `4px solid ${x.qty === 0 ? '#A32D2D' : '#854F0B'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <b style={{ fontSize: 13.5 }}>{x.name}{x.model ? ` · ${x.model}` : ''}</b>
+                  <Badge label={x.qty === 0 ? '🔴 หมด' : `🟡 เหลือ ${x.qty}`} bg={x.qty === 0 ? '#FCEBEB' : '#FAEEDA'} fg={x.qty === 0 ? '#A32D2D' : '#854F0B'} />
+                </div>
+                <div style={{ fontSize: 11.5, color: '#888', marginTop: 2 }}>SKU {x.sku}{x.location ? ` · ที่เก็บ ${x.location}` : ''}</div>
+              </div>
+            ))}
+          </Section>
+        )}
 
         {/* 8) สต็อกเสี่ยง — Level B merge จาก Risk Guard */}
         <Section id="sec-stock-risk" title="🛡️ สต็อกเสี่ยง (Risk Guard)" count={stockRiskCount}>
