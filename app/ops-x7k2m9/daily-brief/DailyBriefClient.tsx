@@ -117,6 +117,19 @@ const CRISIS_BRIEFS: Record<string, CrisisBrief> = {
     notSay: ['สั่งงานปากเปล่าไม่ลงระบบ', 'ปล่อยงานไม่มีเจ้าของข้ามวัน'],
     escalation: 'งานด่วนไม่มีคนรับ >1 วัน → Mr.Chuti',
   },
+  stock: {
+    title: 'ของมีแต่ลูกค้ามองไม่เห็น',
+    first15: [
+      'ดูรุ่นที่ลูกค้าถามเข้ามา (leads) เทียบกับของในสต็อกที่ยังไม่มีรูป',
+      'ถ่ายรูปชิ้นที่ตรงดีมานด์ก่อน (ไม่ไล่ถ่ายตามลำดับคลัง)',
+      'ชิ้นมูลค่าสูง/หายากของรุ่นนั้นก่อน (W140/W126 ตามคลื่น Q4)',
+      'ขึ้นเว็บ + ตั้งราคา (ต้นทุนครบ)',
+      'assign คนถ่าย/คนลงเว็บ',
+    ],
+    templates: [{ label: 'ข้อความมอบงานถ่ายรูป', body: 'ฝากถ่ายรูปอะไหล่ที่ลูกค้าถามบ่อยแต่ยังไม่มีรูปบนเว็บครับ\nรุ่น: [รุ่น]\nถ่ายชิ้นมูลค่าสูง/หายากก่อน มุมชัด ๆ 2-3 รูป แล้วส่งให้ลงเว็บ + ตั้งราคา' }],
+    notSay: ['ปล่อยของดีไม่มีรูปค้างเป็นเดือน', 'ลงเว็บไม่ใส่ราคา'],
+    escalation: 'ลูกค้าถามซ้ำแต่ร้านไม่มีของ → แจ้ง Mr.Chuti จัดหา',
+  },
 }
 
 export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[] }) {
@@ -253,6 +266,17 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   else if (crisisLead.length >= 2) crisisSignals.push({ brief: 'lead', sev: 'yellow', title: `Lead ค้างไม่ได้ตาม >24 ชม. ${crisisLead.length} ราย` })
   if (crisisTaskNoOwner.length >= 1) crisisSignals.push({ brief: 'task', sev: 'red', title: `งานไม่มีเจ้าของ ${crisisTaskNoOwner.length} งาน${crisisTaskOverdueOwned.length ? ` · เกินกำหนด ${crisisTaskOverdueOwned.length}` : ''}` })
   else if (crisisTaskOverdueOwned.length >= 3) crisisSignals.push({ brief: 'task', sev: 'yellow', title: `งานเกินกำหนด ${crisisTaskOverdueOwned.length} งาน` })
+  // Stock (P2 · read-only จาก props): รุ่นที่ลูกค้าถาม (leads) × ของ published ไม่มีรูป ≥3 ชิ้น = ของมีแต่มองไม่เห็น
+  const crisisNorm = (s: any) => String(s || '').trim().toUpperCase()
+  const demandByModel: Record<string, number> = {}
+  leads.forEach((l) => { if (leadOpen(l) && l.car_model) { const m = crisisNorm(l.car_model); demandByModel[m] = (demandByModel[m] || 0) + 1 } })
+  const noPhotoByModel: Record<string, number> = {}
+  products.filter((p) => pPublished(p) && !pImg(p)).forEach((p) => { const m = crisisNorm(pModel(p)); if (m) noPhotoByModel[m] = (noPhotoByModel[m] || 0) + 1 })
+  const stockHidden = Object.keys(noPhotoByModel)
+    .filter((m) => noPhotoByModel[m] >= 3 && (demandByModel[m] || 0) >= 1)
+    .map((m) => ({ model: m, noPhoto: noPhotoByModel[m] }))
+    .sort((a, b) => b.noPhoto - a.noPhoto)
+  if (stockHidden.length >= 1) crisisSignals.push({ brief: 'stock', sev: 'yellow', title: `ของไม่มีรูปตรงรุ่นที่ลูกค้าถาม: ${stockHidden.slice(0, 3).map((h) => `${h.model} ${h.noPhoto} ชิ้น`).join(' · ')}` })
 
   const goto = (anchor: string) => {
     if (anchor.startsWith('/')) { window.location.href = anchor; return }
@@ -324,7 +348,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
                   </div>
                 )
               })}
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>เกณฑ์: Lead ≥5 แดง/2–4 เหลือง · งานไม่มีเจ้าของ ≥1 แดง/เกินกำหนด ≥3 เหลือง · playbook เต็ม 5 เรื่องในคลัง</div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>เกณฑ์: Lead ≥5 แดง/2–4 เหลือง · งานไม่มีเจ้าของ ≥1 แดง/เกินกำหนด ≥3 เหลือง · ของไม่มีรูป ≥3 ตรงรุ่นที่ลูกค้าถาม เหลือง · playbook เต็ม 5 เรื่องในคลัง</div>
             </div>
           )}
         </div>
