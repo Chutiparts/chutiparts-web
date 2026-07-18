@@ -40,7 +40,7 @@ const qbtn: React.CSSProperties = { background: '#fff', border: '1px solid #ddd'
 const sel: React.CSSProperties = { padding: '6px 9px', border: '1px solid #ddd', borderRadius: 8, fontSize: 13 }
 
 export default function RiskGuardClient({ products, leads, tasks }: { products: Row[]; leads: Row[]; tasks: Row[] }) {
-  const [agedDays, setAgedDays] = useState(60)
+  const [agedDays, setAgedDays] = useState(365)
   const [staleDays, setStaleDays] = useState(45)
   const [decisions, setDecisions] = useState<Record<string, string>>({})
   const [toast, setToast] = useState('')
@@ -141,7 +141,7 @@ export default function RiskGuardClient({ products, leads, tasks }: { products: 
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ fontSize: 12, color: '#555' }}>ค้างนาน ≥
             <select value={agedDays} onChange={(e) => setAgedDays(Number(e.target.value))} style={{ ...sel, marginLeft: 4 }}>
-              {[30, 45, 60, 90, 120].map((d) => <option key={d} value={d}>{d} วัน</option>)}
+              {[30, 45, 60, 90, 120, 180, 365].map((d) => <option key={d} value={d}>{d} วัน</option>)}
             </select>
           </label>
           <label style={{ fontSize: 12, color: '#555' }}>ไม่อัปเดต ≥
