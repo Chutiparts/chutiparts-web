@@ -130,9 +130,35 @@ const CRISIS_BRIEFS: Record<string, CrisisBrief> = {
     notSay: ['ปล่อยของดีไม่มีรูปค้างเป็นเดือน', 'ลงเว็บไม่ใส่ราคา'],
     escalation: 'ลูกค้าถามซ้ำแต่ร้านไม่มีของ → แจ้ง Mr.Chuti จัดหา',
   },
+  profit: {
+    title: 'ขายแล้วไม่รู้กำไรจริง',
+    first15: [
+      'เปิดรายการที่ขาดทุน/margin บาง — เช็กว่าผูก landed cost ครบไหม (เฟรต + surcharge + ค่าใน)',
+      'margin บาง = ต้นทุนแฝงตกหล่น → เติมต้นทุนให้ครบก่อน (ไม่ใช่สัญญาณให้ลดราคา)',
+      'ตั้งราคาจากต้นทุนครบตั้งแต่แรก',
+      'ลูกค้าต่อราคา → ยึดราคา (การลด = เฉพาะโปรที่ตั้งใจ)',
+      'บันทึกค่าที่ตกหล่นไว้ ใช้ตั้งราคาล็อตหน้า',
+    ],
+    templates: [{ label: 'เช็กลิสต์ต้นทุนก่อนตั้งราคา', body: 'ก่อนปิดการขาย/ตั้งราคา เช็ก landed cost จริง: ราคาทุนอะไหล่ + ค่าเฟรต + fuel surcharge + ค่าใน (ขนส่งในประเทศ/แพ็ก) แล้วบวก margin กรอบปลอดภัย · ไม่ลดราคายกเว้นช่วงโปร' }],
+    notSay: ['ลดราคาสุ่มตอนต่อรอง', 'ตั้งราคาจากความรู้สึกไม่ดูต้นทุน'],
+    escalation: 'จะลดนอกโปร = ต้องผ่าน Mr.Chuti คนเดียว',
+  },
+  web: {
+    title: 'ลูกค้าเข้าเว็บแล้วหลุด (เว็บ/ฟอร์ม/ค้นหา)',
+    first15: [
+      'เปิด Search Demand ดูคำค้น "ไม่เจอ" — คำไหนซ้ำบ่อย',
+      'คำที่ไม่เจอ + คนถามจริง = ดีมานด์หลุด → จัดหาของ/ลงเว็บ/ทำคอนเทนต์',
+      'ทดสอบฟอร์ม lead ส่งเข้าไหม (ส่ง 1 ครั้ง) + CTA (LINE/WhatsApp) กดไปถูกที่ไหม',
+      'eBook funnel เดินไหม (add friend → ส่ง PDF)',
+      'เป็นบั๊ก → แจ้ง dev · เป็นของขาด → แจ้งทีมขาย',
+    ],
+    templates: [{ label: 'ข้อความแจ้ง dev/ทีม', body: 'เจอคำค้นที่ลูกค้าหาแต่เว็บไม่เจอ ขอช่วยเช็ก: (1) มีของแต่ยังไม่ลงเว็บไหม (2) ควรจัดหามาขายไหม (3) ฟอร์ม/CTA ทำงานปกติไหม' }],
+    notSay: ['ปล่อยฟอร์มเสียข้ามวัน (lead หายเงียบ)', 'เพิกเฉยคำค้นไม่เจอ'],
+    escalation: 'lead route/ฟอร์มเสีย = เลือดไหล → แจ้ง dev + owner ทันที',
+  },
 }
 
-export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[] }) {
+export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [], searches = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[]; searches?: Row[] }) {
   const [toast, setToast] = useState('')
   const [openBrief, setOpenBrief] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
@@ -270,13 +296,25 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   const crisisNorm = (s: any) => String(s || '').trim().toUpperCase()
   const demandByModel: Record<string, number> = {}
   leads.forEach((l) => { if (leadOpen(l) && l.car_model) { const m = crisisNorm(l.car_model); demandByModel[m] = (demandByModel[m] || 0) + 1 } })
+  searches.filter((r) => daysSince(r.created_at) <= 30).forEach((r) => { if (r.model) { const m = crisisNorm(r.model); demandByModel[m] = (demandByModel[m] || 0) + 1 } })
   const noPhotoByModel: Record<string, number> = {}
   products.filter((p) => pPublished(p) && !pImg(p)).forEach((p) => { const m = crisisNorm(pModel(p)); if (m) noPhotoByModel[m] = (noPhotoByModel[m] || 0) + 1 })
   const stockHidden = Object.keys(noPhotoByModel)
     .filter((m) => noPhotoByModel[m] >= 3 && (demandByModel[m] || 0) >= 1)
     .map((m) => ({ model: m, noPhoto: noPhotoByModel[m] }))
     .sort((a, b) => b.noPhoto - a.noPhoto)
-  if (stockHidden.length >= 1) crisisSignals.push({ brief: 'stock', sev: 'yellow', title: `ของไม่มีรูปตรงรุ่นที่ลูกค้าถาม: ${stockHidden.slice(0, 3).map((h) => `${h.model} ${h.noPhoto} ชิ้น`).join(' · ')}` })
+  if (stockHidden.length >= 1) crisisSignals.push({ brief: 'stock', sev: 'yellow', title: `ของไม่มีรูปตรงรุ่นที่ลูกค้าถาม/ค้น: ${stockHidden.slice(0, 3).map((h) => `${h.model} ${h.noPhoto} ชิ้น`).join(' · ')}` })
+  // Web (P2b · read-only จาก search_queries): คำค้นที่ลูกค้าหาแต่ "ไม่เจอ" สะสม = ดีมานด์หลุด/เว็บไม่มีของ
+  const searchRecent = searches.filter((r) => daysSince(r.created_at) <= 30)
+  const notFoundQ = new Set(searchRecent.filter((r) => !(r.had_results === true || r.had_results === 'true')).map((r) => crisisNorm(r.query_text)).filter((q) => q))
+  if (notFoundQ.size >= 3) crisisSignals.push({ brief: 'web', sev: 'yellow', title: `คำค้นที่ลูกค้าหาแต่ไม่เจอ ${notFoundQ.size} คำ (30 วัน) — ดีมานด์หลุด/เว็บไม่มีของ` })
+  // Profit (P2b · read-only จาก sales 90 วัน): ขายขาดทุน (แดง) / กำไรบางผิดปกติ <15% (เหลือง) · cost=0 (ของดิจิทัล) ไม่นับ · policy ไม่ลดราคายกเว้นโปร
+  const crisisMargin = (r: Row) => { const sp = Number(r.sale_price) || 0; if (sp <= 0) return null; return (sp - (Number(r.cost) || 0)) / sp }
+  const salesRecent = sales.filter((r) => r.sale_date && daysSince(r.sale_date) <= 90)
+  const lossSales = salesRecent.filter((r) => { const m = crisisMargin(r); return m !== null && m < 0 })
+  const thinSales = salesRecent.filter((r) => { const m = crisisMargin(r); return m !== null && m >= 0 && m < 0.15 && (Number(r.cost) || 0) > 0 })
+  if (lossSales.length >= 1) crisisSignals.push({ brief: 'profit', sev: 'red', title: `ขายขาดทุน ${lossSales.length} รายการ (90 วัน) — เช็กต้นทุน/ราคาด่วน` })
+  else if (thinSales.length >= 1) crisisSignals.push({ brief: 'profit', sev: 'yellow', title: `กำไรบางผิดปกติ (<15%) ${thinSales.length} รายการ — เช็ก landed cost ครบไหม` })
 
   const goto = (anchor: string) => {
     if (anchor.startsWith('/')) { window.location.href = anchor; return }
@@ -348,7 +386,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
                   </div>
                 )
               })}
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>เกณฑ์: Lead ≥5 แดง/2–4 เหลือง · งานไม่มีเจ้าของ ≥1 แดง/เกินกำหนด ≥3 เหลือง · ของไม่มีรูป ≥3 ตรงรุ่นที่ลูกค้าถาม เหลือง · playbook เต็ม 5 เรื่องในคลัง</div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>เกณฑ์: Lead ≥5 แดง/2–4 เหลือง · งานไม่มีเจ้าของ ≥1 แดง/เกินกำหนด ≥3 เหลือง · ของไม่มีรูป ≥3 ตรงรุ่นที่ลูกค้าถาม/ค้น เหลือง · คำค้นไม่เจอ ≥3 คำ เหลือง · ขายขาดทุน แดง/กำไรต่ำกว่า 15% เหลือง · playbook เต็ม 5 เรื่องในคลัง</div>
             </div>
           )}
         </div>
