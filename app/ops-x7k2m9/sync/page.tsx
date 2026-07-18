@@ -58,7 +58,7 @@ async function applyProductSync(rows: SyncRow[]): Promise<{ ok: boolean; added: 
         // อัปเดต minimal — เขียนเฉพาะ field ที่มีค่า (ไม่ทับด้วยว่าง · ไม่แตะ compatible_models/category/is_published เดิม)
         const set: Record<string, unknown> = { updated_at: at }
         if (name) set.name = name
-        if (model) set.car_model = model
+        if (model) set.compatible_models = [model]
         if (price != null) set.price = price
         if (oem) { set.oem_number = oem; set.oem_number_norm = strip(oem) }
         const { error } = await db.from('products').update(set).eq('id', r.id)
@@ -66,7 +66,7 @@ async function applyProductSync(rows: SyncRow[]): Promise<{ ok: boolean; added: 
       } else {
         const ins: Record<string, unknown> = { part_number: pn, part_number_norm: strip(pn), is_published: false }
         if (name) ins.name = name
-        if (model) { ins.car_model = model; ins.compatible_models = [model] }
+        if (model) ins.compatible_models = [model]
         if (price != null) ins.price = price
         if (oem) { ins.oem_number = oem; ins.oem_number_norm = strip(oem) }
         const { error } = await db.from('products').insert(ins)
@@ -94,6 +94,6 @@ export default async function SyncPage() {
   }
 
   // อ่าน products อย่างเดียว (ให้ client ทำ diff เทียบ CSV ด้วย part_number) — ไม่แตะ stock/sales
-  const res = await svc().from('products').select('id,part_number,name,car_model,price,oem_number,is_published,image_url').limit(5000)
+  const res = await svc().from('products').select('*').limit(5000)
   return <SyncClient products={res.data || []} applyProductSync={applyProductSync} />
 }
