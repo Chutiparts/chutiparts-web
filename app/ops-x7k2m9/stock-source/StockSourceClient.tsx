@@ -22,7 +22,7 @@ export function ageDays(d?: string | null, now?: Date) {
   return Math.max(0, Math.floor(((now || new Date()).getTime() - x.getTime()) / 86400000))
 }
 export type Cfg = { windowDays: number; minSold: number; lowStock: number; ageDays: number }
-export const DEFAULTS: Cfg = { windowDays: 90, minSold: 2, lowStock: 1, ageDays: 60 }
+export const DEFAULTS: Cfg = { windowDays: 90, minSold: 2, lowStock: 1, ageDays: 365 }
 
 // demand group: ต่อ (อะไหล่+รุ่น) — ขายกี่ครั้ง ราคา/กำไรเฉลี่ย ขายล่าสุด vs เหลือในสต็อกกี่ชิ้น
 export function buildDemand(sales: Row[], stock: Row[], cfg: Cfg, now?: Date) {
