@@ -2,6 +2,7 @@
 // หน้าเช้าประจำ: อ่านอย่างเดียว (read-only) จาก contact_leads + ops_tasks ด้วย service_role (ข้าม RLS)
 // pattern เดียวกับ ops เดิม: svc() + authed() (cookie ops_admin === ADMIN_OPS_SECRET) + loginOps
 // ⚠️ ไม่มี mutation / ไม่ส่งข้อความจริง / ไม่แตะ logic Lead-Task-Contact ที่ปิดแล้ว (อ่านล้วน)
+// P2b: เพิ่มอ่าน search_queries (read-only) สำหรับ Crisis Watch สัญญาณ Web/Stock (คำค้นไม่เจอ/ดีมานด์)
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
@@ -48,14 +49,16 @@ export default async function DailyBriefPage() {
     )
   }
 
-  // อ่านล้วน — leads 500 + tasks 500 + sales/stock + products (Level B: Risk section merge)
-  const [leadsRes, tasksRes, salesRes, stockRes, productsRes] = await Promise.all([
+  // อ่านล้วน — leads 500 + tasks 500 + sales/stock + products (Level B: Risk section merge) + search_queries (P2b Crisis Watch)
+  // graceful: ถ้าตาราง search_queries ยังไม่มี/error → [] (ไม่พังหน้า)
+  const [leadsRes, tasksRes, salesRes, stockRes, productsRes, searchesRes] = await Promise.all([
     svc().from('contact_leads').select('*').order('created_at', { ascending: false }).limit(500),
     svc().from('ops_tasks').select('*').order('created_at', { ascending: false }).limit(500),
     svc().from('sales_records').select('*').order('sale_date', { ascending: false }).limit(1000),
     svc().from('stock_records').select('*').order('date_in', { ascending: true }).limit(1000),
     svc().from('products').select('*').limit(2000),
+    svc().from('search_queries').select('*').order('created_at', { ascending: false }).limit(5000),
   ])
 
-  return <DailyBriefClient leads={leadsRes.data || []} tasks={tasksRes.data || []} sales={salesRes.data || []} stock={stockRes.data || []} products={productsRes.data || []} />
+  return <DailyBriefClient leads={leadsRes.data || []} tasks={tasksRes.data || []} sales={salesRes.data || []} stock={stockRes.data || []} products={productsRes.data || []} searches={searchesRes.data || []} />
 }
