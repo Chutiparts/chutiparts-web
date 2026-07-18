@@ -161,6 +161,7 @@ const CRISIS_BRIEFS: Record<string, CrisisBrief> = {
 export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [], searches = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[]; searches?: Row[] }) {
   const [toast, setToast] = useState('')
   const [openBrief, setOpenBrief] = useState('')
+  const [showDetail, setShowDetail] = useState(false)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
   const copy = (text: string, m = 'คัดลอกแล้ว') => navigator.clipboard?.writeText(text).then(() => flash(m))
 
@@ -337,6 +338,25 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
     </div>
   )
 
+  // ===== 🎯 Top 5 วันนี้ (เรียงตาม impact: เงิน>lead มูลค่าสูง>ไม่มีเจ้าของ>overdue>สต็อกหมด) =====
+  const hiVal = (m?: string) => /W140|W126|W120|W119|M104|M119|M120|เครื่อง|ล้อ|AMG/i.test(String(m || ''))
+  type TopItem = { key: string; icon: string; color: string; bg: string; title: string; detail: string; action: string; owner: string; score: number; copyText?: string }
+  const topItems: TopItem[] = []
+  if (lossSales.length) topItems.push({ key: 'loss', icon: '💰', color: '#A32D2D', bg: '#FCEBEB', title: `ขายขาดทุน ${lossSales.length} รายการ (90 วัน)`, detail: 'ราคาต่ำกว่าต้นทุน — เช็คต้นทุน/การตั้งราคา', action: 'เช็คต้นทุน', owner: 'wait', score: 1000 + Math.min(lossSales.length * 10, 150) })
+  else if (thinSales.length) topItems.push({ key: 'thin', icon: '💰', color: '#854F0B', bg: '#FAEEDA', title: `กำไรบางผิดปกติ ${thinSales.length} รายการ (<15%)`, detail: 'อาจมีต้นทุนแฝงตกหล่น — เช็ค landed cost', action: 'เช็คต้นทุน', owner: 'wait', score: 940 })
+  crisisLead.forEach((l) => {
+    const d = daysSinceContact(l); const v = hiVal(l.car_model) || hiVal(partOf(l))
+    topItems.push({ key: 'L' + l.id, icon: '📞', color: '#0C447C', bg: '#E6F1FB', title: `ตามลูกค้า: ${l.name || '(ไม่ระบุ)'}`, detail: `${partOf(l)}${l.car_model ? ` · ${l.car_model}` : ''} · ค้าง ${d} วัน · ${contactOf(l)}`, action: 'โทร/ทักกลับ', owner: leadNoOwner(l) ? 'none' : (l.owner || ''), score: 800 + Math.min(d * 5, 100) + (v ? 60 : 0), copyText: followMsgTH(l) })
+  })
+  B.unassignedLeads.forEach((l) => topItems.push({ key: 'UL' + l.id, icon: '🧑‍🔧', color: '#A32D2D', bg: '#FCEBEB', title: `lead ไม่มีเจ้าของ: ${l.name || '(ไม่ระบุ)'}`, detail: `${partOf(l)}${l.car_model ? ` · ${l.car_model}` : ''}`, action: 'Assign owner', owner: 'none', score: 600 }))
+  B.unassignedTasks.forEach((t) => topItems.push({ key: 'UT' + t.id, icon: '🧑‍🔧', color: '#A32D2D', bg: '#FCEBEB', title: `งานไม่มีเจ้าของ: ${t.title || '(ไม่มีชื่องาน)'}`, detail: t.task_type || 'งาน', action: 'Assign owner', owner: 'none', score: 590 }))
+  B.overdueTasks.forEach((t) => topItems.push({ key: 'OT' + t.id, icon: '⏰', color: '#854F0B', bg: '#FAEEDA', title: `งานเกินกำหนด: ${t.title || '(ไม่มีชื่องาน)'}`, detail: `กำหนด ${fmtDate(t.due_date)}`, action: 'ปิดงาน/เลื่อน', owner: (t.owner && String(t.owner).trim()) ? t.owner : 'none', score: 400 + Math.min(daysSince(t.due_date) * 3, 100) }))
+  sheetStock.filter((x) => x.qty === 0).forEach((x) => { const dem = demandByModel[String(x.model).toUpperCase()] || 0; topItems.push({ key: 'S' + x.sku, icon: '📦', color: '#A32D2D', bg: '#FCEBEB', title: `สต็อกหมด: ${x.name}`, detail: `${x.model} · SKU ${x.sku}${dem ? ` · มีคนถาม/ค้น ${dem}` : ''}`, action: dem ? 'หาเพิ่มด่วน' : 'หาเพิ่ม/ถ่ายรูป', owner: 'wait', score: 200 + (dem ? 80 : 0) }) })
+  const top5 = [...topItems].sort((a, b) => b.score - a.score).slice(0, 5)
+  const dhLeadNoNext = leads.filter((l) => leadOpen(l) && !l.follow_due).length
+  const dhTaskStale = tasks.filter((t) => taskOpen(t) && daysSince(t.updated_at || t.created_at) >= 3).length
+  const dhCostMissing = sales.filter((r) => Number(r.sale_price) > 0 && r.cost == null).length
+
   return (
     <div style={{ minHeight: '100vh', background: CREAM, fontFamily: '-apple-system,"Segoe UI","Noto Sans Thai",sans-serif', color: '#1a1a1a' }}>
       <div style={{ background: GREEN, color: '#fff', padding: '14px 16px' }}>
@@ -352,6 +372,36 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
       </div>
 
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
+        {/* 🎯 Top 5 วันนี้ — hero (มือถืออ่าน 10 วิ) */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 16, color: GREEN, marginBottom: 8 }}>🎯 วันนี้ทำอะไรก่อน — Top {top5.length}</div>
+          {top5.length === 0 ? (
+            <div style={{ ...card, color: '#0F6E56' }}>✅ ไม่มีเรื่องด่วนวันนี้ — เยี่ยม!</div>
+          ) : top5.map((it, i) => (
+            <div key={it.key} style={{ ...card, borderLeft: `4px solid ${it.color}`, padding: '10px 12px' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <div style={{ fontSize: 20, lineHeight: '22px' }}>{it.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{i + 1}. {it.title}</div>
+                  <div style={{ fontSize: 12.5, color: '#555', marginTop: 2 }}>{it.detail}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 7 }}>
+                    <span style={{ background: it.bg, color: it.color, fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 999 }}>→ {it.action}</span>
+                    {it.owner === 'none' ? <span style={{ fontSize: 11.5, color: '#A32D2D', fontWeight: 600 }}>🔴 ไม่มีเจ้าของ</span>
+                      : it.owner === 'wait' ? <span style={{ fontSize: 11.5, color: '#854F0B', fontWeight: 600 }}>⏳ รอเจ้าของตัดสินใจ</span>
+                      : <span style={{ fontSize: 11.5, color: '#0F6E56', fontWeight: 600 }}>👤 {it.owner}</span>}
+                    {it.copyText && <button onClick={() => copy(it.copyText || '', 'คัดลอกข้อความแล้ว')} style={{ ...qbtn, padding: '3px 9px', fontSize: 11.5 }}>คัดลอกข้อความ</button>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div style={{ ...card, background: '#fbfaf6', fontSize: 12, color: '#7c4a13', marginTop: 4 }}>
+            🩺 <b>Data Health:</b> lead ไม่มีนัดตาม {dhLeadNoNext} · task ไม่อัปเดต ≥3 วัน {dhTaskStale} · ต้นทุนว่าง {dhCostMissing}{(dhLeadNoNext + dhTaskStale + dhCostMissing) === 0 ? ' · ✅ ข้อมูลครบดี' : ''}
+          </div>
+          <button onClick={() => setShowDetail((s) => !s)} style={{ ...qbtn, marginTop: 8, width: '100%' }}>{showDetail ? '▲ ซ่อนรายละเอียด' : '▼ ดูรายละเอียดทั้งหมด (สัญญาณ / สต็อก / สรุป)'}</button>
+        </div>
+
+        {showDetail && (<>
         {/* Crisis Watch — สัญญาณเสี่ยงวันนี้ (บนสุด) */}
         <div style={{ marginBottom: 14 }}>
           {crisisSignals.length === 0 ? (
@@ -547,6 +597,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
         <div style={{ fontSize: 11, color: '#aaa', textAlign: 'center', padding: '10px 0 30px' }}>
           AI ช่วยสรุป · เจ้าของเป็นผู้ตัดสินใจ · หน้านี้อ่านอย่างเดียว จัดการงานจริงที่ Parts Desk
         </div>
+        </>)}
       </div>
 
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: GREEN, color: '#fff', padding: '8px 16px', borderRadius: 999, fontSize: 13, zIndex: 20 }}>{toast}</div>}
