@@ -87,7 +87,8 @@ export default function SyncClient({ products, applyProductSync }: { products: R
       else {
         const diffs: string[] = []
         if (name && norm(ex.name) !== name) diffs.push('ชื่อ')
-        if (model && normKey(ex.car_model) !== normKey(model)) diffs.push('รุ่น')
+        const exModels = Array.isArray(ex.compatible_models) ? ex.compatible_models.map((m: any) => normKey(m)) : (ex.car_model ? [normKey(ex.car_model)] : [])
+        if (model && !exModels.includes(normKey(model))) diffs.push('รุ่น')
         if (price != null && Number(ex.price || 0) !== price) diffs.push('ราคา')
         if (oem && norm(ex.oem_number) !== oem) diffs.push('OEM')
         if (diffs.length) { status = 'update'; note = 'อัปเดต: ' + diffs.join(', ') }
