@@ -1,7 +1,8 @@
 // app/ops-x7k2m9/sync/page.tsx — Sheet → Supabase Sync (ทาง C: products catalog only)
 // อ่าน products (read-only) มาให้ client ทำ diff · เขียนเฉพาะตอน owner กดยืนยัน ผ่าน server action
-// SAFETY: owner-only auth · เขียนเฉพาะ products (ไม่แตะ stock_records/sales_records) · ไม่แตะ schema
-//         ห้ามทับด้วยค่าว่าง (เขียนเฉพาะ field ที่มีค่าใน CSV) · new SKU = is_published:false (ซ่อนจากเว็บลูกค้า)
+// KEY = part_number (เว็บ search/แสดงด้วย part_number · รหัสร้าน 140-001 อยู่ช่องนี้) · sheet SKU → part_number
+// SAFETY: owner-only · เขียนเฉพาะ products (ไม่แตะ stock/sales/schema) · ห้ามทับด้วยว่าง
+//         อัปเดตของเดิม = แตะแค่ name/car_model/price/oem_number (ไม่ clobber field อื่น) · new = is_published:false
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
@@ -33,36 +34,45 @@ async function loginOps(formData: FormData) {
   revalidatePath(PATH)
 }
 
-type SyncRow = { id?: string | null; sku: string; name?: string | null; car_model?: string | null; price?: number | null; oem_number?: string | null }
+type SyncRow = { id?: string | null; part_number: string; name?: string | null; car_model?: string | null; price?: number | null; oem_number?: string | null }
+const strip = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '')
 
-// เขียนเฉพาะตอน owner กดยืนยัน · เขียนเฉพาะ field ที่มีค่า (ไม่ทับด้วยว่าง) · new = is_published:false
-async function applyProductSync(rows: SyncRow[]): Promise<{ ok: boolean; added: number; updated: number; errors: { sku: string; msg: string }[]; batchId: string; at: string }> {
+// เขียนเฉพาะตอน owner กดยืนยัน · ไม่ทับด้วยว่าง · อัปเดต = minimal · new = is_published:false + set norm/compatible_models
+async function applyProductSync(rows: SyncRow[]): Promise<{ ok: boolean; added: number; updated: number; errors: { pn: string; msg: string }[]; batchId: string; at: string }> {
   'use server'
   const at = new Date().toISOString()
   const batchId = 'sync-' + at.replace(/[^0-9]/g, '').slice(0, 14)
-  if (!(await authed())) return { ok: false, added: 0, updated: 0, errors: [{ sku: '-', msg: 'unauthorized' }], batchId, at }
+  if (!(await authed())) return { ok: false, added: 0, updated: 0, errors: [{ pn: '-', msg: 'unauthorized' }], batchId, at }
   const db = svc()
   let added = 0, updated = 0
-  const errors: { sku: string; msg: string }[] = []
+  const errors: { pn: string; msg: string }[] = []
   for (const r of Array.isArray(rows) ? rows : []) {
-    const sku = String(r.sku || '').trim()
-    if (!sku) { errors.push({ sku: '-', msg: 'SKU ว่าง (ข้าม)' }); continue }
-    // เขียนเฉพาะ field ที่มีค่า (SAFETY#3: ไม่ทับด้วยว่าง)
-    const set: Record<string, unknown> = {}
-    if (r.name != null && String(r.name).trim() !== '') set.name = String(r.name).trim()
-    if (r.car_model != null && String(r.car_model).trim() !== '') set.car_model = String(r.car_model).trim()
-    if (r.price != null && !isNaN(Number(r.price))) set.price = Number(r.price)
-    if (r.oem_number != null && String(r.oem_number).trim() !== '') set.oem_number = String(r.oem_number).trim()
+    const pn = String(r.part_number || '').trim()
+    if (!pn) { errors.push({ pn: '-', msg: 'part_number ว่าง (ข้าม)' }); continue }
+    const name = r.name != null && String(r.name).trim() !== '' ? String(r.name).trim() : null
+    const model = r.car_model != null && String(r.car_model).trim() !== '' ? String(r.car_model).trim() : null
+    const price = r.price != null && !isNaN(Number(r.price)) ? Number(r.price) : null
+    const oem = r.oem_number != null && String(r.oem_number).trim() !== '' ? String(r.oem_number).trim() : null
     try {
       if (r.id) {
-        set.updated_at = at
+        // อัปเดต minimal — เขียนเฉพาะ field ที่มีค่า (ไม่ทับด้วยว่าง · ไม่แตะ compatible_models/category/is_published เดิม)
+        const set: Record<string, unknown> = { updated_at: at }
+        if (name) set.name = name
+        if (model) set.car_model = model
+        if (price != null) set.price = price
+        if (oem) { set.oem_number = oem; set.oem_number_norm = strip(oem) }
         const { error } = await db.from('products').update(set).eq('id', r.id)
-        if (error) errors.push({ sku, msg: error.message }); else updated++
+        if (error) errors.push({ pn, msg: error.message }); else updated++
       } else {
-        const { error } = await db.from('products').insert({ sku, is_published: false, ...set })
-        if (error) errors.push({ sku, msg: error.message }); else added++
+        const ins: Record<string, unknown> = { part_number: pn, part_number_norm: strip(pn), is_published: false }
+        if (name) ins.name = name
+        if (model) { ins.car_model = model; ins.compatible_models = [model] }
+        if (price != null) ins.price = price
+        if (oem) { ins.oem_number = oem; ins.oem_number_norm = strip(oem) }
+        const { error } = await db.from('products').insert(ins)
+        if (error) errors.push({ pn, msg: error.message }); else added++
       }
-    } catch (e: any) { errors.push({ sku, msg: String(e?.message || e) }) }
+    } catch (e: any) { errors.push({ pn, msg: String(e?.message || e) }) }
   }
   revalidatePath(PATH)
   return { ok: errors.length === 0, added, updated, errors, batchId, at }
@@ -83,7 +93,7 @@ export default async function SyncPage() {
     )
   }
 
-  // อ่าน products อย่างเดียว (ให้ client ทำ diff เทียบ CSV) — ไม่แตะ stock/sales
-  const res = await svc().from('products').select('id,sku,name,car_model,price,oem_number,is_published,image_url').limit(5000)
+  // อ่าน products อย่างเดียว (ให้ client ทำ diff เทียบ CSV ด้วย part_number) — ไม่แตะ stock/sales
+  const res = await svc().from('products').select('id,part_number,name,car_model,price,oem_number,is_published,image_url').limit(5000)
   return <SyncClient products={res.data || []} applyProductSync={applyProductSync} />
 }
