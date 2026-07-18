@@ -79,7 +79,7 @@ const pPublished = (p: Row) => p.is_published === true || p.is_published === 'tr
 const pCreated = (p: Row) => p.created_at || null
 const pUpdated = (p: Row) => p.updated_at || p.created_at || null
 const pDaysSince = (d?: string | null) => { if (!d) return null; const t = new Date(d).getTime(); if (isNaN(t)) return null; return Math.floor((Date.now() - t) / 86400000) }
-const AGED_DAYS = 60, STALE_DAYS = 45 // เกณฑ์ default เดียวกับ Risk Guard (ปรับเกณฑ์ละเอียดที่หน้า Risk Guard)
+const AGED_DAYS = 365, STALE_DAYS = 45 // เกณฑ์ default เดียวกับ Risk Guard (ปรับเกณฑ์ละเอียดที่หน้า Risk Guard)
 
 function Badge({ label, bg, fg }: { label: string; bg: string; fg: string }) {
   return <span style={{ background: bg, color: fg, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999 }}>{label}</span>
@@ -87,8 +87,41 @@ function Badge({ label, bg, fg }: { label: string; bg: string; fg: string }) {
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e7e3d8', borderRadius: 8, padding: '9px 11px', marginBottom: 6 }
 const qbtn: React.CSSProperties = { background: '#fff', border: '1px solid #ddd', color: '#333', borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }
 
+// ===== Crisis Watch playbooks (P0 live: lead + task) — เกณฑ์ owner เคาะ 18 ก.ค. 2026 =====
+// อ่านล้วนจาก props เดิม (leads/tasks) · ไม่มี SQL/fetch ใหม่ · playbook เต็ม 5 เรื่องอยู่ที่ products/crisis-watch/CRISIS-BRIEFS-ChutiBenz-5playbooks.md
+type CrisisBrief = { title: string; first15: string[]; templates: { label: string; body: string }[]; notSay: string[]; escalation: string }
+const CRISIS_BRIEFS: Record<string, CrisisBrief> = {
+  lead: {
+    title: 'ลูกค้าทักแล้วหลุด',
+    first15: [
+      'เปิดลิสต์ lead ค้าง เรียงตามลำดับซื้อสูง',
+      'ตามกลุ่มซื้อสูงก่อน: ส่งราคาแล้ว/รอตัดสินใจที่เงียบ → ถามรุ่นมูลค่าสูง (W140/W126/เครื่อง/ล้อแม็ก) → รายใหม่',
+      'ก๊อปข้อความทักกลับ ปรับชื่อ/รุ่น',
+      'มอบเจ้าของเคส 1 คนต่อ 1 lead',
+      'ตั้งวันตามครั้งถัดไป กันหลุดซ้ำ',
+    ],
+    templates: [{ label: 'ข้อความทักกลับ (ไทย)', body: 'สวัสดีครับ ขออนุญาตติดตามเรื่องอะไหล่ Mercedes-Benz ที่สอบถามไว้ครับ\nรายการ: [ชิ้น]\nรุ่นรถ: [รุ่น]\nหากยังสนใจอยู่ ผมช่วยเช็กของ/รูป/ราคาให้ต่อได้ครับ' }],
+    notSay: ['“ทำไมเงียบไป”', '“ยังเอาอยู่ไหม” (กดดัน)', 'ทิ้งไว้เฉย ๆ ไม่ตาม'],
+    escalation: 'lead มูลค่าสูงค้าง >3 วัน → แจ้ง Mr.Chuti',
+  },
+  task: {
+    title: 'งานหลุดเพราะไม่มีคนถือ',
+    first15: [
+      'เปิดงานที่ไม่มี owner → assign ทันทีทีละงาน',
+      'งานเกินกำหนด → เคาะปิดวันนี้ หรือเลื่อนวันใหม่ (อย่าปล่อยลอย)',
+      'งานด่วน (high) ที่ค้าง → ดันขึ้นก่อน',
+      'กำหนดคน update สถานะ',
+      'เช็กว่างานที่หายกระทบ Daily Brief ตรงไหน',
+    ],
+    templates: [{ label: 'ข้อความแจ้งทีม', body: 'ขอเคลียร์งานค้างครับ: งานที่ไม่มีเจ้าของจะ assign ให้ทีละคน · งานเกินกำหนดขอปิดวันนี้หรือเลื่อนวันใหม่ · ช่วยอัปเดตสถานะในระบบด้วยครับ' }],
+    notSay: ['สั่งงานปากเปล่าไม่ลงระบบ', 'ปล่อยงานไม่มีเจ้าของข้ามวัน'],
+    escalation: 'งานด่วนไม่มีคนรับ >1 วัน → Mr.Chuti',
+  },
+}
+
 export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[] }) {
   const [toast, setToast] = useState('')
+  const [openBrief, setOpenBrief] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
   const copy = (text: string, m = 'คัดลอกแล้ว') => navigator.clipboard?.writeText(text).then(() => flash(m))
 
@@ -210,6 +243,17 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   if (P.aged.length) risks.push(`📦 ของค้างนาน ≥${AGED_DAYS} วัน ${P.aged.length} รายการ — เงินจม`)
   if (P.incomplete.length) risks.push(`🖼️ ข้อมูลไม่ครบ (ไม่มีรูป/ราคา) ${P.incomplete.length} รายการ — ขายยากบนเว็บ`)
 
+  // ===== Crisis Watch — สัญญาณเสี่ยงวันนี้ (P0 live: Lead + Task · read-only จาก props) =====
+  const daysSinceContact = (l: Row) => daysSince(l.last_activity_at || l.updated_at || l.created_at)
+  const crisisLead = leads.filter((l) => leadOpen(l) && (leadOverdue(l) || (!l.follow_due && daysSinceContact(l) >= 1)))
+  const crisisTaskNoOwner = tasks.filter(taskNoOwner)
+  const crisisTaskOverdueOwned = tasks.filter((t) => taskOverdue(t) && !!t.owner && !!String(t.owner).trim())
+  const crisisSignals: { brief: string; sev: 'red' | 'yellow'; title: string }[] = []
+  if (crisisLead.length >= 5) crisisSignals.push({ brief: 'lead', sev: 'red', title: `Lead ค้างไม่ได้ตาม >24 ชม. ${crisisLead.length} ราย` })
+  else if (crisisLead.length >= 2) crisisSignals.push({ brief: 'lead', sev: 'yellow', title: `Lead ค้างไม่ได้ตาม >24 ชม. ${crisisLead.length} ราย` })
+  if (crisisTaskNoOwner.length >= 1) crisisSignals.push({ brief: 'task', sev: 'red', title: `งานไม่มีเจ้าของ ${crisisTaskNoOwner.length} งาน${crisisTaskOverdueOwned.length ? ` · เกินกำหนด ${crisisTaskOverdueOwned.length}` : ''}` })
+  else if (crisisTaskOverdueOwned.length >= 3) crisisSignals.push({ brief: 'task', sev: 'yellow', title: `งานเกินกำหนด ${crisisTaskOverdueOwned.length} งาน` })
+
   const goto = (anchor: string) => {
     if (anchor.startsWith('/')) { window.location.href = anchor; return }
     document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -242,6 +286,49 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
       </div>
 
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
+        {/* Crisis Watch — สัญญาณเสี่ยงวันนี้ (บนสุด) */}
+        <div style={{ marginBottom: 14 }}>
+          {crisisSignals.length === 0 ? (
+            <div style={{ ...card, color: '#0F6E56', fontSize: 12.5 }}>✅ วันนี้ไม่มีสัญญาณเสี่ยง — ร้านปกติ</div>
+          ) : (
+            <div style={{ background: '#fff', border: '1px solid #e7e3d8', borderRadius: 10, padding: '11px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
+                <span style={{ fontSize: 16 }}>⚠️</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: GREEN }}>สัญญาณเสี่ยงวันนี้</span>
+                <span style={{ marginLeft: 'auto', background: '#FAEEDA', color: '#854F0B', fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 999 }}>{crisisSignals.length} เรื่อง</span>
+              </div>
+              {crisisSignals.map((s) => {
+                const b = CRISIS_BRIEFS[s.brief]
+                const isRed = s.sev === 'red'
+                const isOpen = openBrief === s.brief
+                return (
+                  <div key={s.brief} style={{ background: isRed ? '#FCEBEB' : '#FAEEDA', borderLeft: `3px solid ${isRed ? '#A32D2D' : '#854F0B'}`, padding: '9px 11px', marginBottom: 8 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: isRed ? '#501313' : '#412402' }}>{s.title}</div>
+                    <div style={{ fontSize: 12.5, color: isRed ? '#791F1F' : '#633806', margin: '2px 0 8px' }}>→ เปิด “{b.title}”</div>
+                    <button onClick={() => setOpenBrief(isOpen ? '' : s.brief)} style={{ ...qbtn, padding: '5px 11px', fontSize: 12 }}>{isOpen ? 'ซ่อน checklist' : 'ดู checklist 15 นาทีแรก'}</button>
+                    {isOpen && (
+                      <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '9px 11px', marginTop: 8 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: GREEN, marginBottom: 4 }}>15 นาทีแรก</div>
+                        <ol style={{ margin: '0 0 8px', paddingLeft: 18, fontSize: 12.5, color: '#333', lineHeight: 1.7 }}>
+                          {b.first15.map((x, i) => <li key={i}>{x}</li>)}
+                        </ol>
+                        {b.templates.map((tp, i) => (
+                          <div key={i} style={{ marginBottom: 6 }}>
+                            <button onClick={() => copy(tp.body, 'คัดลอก ' + tp.label)} style={{ ...qbtn, padding: '4px 10px', fontSize: 11.5 }}>📋 คัดลอก: {tp.label}</button>
+                          </div>
+                        ))}
+                        <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 4 }}><b>ห้ามพูด:</b> {b.notSay.join(' · ')}</div>
+                        <div style={{ fontSize: 12, color: '#633806', marginTop: 3 }}><b>Escalation:</b> {b.escalation}</div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>เกณฑ์: Lead ≥5 แดง/2–4 เหลือง · งานไม่มีเจ้าของ ≥1 แดง/เกินกำหนด ≥3 เหลือง · playbook เต็ม 5 เรื่องในคลัง</div>
+            </div>
+          )}
+        </div>
+
         {/* stat strip */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
           {stat('ตามวันนี้', B.todayFollow.length, '#0C447C', 'sec-today-follow')}
