@@ -1,10 +1,11 @@
 'use client'
 // app/ops-x7k2m9/ledger/LedgerClient.tsx — Core Ledger P0 (ฐานข้อมูลกลาง)
 // 2 แท็บ: Sales Record (ขายจริง+กำไร) · Stock Record (สต็อก+อายุ) · add/edit/filter/export · ไม่ลบ (ใช้ status)
-// P3.3: เพิ่มช่อง "แหล่งซื้อ" (stock_records.source) — ฟอร์มเพิ่ม/แก้ + การ์ด + export
+// P3.3: เพิ่มช่อง "แหล่งซื้อ" (stock_records.source)
+// PathB: เพิ่มช่อง SKU ในฟอร์มขาย (+datalist จาก stock) → เว็บตัดสต็อกตาม SKU (คงเหลือ=รับเข้า−ขาย)
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import FinanceClient from '../finance/FinanceClient' // Level B: Finance Lite เป็นแท็บในหน้านี้
+import FinanceClient from '../finance/FinanceClient'
 
 type Row = Record<string, any>
 const GREEN = '#17301F', BRASS = '#B8895A', CREAM = '#F4EFE4'
@@ -58,6 +59,7 @@ export default function LedgerClient({ sales, stock, addSale, updateSale, addSto
   const [tab, setTab] = useState<'sales' | 'stock' | 'finance'>('sales')
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
+  const saleSkus = useMemo(() => Array.from(new Set((stock || []).map((s) => String(s.sku || '').trim()).filter(Boolean))).sort(), [stock])
 
   function submit(action: (fd: FormData) => Promise<void>, fd: FormData, msg: string, done?: () => void) {
     start(async () => { await action(fd); router.refresh(); flash(msg); done?.() })
@@ -80,7 +82,7 @@ export default function LedgerClient({ sales, stock, addSale, updateSale, addSto
 
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
         {tab === 'sales'
-          ? <SalesTab rows={sales} onAdd={(fd, d) => submit(addSale, fd, 'บันทึกการขายแล้ว', d)} onSave={(fd) => submit(updateSale, fd, 'อัปเดตแล้ว')} flash={flash} />
+          ? <SalesTab rows={sales} skus={saleSkus} onAdd={(fd, d) => submit(addSale, fd, 'บันทึกการขายแล้ว', d)} onSave={(fd) => submit(updateSale, fd, 'อัปเดตแล้ว')} flash={flash} />
           : tab === 'stock'
           ? <StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} />
           : (addEntry && deleteEntry ? <FinanceClient entries={entries} addEntry={addEntry} deleteEntry={deleteEntry} /> : <div style={{ ...card, padding: 16, color: '#999' }}>Finance Lite ไม่พร้อมใช้</div>)}
@@ -97,7 +99,7 @@ function Stat({ label, val, color }: { label: string; val: string; color: string
 }
 
 /* ===================== SALES ===================== */
-function SalesTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: FormData, done: () => void) => void; onSave: (fd: FormData) => void; flash: (m: string) => void }) {
+function SalesTab({ rows, skus, onAdd, onSave, flash }: { rows: Row[]; skus: string[]; onAdd: (fd: FormData, done: () => void) => void; onSave: (fd: FormData) => void; flash: (m: string) => void }) {
   const [showAdd, setShowAdd] = useState(false)
   const [q, setQ] = useState(''); const [payF, setPayF] = useState(''); const [openId, setOpenId] = useState<string | null>(null)
 
@@ -111,18 +113,19 @@ function SalesTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
     return rows.filter((r) => {
       if (payF && (r.payment_status || 'unpaid') !== payF) return false
       if (!kw) return true
-      return [r.customer, r.car_model, r.part_sold, r.tracking_no, r.note].filter(Boolean).join(' ').toLowerCase().includes(kw)
+      return [r.customer, r.car_model, r.part_sold, r.sku, r.tracking_no, r.note].filter(Boolean).join(' ').toLowerCase().includes(kw)
     })
   }, [rows, q, payF])
 
-  const COLS = ['sale_date', 'customer', 'car_model', 'part_sold', 'sale_price', 'cost', 'profit', 'margin', 'payment_status', 'delivery_status', 'tracking_no', 'note']
-  const row = (r: Row) => [r.sale_date, r.customer, r.car_model, r.part_sold, num(r.sale_price), num(r.cost), profitOf(r), marginOf(r) + '%', PAY[r.payment_status || 'unpaid']?.th, DELIV[r.delivery_status || 'pending']?.th, r.tracking_no, r.note]
-  const exportCsv = () => dl(`sales-${todayStr()}.csv`, '\uFEFF' + [COLS.join(','), ...filtered.map((r) => row(r).map(esc).join(','))].join('\r\n'), 'text/csv;charset=utf-8')
-  const exportTxt = () => dl(`sales-${todayStr()}.txt`, '\uFEFF' + `ChutiBenz — Sales Record\n${new Date().toLocaleString('th-TH')} · ${filtered.length} รายการ · ยอดขาย ${baht(totalSales)} · กำไร ${baht(totalProfit)}\n${'─'.repeat(40)}\n` + filtered.map((r) => `▪ ${fmtDate(r.sale_date)} · ${r.customer || '(ไม่ระบุ)'} · ${r.part_sold || 'อะไหล่'} ${r.car_model || ''}\n   ขาย ${baht(r.sale_price)} · ทุน ${baht(r.cost)} · กำไร ${baht(profitOf(r))} (${marginOf(r)}%) · ${PAY[r.payment_status || 'unpaid']?.th} · ${DELIV[r.delivery_status || 'pending']?.th}${r.tracking_no ? ` · พัสดุ ${r.tracking_no}` : ''}`).join('\n\n'), 'text/plain;charset=utf-8')
-  const exportJson = () => dl(`sales-${todayStr()}.json`, JSON.stringify(filtered.map((r) => ({ sale_date: r.sale_date, customer: r.customer, car_model: r.car_model, part_sold: r.part_sold, sale_price: num(r.sale_price), cost: num(r.cost), profit: profitOf(r), margin_pct: marginOf(r), payment_status: r.payment_status || 'unpaid', delivery_status: r.delivery_status || 'pending', tracking_no: r.tracking_no, note: r.note })), null, 2), 'application/json')
+  const COLS = ['sale_date', 'sku', 'customer', 'car_model', 'part_sold', 'sale_price', 'cost', 'profit', 'margin', 'payment_status', 'delivery_status', 'tracking_no', 'note']
+  const row = (r: Row) => [r.sale_date, r.sku, r.customer, r.car_model, r.part_sold, num(r.sale_price), num(r.cost), profitOf(r), marginOf(r) + '%', PAY[r.payment_status || 'unpaid']?.th, DELIV[r.delivery_status || 'pending']?.th, r.tracking_no, r.note]
+  const exportCsv = () => dl(`sales-${todayStr()}.csv`, '﻿' + [COLS.join(','), ...filtered.map((r) => row(r).map(esc).join(','))].join('\r\n'), 'text/csv;charset=utf-8')
+  const exportTxt = () => dl(`sales-${todayStr()}.txt`, '﻿' + `ChutiBenz — Sales Record\n${new Date().toLocaleString('th-TH')} · ${filtered.length} รายการ · ยอดขาย ${baht(totalSales)} · กำไร ${baht(totalProfit)}\n${'─'.repeat(40)}\n` + filtered.map((r) => `▪ ${fmtDate(r.sale_date)} · ${r.customer || '(ไม่ระบุ)'} · ${r.part_sold || 'อะไหล่'} ${r.car_model || ''}${r.sku ? ` [${r.sku}]` : ''}\n ขาย ${baht(r.sale_price)} · ทุน ${baht(r.cost)} · กำไร ${baht(profitOf(r))} (${marginOf(r)}%) · ${PAY[r.payment_status || 'unpaid']?.th} · ${DELIV[r.delivery_status || 'pending']?.th}${r.tracking_no ? ` · พัสดุ ${r.tracking_no}` : ''}`).join('\n\n'), 'text/plain;charset=utf-8')
+  const exportJson = () => dl(`sales-${todayStr()}.json`, JSON.stringify(filtered.map((r) => ({ sale_date: r.sale_date, sku: r.sku, customer: r.customer, car_model: r.car_model, part_sold: r.part_sold, sale_price: num(r.sale_price), cost: num(r.cost), profit: profitOf(r), margin_pct: marginOf(r), payment_status: r.payment_status || 'unpaid', delivery_status: r.delivery_status || 'pending', tracking_no: r.tracking_no, note: r.note })), null, 2), 'application/json')
 
   return (
     <>
+      <datalist id="salesku">{skus.map((s2) => <option key={s2} value={s2} />)}</datalist>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
         <Stat label="ยอดขายรวม" val={baht(totalSales)} color={GREEN} />
         <Stat label="กำไรรวม" val={baht(totalProfit)} color="#0F6E56" />
@@ -131,7 +134,7 @@ function SalesTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => setShowAdd((v) => !v)} style={{ background: GREEN, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{showAdd ? '× ปิดฟอร์ม' : '+ บันทึกการขาย'}</button>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ลูกค้า/อะไหล่/รุ่น/พัสดุ" style={{ flex: 1, minWidth: 150, padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ลูกค้า/อะไหล่/รุ่น/SKU/พัสดุ" style={{ flex: 1, minWidth: 150, padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }} />
         <select value={payF} onChange={(e) => setPayF(e.target.value)} style={sel}><option value="">ทุกสถานะเงิน</option>{PAY_ORDER.map((p) => <option key={p} value={p}>{PAY[p].th}</option>)}</select>
         <button onClick={exportCsv} style={qbtn}>⬇ CSV</button><button onClick={exportTxt} style={qbtn}>⬇ TXT</button><button onClick={exportJson} style={qbtn}>⬇ JSON</button>
       </div>
@@ -140,9 +143,10 @@ function SalesTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
         <form action={(fd) => onAdd(fd, () => setShowAdd(false))} style={{ ...card, padding: 12, border: '1px solid #e7e3d8' }}>
           <div style={{ fontWeight: 700, color: GREEN, marginBottom: 8, fontSize: 14 }}>บันทึกการขายใหม่</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <label style={lbl}>SKU สินค้า (ตัดสต็อกตามนี้)<input name="sku" list="salesku" style={inp} placeholder="เช่น 140-001" /></label>
+            <label style={lbl}>อะไหล่ที่ขาย<input name="part_sold" style={inp} placeholder="เช่น ไฟหน้า" /></label>
             <label style={lbl}>ลูกค้า<input name="customer" style={inp} placeholder="ชื่อลูกค้า" /></label>
             <label style={lbl}>รุ่นรถ<input name="car_model" style={inp} placeholder="เช่น W124" /></label>
-            <label style={lbl}>อะไหล่ที่ขาย<input name="part_sold" style={inp} placeholder="เช่น ไฟหน้า" /></label>
             <label style={lbl}>วันที่ขาย<input name="sale_date" type="date" defaultValue={todayStr()} style={inp} /></label>
             <label style={lbl}>ราคาขาย (฿)<input name="sale_price" type="number" inputMode="numeric" style={inp} /></label>
             <label style={lbl}>ต้นทุน (฿)<input name="cost" type="number" inputMode="numeric" style={inp} /></label>
@@ -162,7 +166,7 @@ function SalesTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
           <div key={r.id} style={card}>
             <div onClick={() => setOpenId(open ? null : r.id)} style={{ padding: '10px 12px', cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{r.customer || '(ไม่ระบุ)'} · {r.part_sold || 'อะไหล่'}</div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{r.customer || '(ไม่ระบุ)'} · {r.part_sold || 'อะไหล่'}{r.sku ? ` [${r.sku}]` : ''}</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <Badge label={PAY[r.payment_status || 'unpaid']?.th} bg={PAY[r.payment_status || 'unpaid']?.bg} fg={PAY[r.payment_status || 'unpaid']?.fg} />
                   <Badge label={DELIV[r.delivery_status || 'pending']?.th} bg={DELIV[r.delivery_status || 'pending']?.bg} fg={DELIV[r.delivery_status || 'pending']?.fg} />
@@ -171,7 +175,7 @@ function SalesTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
               <div style={{ fontSize: 13, color: '#444', marginTop: 3 }}>{r.car_model || '—'} · ขาย {baht(r.sale_price)} · ทุน {baht(r.cost)} · <b style={{ color: pf >= 0 ? '#0F6E56' : '#A32D2D' }}>กำไร {baht(pf)} ({marginOf(r)}%)</b></div>
               <div style={{ fontSize: 11.5, color: '#999', marginTop: 3 }}>{fmtDate(r.sale_date)}{r.tracking_no ? ` · 📦 ${r.tracking_no}` : ''}{r.note ? ` · ${String(r.note).slice(0, 40)}` : ''}</div>
             </div>
-            {open && <SaleEdit r={r} onSave={onSave} />}
+            {open && <SaleEdit r={r} skus={skus} onSave={onSave} />}
           </div>
         )
       })}
@@ -179,19 +183,20 @@ function SalesTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
   )
 }
 
-function SaleEdit({ r, onSave }: { r: Row; onSave: (fd: FormData) => void }) {
+function SaleEdit({ r, skus, onSave }: { r: Row; skus: string[]; onSave: (fd: FormData) => void }) {
   return (
     <form action={onSave} style={{ borderTop: '1px solid #eee', padding: 12, background: '#fbfaf6' }}>
       <input type="hidden" name="id" value={r.id} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-        {PAY_ORDER.map((p) => <button key={p} type="submit" name="payment_status" value={p} style={{ ...qbtn, ...(( r.payment_status || 'unpaid') === p ? { background: PAY[p].bg, color: PAY[p].fg, borderColor: PAY[p].fg } : {}) }}>{PAY[p].th}</button>)}
+        {PAY_ORDER.map((p) => <button key={p} type="submit" name="payment_status" value={p} style={{ ...qbtn, ...((r.payment_status || 'unpaid') === p ? { background: PAY[p].bg, color: PAY[p].fg, borderColor: PAY[p].fg } : {}) }}>{PAY[p].th}</button>)}
         <span style={{ width: 8 }} />
-        {DELIV_ORDER.map((d) => <button key={d} type="submit" name="delivery_status" value={d} style={{ ...qbtn, ...(( r.delivery_status || 'pending') === d ? { background: DELIV[d].bg, color: DELIV[d].fg, borderColor: DELIV[d].fg } : {}) }}>{DELIV[d].th}</button>)}
+        {DELIV_ORDER.map((d) => <button key={d} type="submit" name="delivery_status" value={d} style={{ ...qbtn, ...((r.delivery_status || 'pending') === d ? { background: DELIV[d].bg, color: DELIV[d].fg, borderColor: DELIV[d].fg } : {}) }}>{DELIV[d].th}</button>)}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+        <label style={lbl}>SKU<input name="sku" list="salesku" defaultValue={r.sku || ''} style={inp} /></label>
+        <label style={lbl}>สินค้า/อะไหล่<input name="part_sold" defaultValue={r.part_sold || ''} style={inp} /></label>
         <label style={lbl}>ลูกค้า<input name="customer" defaultValue={r.customer || ''} style={inp} /></label>
         <label style={lbl}>รุ่น<input name="car_model" defaultValue={r.car_model || ''} style={inp} /></label>
-        <label style={{ ...lbl, gridColumn: '1 / -1' }}>สินค้า/อะไหล่<input name="part_sold" defaultValue={r.part_sold || ''} style={inp} /></label>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <label style={lbl}>ราคาขาย<input name="sale_price" type="number" defaultValue={r.sale_price ?? ''} style={inp} /></label>
@@ -226,8 +231,8 @@ function StockTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
 
   const COLS = ['date_in', 'part_name', 'car_model', 'cost', 'set_price', 'status', 'location', 'source', 'has_image', 'age_days', 'sku', 'note']
   const row = (r: Row) => [r.date_in, r.part_name, r.car_model, num(r.cost), num(r.set_price), STK[r.status || 'in_stock']?.th, r.location, r.source, r.has_image ? 'มีรูป' : 'ไม่มีรูป', ageOf(r) ?? '', r.sku, r.note]
-  const exportCsv = () => dl(`stock-${todayStr()}.csv`, '\uFEFF' + [COLS.join(','), ...filtered.map((r) => row(r).map(esc).join(','))].join('\r\n'), 'text/csv;charset=utf-8')
-  const exportTxt = () => dl(`stock-${todayStr()}.txt`, '\uFEFF' + `ChutiBenz — Stock Record\n${new Date().toLocaleString('th-TH')} · ${filtered.length} รายการ · มูลค่าสต็อก(ทุน) ${baht(stockValue)}\n${'─'.repeat(40)}\n` + filtered.map((r) => `▪ ${r.part_name || '(ไม่ระบุ)'} ${r.car_model || ''} · ${STK[r.status || 'in_stock']?.th}\n   ทุน ${baht(r.cost)} · ตั้งขาย ${baht(r.set_price)} · เข้า ${fmtDate(r.date_in)} (อายุ ${ageOf(r) ?? '-'} วัน) · ${r.has_image ? 'มีรูป' : 'ไม่มีรูป'}${r.location ? ` · ที่เก็บ ${r.location}` : ''}`).join('\n\n'), 'text/plain;charset=utf-8')
+  const exportCsv = () => dl(`stock-${todayStr()}.csv`, '﻿' + [COLS.join(','), ...filtered.map((r) => row(r).map(esc).join(','))].join('\r\n'), 'text/csv;charset=utf-8')
+  const exportTxt = () => dl(`stock-${todayStr()}.txt`, '﻿' + `ChutiBenz — Stock Record\n${new Date().toLocaleString('th-TH')} · ${filtered.length} รายการ · มูลค่าสต็อก(ทุน) ${baht(stockValue)}\n${'─'.repeat(40)}\n` + filtered.map((r) => `▪ ${r.part_name || '(ไม่ระบุ)'} ${r.car_model || ''} · ${STK[r.status || 'in_stock']?.th}\n ทุน ${baht(r.cost)} · ตั้งขาย ${baht(r.set_price)} · เข้า ${fmtDate(r.date_in)} (อายุ ${ageOf(r) ?? '-'} วัน) · ${r.has_image ? 'มีรูป' : 'ไม่มีรูป'}${r.location ? ` · ที่เก็บ ${r.location}` : ''}`).join('\n\n'), 'text/plain;charset=utf-8')
   const exportJson = () => dl(`stock-${todayStr()}.json`, JSON.stringify(filtered.map((r) => ({ date_in: r.date_in, part_name: r.part_name, car_model: r.car_model, cost: num(r.cost), set_price: num(r.set_price), status: r.status || 'in_stock', location: r.location, source: r.source, has_image: !!r.has_image, age_days: ageOf(r), sku: r.sku, note: r.note })), null, 2), 'application/json')
 
   return (
@@ -294,7 +299,7 @@ function StockEdit({ r, onSave }: { r: Row; onSave: (fd: FormData) => void }) {
     <form action={onSave} style={{ borderTop: '1px solid #eee', padding: 12, background: '#fbfaf6' }}>
       <input type="hidden" name="id" value={r.id} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-        {STK_ORDER.map((s2) => <button key={s2} type="submit" name="status" value={s2} style={{ ...qbtn, ...(( r.status || 'in_stock') === s2 ? { background: STK[s2].bg, color: STK[s2].fg, borderColor: STK[s2].fg } : {}) }}>{STK[s2].th}</button>)}
+        {STK_ORDER.map((s2) => <button key={s2} type="submit" name="status" value={s2} style={{ ...qbtn, ...((r.status || 'in_stock') === s2 ? { background: STK[s2].bg, color: STK[s2].fg, borderColor: STK[s2].fg } : {}) }}>{STK[s2].th}</button>)}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <label style={lbl}>ต้นทุน<input name="cost" type="number" defaultValue={r.cost ?? ''} style={inp} /></label>
