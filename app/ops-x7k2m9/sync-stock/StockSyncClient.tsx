@@ -1,7 +1,8 @@
 'use client'
-// app/ops-x7k2m9/sync-stock/StockSyncClient.tsx — Sheet(Stock tab) → stock_records.qty
-// flow: upload CSV แท็บ Stock → parse SKU + คงเหลือ → PREVIEW (new/update/nochange) → owner กดยืนยัน → เขียน qty
-// KEY = sku · SAFETY: dry-run · ไม่ทับด้วยว่าง · backup ก่อนเขียน · import report · owner-only
+// app/ops-x7k2m9/sync-stock/StockSyncClient.tsx — Path B: Sheet(รับเข้า tab) → stock_records "คลังตั้งต้น (received)"
+// flow: upload CSV แท็บ "รับเข้า" → รวมจำนวนต่อ SKU (received) → PREVIEW → owner กดยืนยัน → เขียน qty(=received)
+// เว็บจะหักยอดขาย (sales by sku) เอง = คงเหลือจริง (คิดที่ Daily Brief) · KEY = sku
+// SAFETY: dry-run · ไม่เขียนจนกดยืนยัน · backup ก่อนเขียน · import report · owner-only
 import { useMemo, useState } from 'react'
 
 type Row = Record<string, any>
@@ -53,17 +54,17 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
     const header = grid[hi]
     const ci = {
       sku: findCol(header, ['sku']),
-      qty: findCol(header, ['คงเหลือ', 'เหลือ', 'qty', 'คงคลัง']),
+      qty: findCol(header, ['จำนวน', 'รับเข้า', 'qty', 'คงเหลือ']),
       name: findCol(header, ['ชื่ออะไหล่', 'ชื่อ', 'name']),
       model: findCol(header, ['รุ่น', 'model']),
       cost: findCol(header, ['ต้นทุน', 'cost']),
       price: findCol(header, ['ราคาขาย', 'ราคา', 'price']),
       loc: findCol(header, ['ที่เก็บ', 'location', 'ตำแหน่ง']),
     }
-    if (ci.sku < 0) return { error: 'ไม่พบคอลัมน์ SKU (export แท็บ "Stock" ให้ถูก)', rows: [] as PreviewRow[], counts: {} as any, skipped: 0, orphans: 0, headerRow: hi + 1, hasQty: false }
-    if (ci.qty < 0) return { error: 'ไม่พบคอลัมน์ "คงเหลือ" (ต้อง export แท็บ Stock ไม่ใช่ รับเข้า)', rows: [] as PreviewRow[], counts: {} as any, skipped: 0, orphans: 0, headerRow: hi + 1, hasQty: false }
-    const out: PreviewRow[] = []
-    const used = new Set<string>()
+    if (ci.sku < 0) return { error: 'ไม่พบคอลัมน์ SKU (export แท็บ "รับเข้า" ให้ถูก)', rows: [] as PreviewRow[], counts: {} as any, skipped: 0, orphans: 0, headerRow: hi + 1, hasQty: false }
+    if (ci.qty < 0) return { error: 'ไม่พบคอลัมน์ "จำนวน" (ต้อง export แท็บ "รับเข้า")', rows: [] as PreviewRow[], counts: {} as any, skipped: 0, orphans: 0, headerRow: hi + 1, hasQty: false }
+    // รวมจำนวนต่อ SKU (received = SUM ของทุกแถวรับเข้า) · เก็บ meta จากแถวแรก
+    const agg: Record<string, { sku: string; recv: number; name: string; model: string; cost: number | null; price: number | null; loc: string }> = {}
     let skipped = 0
     for (let i = hi + 1; i < grid.length; i++) {
       const r = grid[i]
@@ -71,32 +72,32 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
       if (!sku) continue
       if (!hasDigit(sku)) { skipped++; continue }
       const key = normKey(sku)
-      if (used.has(key)) continue
-      used.add(key)
-      const qtyN = toNum(r[ci.qty])
-      const name = ci.name >= 0 ? norm(r[ci.name]) : ''
-      const model = ci.model >= 0 ? norm(r[ci.model]) : ''
-      const cost = ci.cost >= 0 ? toNum(r[ci.cost]) : null
-      const price = ci.price >= 0 ? toNum(r[ci.price]) : null
-      const loc = ci.loc >= 0 ? norm(r[ci.loc]) : ''
-      if (qtyN == null) { out.push({ status: 'error', sku, part_name: name, car_model: model, qty: 0, cost, set_price: price, location: loc, note: 'คงเหลือไม่ใช่ตัวเลข', id: null, write: false }); continue }
+      const q = toNum(r[ci.qty]) || 0
+      if (!agg[key]) agg[key] = { sku, recv: 0, name: ci.name >= 0 ? norm(r[ci.name]) : '', model: ci.model >= 0 ? norm(r[ci.model]) : '', cost: ci.cost >= 0 ? toNum(r[ci.cost]) : null, price: ci.price >= 0 ? toNum(r[ci.price]) : null, loc: ci.loc >= 0 ? norm(r[ci.loc]) : '' }
+      agg[key].recv += q
+    }
+    const out: PreviewRow[] = []
+    for (const key of Object.keys(agg)) {
+      const a = agg[key]
+      const qtyN = a.recv
       const ex = bySku[key]
       let status: PreviewRow['status'], note = ''
-      if (!ex) { status = 'new'; note = qtyN > 0 ? `ตั้งคงเหลือ ${qtyN}` : 'ตั้งคงเหลือ 0 (หมด)' }
+      if (!ex) { status = 'new'; note = `ตั้งคลังตั้งต้น (รับเข้า) ${qtyN}` }
       else {
         const exQty = Number(ex.qty)
         if (!isNaN(exQty) && exQty === qtyN) { status = 'nochange'; note = 'เหมือนเดิม' }
-        else { status = 'update'; note = `คงเหลือ ${isNaN(exQty) ? '—' : exQty} → ${qtyN}` }
+        else { status = 'update'; note = `รับเข้า ${isNaN(exQty) ? '—' : exQty} → ${qtyN}` }
       }
-      out.push({ status, sku, part_name: name, car_model: model, qty: qtyN, cost, set_price: price, location: loc, note, id: ex ? ex.id : null, write: status === 'new' || status === 'update' })
+      out.push({ status, sku: a.sku, part_name: a.name, car_model: a.model, qty: qtyN, cost: a.cost, set_price: a.price, location: a.loc, note, id: ex ? ex.id : null, write: status === 'new' || status === 'update' })
     }
+    out.sort((x, y) => (x.car_model + x.sku).localeCompare(y.car_model + y.sku))
     const sheetKeys = new Set(out.map((o) => normKey(o.sku)))
     const orphans = stock.filter((s) => normKey(s.sku) && !sheetKeys.has(normKey(s.sku))).length
     const counts = {
       new: out.filter((o) => o.status === 'new').length,
       update: out.filter((o) => o.status === 'update').length,
       nochange: out.filter((o) => o.status === 'nochange').length,
-      error: out.filter((o) => o.status === 'error').length,
+      error: 0,
     }
     return { error: '', rows: out, counts, skipped, orphans, headerRow: hi + 1, hasQty: true }
   }, [raw, bySku, stock])
@@ -109,7 +110,7 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
   const backup = () => dl(`stock-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(stock, null, 2), 'application/json')
   async function confirmWrite() {
     if (!toWrite.length || busy) return
-    if (!window.confirm(`ยืนยันเขียนจำนวนคงเหลือ ${toWrite.length} รายการลง stock_records?\n(เพิ่ม ${analysis?.counts.new} · แก้ ${analysis?.counts.update})\nระบบจะดาวน์โหลด backup ให้ก่อน`)) return
+    if (!window.confirm(`ยืนยันเขียนคลังตั้งต้น (รับเข้า) ${toWrite.length} รายการลง stock_records?\n(เพิ่ม ${analysis?.counts.new} · แก้ ${analysis?.counts.update})\nเว็บจะหักยอดขายเอง = คงเหลือจริง · ระบบดาวน์โหลด backup ให้ก่อน`)) return
     setBusy(true)
     backup()
     try {
@@ -136,20 +137,20 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
   return (
     <div style={{ minHeight: '100vh', background: CREAM, fontFamily: '-apple-system,"Segoe UI","Noto Sans Thai",sans-serif', color: '#1a1a1a' }}>
       <div style={{ background: GREEN, color: '#fff', padding: '14px 16px' }}>
-        <div style={{ fontWeight: 700, fontSize: 18 }}>📦 Stock Sync — อัปเดตจำนวนคงเหลือจากชีต</div>
-        <div style={{ fontSize: 12, color: '#cbd8cf' }}>Google Sheet แท็บ "Stock" = แม่ · export CSV → อัปโหลด → ดู preview → กดยืนยันจึงเขียน · เขียนเฉพาะ stock_records (ไม่แตะ products/ยอดขาย)</div>
-        <div style={{ fontSize: 11.5, color: '#a9bfb1', marginTop: 4 }}>คงเหลือ = รับเข้า−ขายออก (ชีตคำนวณให้) · จับคู่ด้วย SKU · upsert 1 แถว/SKU · dry-run + backup ก่อนเขียน · เฉพาะ owner</div>
+        <div style={{ fontWeight: 700, fontSize: 18 }}>📦 Sync คลังตั้งต้น (รับเข้า) จากชีต</div>
+        <div style={{ fontSize: 12, color: '#cbd8cf' }}>Path B · export แท็บ "รับเข้า" → อัปโหลด → ดู preview → ยืนยัน · เขียน "รับเข้ารวม" ต่อ SKU · <b>เว็บหักยอดขายเอง = คงเหลือจริง</b> (ดู Daily Brief)</div>
+        <div style={{ fontSize: 11.5, color: '#a9bfb1', marginTop: 4 }}>รวมจำนวนต่อ SKU · จับคู่ด้วย SKU · upsert 1 แถว/SKU · dry-run + backup ก่อนเขียน · เฉพาะ owner</div>
       </div>
 
       <div style={{ padding: 12, maxWidth: 1000, margin: '0 auto' }}>
         <div style={card}>
-          <div style={{ fontWeight: 700, color: GREEN, marginBottom: 8 }}>1) วาง CSV หรือเลือกไฟล์ (export จากแท็บ <b>"Stock"</b> — ที่มีคอลัมน์ "คงเหลือ")</div>
+          <div style={{ fontWeight: 700, color: GREEN, marginBottom: 8 }}>1) วาง CSV หรือเลือกไฟล์ (export จากแท็บ <b>"รับเข้า"</b> — มีคอลัมน์ SKU + จำนวน)</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
             <input type="file" accept=".csv,text/csv" onChange={(e) => onFile(e.target.files?.[0])} style={{ fontSize: 13 }} />
             {fileName && <span style={{ fontSize: 12, color: '#555' }}>📄 {fileName}</span>}
             {raw && <button style={btn} onClick={() => { setRaw(''); setFileName(''); setResult(null) }}>ล้าง</button>}
           </div>
-          <textarea value={raw} onChange={(e) => setRaw(e.target.value)} placeholder='วางข้อความ CSV แท็บ Stock ที่นี่ (ต้องมีคอลัมน์ SKU และ "คงเหลือ")'
+          <textarea value={raw} onChange={(e) => setRaw(e.target.value)} placeholder='วางข้อความ CSV แท็บ "รับเข้า" ที่นี่ (ต้องมีคอลัมน์ SKU และ จำนวน)'
             style={{ width: '100%', minHeight: 80, border: '1px solid #ddd', borderRadius: 8, padding: 10, fontSize: 12.5, fontFamily: 'monospace' }} />
         </div>
 
@@ -157,21 +158,21 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
         {analysis && !analysis.error && (
           <>
             <div style={card}>
-              <div style={{ fontWeight: 700, color: GREEN, marginBottom: 8 }}>2) Preview (ยังไม่เขียนอะไร) · หัวตารางแถวที่ {analysis.headerRow} · รวมของในคลัง {totalUnits} ชิ้น</div>
+              <div style={{ fontWeight: 700, color: GREEN, marginBottom: 8 }}>2) Preview (ยังไม่เขียนอะไร) · หัวตารางแถวที่ {analysis.headerRow} · รับเข้ารวม {totalUnits} ชิ้น</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                 {chip('ใหม่', analysis.counts.new, SC.new)}
                 {chip('อัปเดต', analysis.counts.update, SC.update)}
                 {chip('เหมือนเดิม', analysis.counts.nochange, SC.nochange)}
-                {chip('error', analysis.counts.error, SC.error)}
               </div>
               {analysis.skipped > 0 && <div style={{ fontSize: 12.5, color: '#5F5E5A', marginBottom: 4 }}>ℹ️ ข้ามแถวหมวด/ไม่มีรหัส {analysis.skipped} แถว</div>}
               {analysis.orphans > 0 && <div style={{ fontSize: 12.5, color: '#5F5E5A' }}>ℹ️ มีในเว็บแต่ไม่มีในชีต {analysis.orphans} รายการ — ไม่ลบ</div>}
+              <div style={{ fontSize: 11.5, color: '#7c4a13', marginTop: 4 }}>💡 ตัวเลขนี้ = "รับเข้ารวม" (คลังตั้งต้น) · คงเหลือจริง = รับเข้า − ยอดขาย (เว็บคิดให้ที่ Daily Brief)</div>
             </div>
 
             <div style={{ ...card, padding: 0, overflow: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                 <thead><tr style={{ background: '#f3f1ea', textAlign: 'left' }}>
-                  {['สถานะ', 'SKU', 'ชื่อ', 'รุ่น', 'คงเหลือ', 'ที่เก็บ', 'หมายเหตุ'].map((h) => <th key={h} style={{ padding: '8px 10px', borderBottom: '1px solid #e7e3d8', whiteSpace: 'nowrap' }}>{h}</th>)}
+                  {['สถานะ', 'SKU', 'ชื่อ', 'รุ่น', 'รับเข้ารวม', 'ที่เก็บ', 'หมายเหตุ'].map((h) => <th key={h} style={{ padding: '8px 10px', borderBottom: '1px solid #e7e3d8', whiteSpace: 'nowrap' }}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {analysis.rows.slice(0, 400).map((r, i) => (
@@ -180,7 +181,7 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
                       <td style={{ padding: '6px 10px', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.sku}</td>
                       <td style={{ padding: '6px 10px' }}>{r.part_name || '—'}</td>
                       <td style={{ padding: '6px 10px' }}>{r.car_model || '—'}</td>
-                      <td style={{ padding: '6px 10px', fontWeight: 700, color: r.qty > 0 ? '#3B6D11' : '#A32D2D', whiteSpace: 'nowrap' }}>{r.qty}{r.qty > 0 ? '' : ' (หมด)'}</td>
+                      <td style={{ padding: '6px 10px', fontWeight: 700, color: '#3B6D11', whiteSpace: 'nowrap' }}>{r.qty}</td>
                       <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>{r.location || '—'}</td>
                       <td style={{ padding: '6px 10px', color: '#777' }}>{r.note}</td>
                     </tr>
@@ -196,10 +197,10 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
                 <button style={btn} onClick={backup}>⬇ ดาวน์โหลด backup ปัจจุบัน</button>
                 <button onClick={confirmWrite} disabled={busy || toWrite.length === 0}
                   style={{ ...btn, background: toWrite.length ? GREEN : '#ccc', color: '#fff', borderColor: GREEN, cursor: toWrite.length ? 'pointer' : 'default' }}>
-                  {busy ? 'กำลังเขียน…' : `✅ ยืนยันเขียนจำนวนคงเหลือ ${toWrite.length} รายการ`}
+                  {busy ? 'กำลังเขียน…' : `✅ ยืนยันเขียนคลังตั้งต้น ${toWrite.length} รายการ`}
                 </button>
               </div>
-              <div style={{ fontSize: 11.5, color: '#999', marginTop: 6 }}>กดยืนยัน = ดาวน์โหลด backup ให้อัตโนมัติ แล้วเขียน · re-sync = ทับ qty ตัวใหม่ (ปลอดภัย ไม่สร้างซ้ำ)</div>
+              <div style={{ fontSize: 11.5, color: '#999', marginTop: 6 }}>กดยืนยัน = ดาวน์โหลด backup ให้อัตโนมัติ แล้วเขียน · re-sync = ทับรับเข้ารวมตัวใหม่ (ปลอดภัย ไม่สร้างซ้ำ)</div>
             </div>
           </>
         )}
@@ -211,7 +212,7 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
             </div>
             <div style={{ fontSize: 13 }}>เพิ่มใหม่ {result.added} · อัปเดต {result.updated} · error {result.errors.length}</div>
             {result.errors.length > 0 && <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 4 }}>{result.errors.slice(0, 10).map((e, i) => <div key={i}>• {e.sku}: {e.msg}</div>)}</div>}
-            <div style={{ fontSize: 11.5, color: '#777', marginTop: 6 }}>ดาวน์โหลด report + backup ไว้แล้ว · จำนวนคงเหลือในเว็บตรงกับชีตแล้ว</div>
+            <div style={{ fontSize: 11.5, color: '#777', marginTop: 6 }}>ดาวน์โหลด report + backup ไว้แล้ว · คลังตั้งต้นในเว็บตรงกับ "รับเข้า" ในชีตแล้ว · คงเหลือจริงดูที่ Daily Brief</div>
           </div>
         )}
       </div>
