@@ -199,7 +199,9 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   const unassignedCount = B.unassignedLeads.length + B.unassignedTasks.length
   const reorder = useMemo(() => reorderSignals(sales, stock), [sales, stock])
   // 📦 คงเหลือจากชีต (stock_records.qty ที่ sync จากแท็บ Stock) — อ่านตรงตาม SKU ไม่พึ่งชื่อยอดขาย
-  const sheetStock = useMemo(() => stock.filter((s) => s.qty != null && !isNaN(Number(s.qty))).map((s) => ({ sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', qty: Number(s.qty), location: s.location || '' })), [stock])
+  // Path B: คงเหลือจริง = รับเข้า (stock.qty จากชีต) − ขาย (นับ sales_records ตาม sku · 1 แถว=1 ชิ้น)
+  const soldBySku = useMemo(() => { const m: Record<string, number> = {}; (sales || []).forEach((r) => { const k = String(r.sku || '').trim().toUpperCase(); if (k) m[k] = (m[k] || 0) + 1 }); return m }, [sales])
+  const sheetStock = useMemo(() => stock.filter((s) => s.qty != null && !isNaN(Number(s.qty))).map((s) => { const received = Number(s.qty); const sold = soldBySku[String(s.sku || '').trim().toUpperCase()] || 0; return { sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', received, sold, qty: received - sold, location: s.location || '' } }), [stock, soldBySku])
   const lowStock = useMemo(() => sheetStock.filter((x) => x.qty <= 1).sort((a, b) => a.qty - b.qty), [sheetStock])
   const totalUnits = useMemo(() => sheetStock.reduce((s, x) => s + x.qty, 0), [sheetStock])
   const reorderUrgent = reorder.filter((x) => x.urgent).length
@@ -358,6 +360,15 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   const dhLeadNoNext = leads.filter((l) => leadOpen(l) && !l.follow_due).length
   const dhTaskStale = tasks.filter((t) => taskOpen(t) && daysSince(t.updated_at || t.created_at) >= 3).length
   const dhCostMissing = sales.filter((r) => Number(r.sale_price) > 0 && r.cost == null).length
+  // 📊 สรุปร้าน (สำหรับภาพรวม/FC demo)
+  const _month = new Date().toISOString().slice(0, 7)
+  const salesMonth = (sales || []).filter((r) => String(r.sale_date || '').startsWith(_month))
+  const revMonth = salesMonth.reduce((a, r) => a + (Number(r.sale_price) || 0), 0)
+  const profitMonth = salesMonth.reduce((a, r) => a + ((Number(r.sale_price) || 0) - (Number(r.cost) || 0)), 0)
+  const outCount = sheetStock.filter((x) => x.qty <= 0).length
+  const sellMap: Record<string, number> = {}; (sales || []).forEach((r) => { const k = String(r.part_sold || r.sku || 'อะไหล่'); sellMap[k] = (sellMap[k] || 0) + 1 })
+  const topSellers = Object.entries(sellMap).sort((a, b) => b[1] - a[1]).slice(0, 3)
+  const bahtN = (n: number) => '฿' + Math.round(n).toLocaleString()
 
   return (
     <div style={{ minHeight: '100vh', background: CREAM, fontFamily: '-apple-system,"Segoe UI","Noto Sans Thai",sans-serif', color: '#1a1a1a' }}>
@@ -400,7 +411,17 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
           <div style={{ ...card, background: '#fbfaf6', fontSize: 12, color: '#7c4a13', marginTop: 4 }}>
             🩺 <b>Data Health:</b> lead ไม่มีนัดตาม {dhLeadNoNext} · task ไม่อัปเดต ≥3 วัน {dhTaskStale} · ต้นทุนว่าง {dhCostMissing}{(dhLeadNoNext + dhTaskStale + dhCostMissing) === 0 ? ' · ✅ ข้อมูลครบดี' : ''}
           </div>
-          <button onClick={() => setShowDetail((s) => !s)} style={{ ...qbtn, marginTop: 8, width: '100%' }}>{showDetail ? '▲ ซ่อนรายละเอียด' : '▼ ดูรายละเอียดทั้งหมด (สัญญาณ / สต็อก / สรุป)'}</button>
+          <div style={{ ...card, marginTop: 4, padding: '10px 12px' }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: GREEN, marginBottom: 6 }}>📊 สรุปร้านเดือนนี้</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 90, textAlign: 'center' }}><div style={{ fontSize: 18, fontWeight: 700, color: GREEN }}>{salesMonth.length}</div><div style={{ fontSize: 11, color: '#777' }}>ขายได้ (รายการ)</div></div>
+              <div style={{ flex: 1, minWidth: 90, textAlign: 'center' }}><div style={{ fontSize: 18, fontWeight: 700, color: '#0C447C' }}>{bahtN(revMonth)}</div><div style={{ fontSize: 11, color: '#777' }}>ยอดขาย</div></div>
+              <div style={{ flex: 1, minWidth: 90, textAlign: 'center' }}><div style={{ fontSize: 18, fontWeight: 700, color: '#0F6E56' }}>{bahtN(profitMonth)}</div><div style={{ fontSize: 11, color: '#777' }}>กำไร</div></div>
+              <div style={{ flex: 1, minWidth: 90, textAlign: 'center' }}><div style={{ fontSize: 18, fontWeight: 700, color: '#A32D2D' }}>{outCount}</div><div style={{ fontSize: 11, color: '#777' }}>ของหมด (SKU)</div></div>
+            </div>
+            {topSellers.length > 0 && <div style={{ fontSize: 11.5, color: '#666', marginTop: 6 }}>🏆 ขายดี: {topSellers.map(([k, n]) => `${k} (${n})`).join(' · ')}</div>}
+          </div>
+          <button onClick={() => setShowDetail((s) => !s)} style={{ ...qbtn, marginTop: 8, width: '100%' }}>{showDetail ? '▲ ซ่อนรายละเอียด' : '▼ ดูรายละเอียดทั้งหมด (สัญญาณ / สต็อก / งานค้าง)'}</button>
         </div>
 
         {showDetail && (<>
@@ -571,14 +592,14 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
         {/* 📦 คงเหลือจากชีต (SKU) — คงเหลือน้อย/หมด · อ่านจาก stock_records.qty ที่ sync จากแท็บ Stock */}
         {sheetStock.length > 0 && (
           <Section id="sec-sheet-stock" title="📦 คงเหลือน้อย/หมด (จากชีต · ตาม SKU)" count={lowStock.length}>
-            <div style={{ fontSize: 11.5, color: '#888', marginBottom: 6 }}>ของในคลังรวม {totalUnits} ชิ้น · แสดงเฉพาะคงเหลือ ≤ 1 (จาก stock ที่ sync จากแท็บ Stock)</div>
+            <div style={{ fontSize: 11.5, color: '#888', marginBottom: 6 }}>คงเหลือจริงรวม {totalUnits} ชิ้น · คงเหลือ = รับเข้า − ขาย (เว็บคิดให้ · Path B) · แสดงเฉพาะคงเหลือ ≤ 1</div>
             {lowStock.length === 0 ? <div style={{ ...card, color: '#0F6E56', fontSize: 12.5 }}>✅ ไม่มีรายการคงเหลือน้อย/หมด</div> : lowStock.map((x) => (
               <div key={x.sku} style={{ ...card, borderLeft: `4px solid ${x.qty === 0 ? '#A32D2D' : '#854F0B'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                   <b style={{ fontSize: 13.5 }}>{x.name}{x.model ? ` · ${x.model}` : ''}</b>
                   <Badge label={x.qty === 0 ? '🔴 หมด' : `🟡 เหลือ ${x.qty}`} bg={x.qty === 0 ? '#FCEBEB' : '#FAEEDA'} fg={x.qty === 0 ? '#A32D2D' : '#854F0B'} />
                 </div>
-                <div style={{ fontSize: 11.5, color: '#888', marginTop: 2 }}>SKU {x.sku}{x.location ? ` · ที่เก็บ ${x.location}` : ''}</div>
+                <div style={{ fontSize: 11.5, color: '#888', marginTop: 2 }}>SKU {x.sku}{x.location ? ` · ที่เก็บ ${x.location}` : ''} · รับเข้า {x.received} − ขาย {x.sold}</div>
               </div>
             ))}
           </Section>
