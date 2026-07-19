@@ -2,6 +2,7 @@
 // บันทึก Sales Record + Stock Record จริง → ให้ CRM/Profit/Stock/Risk Guard อ่านต้นทุน/กำไร/สต็อก
 // pattern เดิม: svc() + authed() (cookie ops_admin) + server actions · ไม่ลบ (ใช้ status) · ไม่แตะโมดูลอื่น
 // P3.3: รับ field "source" (แหล่งซื้อ) ทั้ง addStock + updateStock
+// PathB: รับ field "sku" ใน Sales (เพื่อตัดสต็อกตาม SKU · เว็บคิดคงเหลือ=รับเข้า−ขาย)
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
@@ -42,6 +43,7 @@ async function addSale(formData: FormData) {
   if (!(await authed())) return
   await svc().from('sales_records').insert({
     customer: s(formData, 'customer'), car_model: s(formData, 'car_model'), part_sold: s(formData, 'part_sold'),
+    sku: s(formData, 'sku'),
     sale_date: s(formData, 'sale_date'), sale_price: num(formData, 'sale_price'), cost: num(formData, 'cost'),
     payment_status: s(formData, 'payment_status') || 'unpaid', delivery_status: s(formData, 'delivery_status') || 'pending',
     tracking_no: s(formData, 'tracking_no'), note: s(formData, 'note'), linked_lead_id: s(formData, 'linked_lead_id'),
@@ -53,7 +55,7 @@ async function updateSale(formData: FormData) {
   if (!(await authed())) return
   const id = String(formData.get('id') || ''); if (!id) return
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  for (const f of ['customer', 'car_model', 'part_sold', 'sale_date', 'payment_status', 'delivery_status', 'tracking_no', 'note']) {
+  for (const f of ['customer', 'car_model', 'part_sold', 'sku', 'sale_date', 'payment_status', 'delivery_status', 'tracking_no', 'note']) {
     const v = formData.get(f); if (v !== null) patch[f] = String(v) === '' ? null : String(v)
   }
   for (const f of ['sale_price', 'cost']) {
@@ -91,7 +93,7 @@ async function updateStock(formData: FormData) {
   revalidatePath(PATH)
 }
 
-// Level B: Finance Lite (finance_entries) — reuse pattern จาก finance เดิม (เงินเข้า-ออกพื้นฐาน · ไม่ทำบัญชีเต็ม)
+// Level B: Finance Lite (finance_entries)
 async function addEntry(formData: FormData) {
   'use server'
   if (!(await authed())) return
