@@ -173,6 +173,13 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
     setFb((p) => ({ ...p, [it.key]: feedback }))
     fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: 'daily-brief', item_key: it.key, brief_item: it.title, ai_recommendation: it.action, input_context: { detail: it.detail, owner: it.owner, score: it.score }, feedback }) }).then(() => flash('บันทึกความเห็นแล้ว 🙏')).catch(() => flash('บันทึกไม่สำเร็จ'))
   }
+  // Phase 4a.1 · ยกเลิกปิดเสียง (un-mute) → โพสต์ remind_again (latest ชนะ) → เรื่องกลับมาเตือน
+  const [unmuted, setUnmuted] = useState<Record<string, boolean>>({})
+  const [showMuted, setShowMuted] = useState(false)
+  const unmute = (it: any) => {
+    setUnmuted((p) => ({ ...p, [it.key]: true }))
+    fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: 'daily-brief', item_key: it.key, brief_item: it.title, ai_recommendation: it.action, input_context: { unmute: true }, feedback: 'remind_again' }) }).then(() => flash('จะกลับมาเตือนแล้ว 🙏')).catch(() => flash('ไม่สำเร็จ'))
+  }
 
   const leadName = (id?: string) => { if (!id) return ''; const l = leads.find((x) => x.id === id); return l ? (l.name || '(lead)') : '' }
   const leadModelPart = (id?: string) => { const l = leads.find((x) => x.id === id); return l ? `${partOf(l)}${l.car_model ? ` (${l.car_model})` : ''}` : '' }
@@ -372,8 +379,10 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
     return muted
   }, [feedback])
   const rankedItems = [...topItems].sort((a, b) => b.score - a.score)
-  const mutedCount = rankedItems.filter((it) => mutedKeys.has(it.key)).length
-  const top5 = rankedItems.filter((it) => !mutedKeys.has(it.key)).slice(0, 5)
+  const isMuted = (it: any) => mutedKeys.has(it.key) && !unmuted[it.key]
+  const mutedItems = rankedItems.filter(isMuted)
+  const mutedCount = mutedItems.length
+  const top5 = rankedItems.filter((it) => !isMuted(it)).slice(0, 5)
   const dhLeadNoNext = leads.filter((l) => leadOpen(l) && !l.follow_due).length
   const dhTaskStale = tasks.filter((t) => taskOpen(t) && daysSince(t.updated_at || t.created_at) >= 3).length
   const dhCostMissing = sales.filter((r) => Number(r.sale_price) > 0 && r.cost == null).length
@@ -433,6 +442,17 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
               </div>
             </div>
           ))}
+          {mutedCount > 0 && (
+            <div style={{ ...card, background: '#faf9f5', padding: '8px 11px' }}>
+              <div onClick={() => setShowMuted((s) => !s)} style={{ cursor: 'pointer', fontSize: 12.5, color: '#999', fontWeight: 600 }}>🔕 ปิดเสียงไว้ {mutedCount} เรื่อง {showMuted ? '▲' : '▼ (กดดู/ยกเลิก)'}</div>
+              {showMuted && mutedItems.map((it) => (
+                <div key={it.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 7, fontSize: 12.5 }}>
+                  <span style={{ color: '#777', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</span>
+                  <button onClick={() => unmute(it)} style={{ ...fbbtn, whiteSpace: 'nowrap' }}>↩️ เตือนอีก</button>
+                </div>
+              ))}
+            </div>
+          )}
           <div style={{ ...card, background: '#fbfaf6', fontSize: 12, color: '#7c4a13', marginTop: 4 }}>
             🩺 <b>Data Health:</b> lead ไม่มีนัดตาม {dhLeadNoNext} · task ไม่อัปเดต ≥3 วัน {dhTaskStale} · ต้นทุนว่าง {dhCostMissing}{(dhLeadNoNext + dhTaskStale + dhCostMissing) === 0 ? ' · ✅ ข้อมูลครบดี' : ''}
           </div>
