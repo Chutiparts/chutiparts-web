@@ -49,7 +49,8 @@ const CSS = `
 
 const enc = (s: string) => encodeURIComponent((s || '').trim())
 
-export default function SourcingClient() {
+export default function SourcingClient({ role = 'owner' }: { role?: string }) {
+  const isOwner = role === 'owner'
   const [q, setQ] = useState('')
   const [model, setModel] = useState('')
   const [pn, setPn] = useState('')
@@ -57,6 +58,9 @@ export default function SourcingClient() {
   const [f, setF] = useState<Row>(EMPTY)
   const [toast, setToast] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
+  // P1 · Landed Cost Simulation (owner-only · คำนวณล้วน · ไม่บันทึก/ไม่เขียน DB · ephemeral)
+  const [sim, setSim] = useState({ buy: '', qty: '1', ship: '', fees: '', sell: '' })
+  const setSim1 = (k: keyof typeof sim, v: string) => setSim((p) => ({ ...p, [k]: v }))
 
   useEffect(() => {
     try { const s = localStorage.getItem('cb_sourcing'); if (s) setRows(JSON.parse(s)) } catch {}
@@ -164,6 +168,58 @@ export default function SourcingClient() {
           </tbody></table>
           <div className="muted" style={{ marginTop: 6 }}>รายการเก็บในเบราว์เซอร์นี้ (localStorage) · กด &quot;คัดลอกเป็นตาราง&quot; แล้ววางในชีต <b>ประวัติการหา</b> ได้เลย</div>
         </div>
+
+        {isOwner && (() => {
+          const nBuy = parseFloat(sim.buy), nQty = parseFloat(sim.qty), nShip = parseFloat(sim.ship) || 0, nFees = parseFloat(sim.fees) || 0, nSell = parseFloat(sim.sell)
+          const valid = !isNaN(nBuy) && nBuy > 0 && !isNaN(nQty) && nQty > 0
+          const landed = valid ? nBuy + (nShip + nFees) / nQty : null
+          const hasSell = !isNaN(nSell) && nSell > 0
+          const profit = (landed !== null && hasSell) ? nSell - landed : null
+          const margin = (profit !== null && hasSell) ? (profit / nSell) * 100 : null
+          const total = (profit !== null) ? profit * nQty : null
+          const baht = (n: number) => '฿' + Math.round(n).toLocaleString()
+          return (
+            <div className="card">
+              <h2>🧮 จำลองต้นทุนถึงมือ + กำไร (Landed Cost Simulation)</h2>
+              <div className="muted" style={{ marginBottom: 8 }}><b>เฉพาะเจ้าของ</b> · ช่วยตัดสินใจก่อนสั่งซื้อ — <b>simulation เท่านั้น ยังไม่บันทึกจริง</b> · ไม่เขียนกลับ stock/ledger</div>
+              <div className="row">
+                <div><label>ราคาซื้อ/ชิ้น (บาท)</label><input inputMode="decimal" value={sim.buy} onChange={(ev) => setSim1('buy', ev.target.value)} placeholder="3500" /></div>
+                <div><label>จำนวน (ชิ้น)</label><input inputMode="decimal" value={sim.qty} onChange={(ev) => setSim1('qty', ev.target.value)} placeholder="1" /></div>
+                <div><label>ราคาขายคาดการณ์/ชิ้น</label><input inputMode="decimal" value={sim.sell} onChange={(ev) => setSim1('sell', ev.target.value)} placeholder="8000" /></div>
+              </div>
+              <div className="row">
+                <div><label>ค่าขนส่งรวม (ทั้งล็อต)</label><input inputMode="decimal" value={sim.ship} onChange={(ev) => setSim1('ship', ev.target.value)} placeholder="1200" /></div>
+                <div><label>ภาษี/ค่าใช้จ่ายรวม (ทั้งล็อต)</label><input inputMode="decimal" value={sim.fees} onChange={(ev) => setSim1('fees', ev.target.value)} placeholder="600" /></div>
+                <div style={{ display: 'flex', alignItems: 'flex-end' }}><button className="btn ghost" onClick={() => setSim({ buy: '', qty: '1', ship: '', fees: '', sell: '' })}>ล้างค่า</button></div>
+              </div>
+              {!valid ? (
+                <div className="thwarn" style={{ marginTop: 12 }}>กรอก <b>ราคาซื้อ/ชิ้น</b> และ <b>จำนวน</b> (มากกว่า 0) ก่อน — ข้อมูลไม่พอ คำนวณไม่ได้</div>
+              ) : (
+                <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 130, background: '#f4efe4', border: '1px solid #e2ddcf', borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 11, color: '#777' }}>Landed cost/ชิ้น</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: '#17301F' }}>{baht(landed as number)}</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 130, background: hasSell ? ((profit as number) >= 0 ? '#eaf5ee' : '#fdecec') : '#f7f5ef', border: '1px solid #e2ddcf', borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 11, color: '#777' }}>กำไร/ชิ้น</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: hasSell ? ((profit as number) >= 0 ? '#0F6E56' : '#A32D2D') : '#999' }}>{hasSell ? baht(profit as number) : '—'}</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 130, background: hasSell ? ((margin as number) >= 15 ? '#eaf5ee' : '#faeeda') : '#f7f5ef', border: '1px solid #e2ddcf', borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 11, color: '#777' }}>Margin</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: hasSell ? ((margin as number) >= 15 ? '#0F6E56' : '#854F0B') : '#999' }}>{hasSell ? (margin as number).toFixed(1) + '%' : '—'}</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 130, background: '#f7f5ef', border: '1px solid #e2ddcf', borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ fontSize: 11, color: '#777' }}>กำไรรวม ({nQty} ชิ้น)</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: hasSell ? ((total as number) >= 0 ? '#0F6E56' : '#A32D2D') : '#999' }}>{hasSell ? baht(total as number) : '—'}</div>
+                  </div>
+                </div>
+              )}
+              {valid && hasSell && margin !== null && margin < 15 && (
+                <div className="muted" style={{ marginTop: 8, color: '#854F0B' }}>⚠️ margin ต่ำกว่า 15% — เช็กว่าต้นทุนครบไหม (ค่าเฟรต + surcharge + ค่าใน) ก่อนสั่ง · policy: ไม่ลดราคายกเว้นโปร</div>
+              )}
+            </div>
+          )
+        })()}
 
         <div className="card ref">
           <h2>③ แหล่งอ้างอิง (3 ชั้น)</h2>
