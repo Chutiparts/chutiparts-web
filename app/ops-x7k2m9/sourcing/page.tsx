@@ -64,5 +64,8 @@ export default async function Page() {
       </div>
     )
   }
-  return <SourcingClient />
+  // P1: ส่ง role → SourcingClient ซ่อน Landed Cost Simulation (โชว์ margin/กำไร) ไม่ให้ team
+  const c = await cookies()
+  const isOwner = !!process.env.ADMIN_OPS_SECRET && c.get(COOKIE)?.value === process.env.ADMIN_OPS_SECRET
+  return <SourcingClient role={isOwner ? 'owner' : 'team'} />
 }
