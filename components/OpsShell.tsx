@@ -7,26 +7,26 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
 const BASE = '/ops-x7k2m9'
-type Item = { href: string; label: string; icon: string; match?: string }
+type Item = { href: string; label: string; icon: string; match?: string; ownerOnly?: boolean }
 // P0.2 Lean: regroup เป็น Lean 8 · Daily Brief = home · ซ่อนเมนูเดี่ยว CRM/RiskGuard/Finance/ProfitGuard
 // (หน้าเดิมยังเปิดได้ตรง URL — แค่ไม่อยู่ top-level · Level B ค่อยรวมเนื้อหาเข้าโมดูลแม่)
 // #7 AI Search = หน้า public /search (ไม่อยู่เมนู ops · roadmap เดือน 3) · WebChecker → System Monitor (#8)
 type Group = { title: string; items: Item[] }
 const GROUPS: Group[] = [
   { title: 'หลัก', items: [
-    { href: `${BASE}/daily-brief`, label: 'Daily Brief', icon: '☀️' },
+    { href: `${BASE}/daily-brief`, label: 'Daily Brief', icon: '☀️', ownerOnly: true },
     { href: `${BASE}/parts-desk`, label: 'Leads', icon: '📇' },
     { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk` },
   ]},
   { title: 'เงิน & สต็อก', items: [
-    { href: `${BASE}/ledger`, label: 'Ledger', icon: '📒' },
-    { href: `${BASE}/landed-cost`, label: 'Landed Cost', icon: '🧮' },
-    { href: `${BASE}/stock-source`, label: 'Stock', icon: '📦' },
+    { href: `${BASE}/ledger`, label: 'Ledger', icon: '📒', ownerOnly: true },
+    { href: `${BASE}/landed-cost`, label: 'Landed Cost', icon: '🧮', ownerOnly: true },
+    { href: `${BASE}/stock-source`, label: 'Stock', icon: '📦', ownerOnly: true },
     { href: `${BASE}/sync-stock`, label: 'Sync สต็อก', icon: '🔄' },
     { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
   ]},
   { title: 'ระบบ', items: [
-    { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺' },
+    { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺', ownerOnly: true },
   ]},
 ]
 const ITEMS: Item[] = GROUPS.flatMap((g) => g.items)
@@ -54,8 +54,12 @@ const CSS = `
 }
 `
 
-export default function OpsShell({ children }: { children: React.ReactNode }) {
+export default function OpsShell({ children, role = 'owner' }: { children: React.ReactNode; role?: string }) {
   const path = usePathname() || ''
+  // role-access: team เห็นเฉพาะเมนูที่ไม่ ownerOnly (ซ่อน Daily Brief/Ledger/Landed Cost/Monitor) · owner เห็นครบ
+  const canSee = (it: Item) => role === 'owner' || !it.ownerOnly
+  const visGroups = GROUPS.map((g) => ({ ...g, items: g.items.filter(canSee) })).filter((g) => g.items.length > 0)
+  const visMobile = MOBILE_ITEMS.filter(canSee)
   // ไฮไลต์ทีละปุ่มเดียว: parts-desk แยก Leads/Tasks ด้วย ?tab=tasks · หน้าอื่นเทียบ pathname ตรง ๆ
   const [search, setSearch] = useState('')
   useEffect(() => { setSearch(typeof window !== 'undefined' ? window.location.search : '') }, [path])
@@ -73,7 +77,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
       {/* Desktop = เมนูซ้าย */}
       <aside className="opsx-side">
         <div className="opsx-brand">ChutiBenz<small>Mini ERP · Command Center</small></div>
-        {GROUPS.map((g) => (
+        {visGroups.map((g) => (
           <div key={g.title}>
             <div className="opsx-ghead">{g.title}</div>
             {g.items.map((it) => (
@@ -87,7 +91,7 @@ export default function OpsShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile = แท็บล่าง */}
       <nav className="opsx-bottom">
-        {MOBILE_ITEMS.map((it) => (
+        {visMobile.map((it) => (
           <a key={it.label} href={it.href} target={it.href.endsWith('.html') ? '_blank' : undefined} rel={it.href.endsWith('.html') ? 'noopener' : undefined} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
             <span className="opsx-bicon">{it.icon}</span><span>{it.label}</span>
           </a>
