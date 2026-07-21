@@ -7,6 +7,19 @@ import { createServerClient } from '@supabase/ssr'
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
+  // === Ops role gate: team เข้าได้เฉพาะหน้าที่อนุญาต · owner-only → /unauthorized ===
+  if (pathname.startsWith('/ops-x7k2m9')) {
+    const TEAM_ALLOWED = ['/ops-x7k2m9/parts-desk', '/ops-x7k2m9/sync-stock', '/ops-x7k2m9/sourcing', '/ops-x7k2m9/unauthorized']
+    const allowed = TEAM_ALLOWED.some((p) => pathname === p || pathname.startsWith(p + '/'))
+    const isOwner = request.cookies.get('ops_admin')?.value === process.env.ADMIN_OPS_SECRET
+    const team = process.env.TEAM_OPS_SECRET
+    const isTeam = !isOwner && !!team && request.cookies.get('ops_team')?.value === team
+    if (isTeam && !allowed) {
+      return NextResponse.redirect(new URL('/ops-x7k2m9/unauthorized', request.url))
+    }
+    return NextResponse.next()
+  }
+
   // Only protect /admin routes
   if (!pathname.startsWith('/admin')) {
     return NextResponse.next()
@@ -74,5 +87,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/ops-x7k2m9/:path*'],
 }
