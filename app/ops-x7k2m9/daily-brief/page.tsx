@@ -59,7 +59,8 @@ export default async function DailyBriefPage() {
     svc().from('products').select('*').limit(2000),
     svc().from('search_queries').select('*').order('created_at', { ascending: false }).limit(5000),
     // Phase 4a · brief_feedback (ถ้าตารางยังไม่มี = คืน null → [] ปลอดภัย)
-    svc().from('brief_feedback').select('item_key,feedback,created_at').order('created_at', { ascending: false }).limit(2000),
+    // scope: filter business (single-tenant ตอนนี้ = 'chutibenz' · เตรียม multi-tenant: เปลี่ยนเป็น tenant/user id ภายหลัง)
+    svc().from('brief_feedback').select('item_key,feedback,created_at').eq('business', 'chutibenz').order('created_at', { ascending: false }).limit(2000),
   ])
 
   return <DailyBriefClient leads={leadsRes.data || []} tasks={tasksRes.data || []} sales={salesRes.data || []} stock={stockRes.data || []} products={productsRes.data || []} searches={searchesRes.data || []} feedback={feedbackRes.data || []} />
