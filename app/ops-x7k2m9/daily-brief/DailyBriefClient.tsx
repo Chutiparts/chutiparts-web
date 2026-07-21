@@ -2,7 +2,7 @@
 // app/ops-x7k2m9/daily-brief/DailyBriefClient.tsx — Command Center P0 (อ่านล้วน + copy/export)
 // รวมงานเช้าจาก Lead & Follow-up + Task Ops มาหน้าเดียว: ต้องตาม/ต้องทำ/เกินกำหนด/ไม่มีเจ้าของ/ตัดสินใจ/เสี่ยง
 // rule-based ล้วน (ไม่มี AI จริง) · ไม่ส่งข้อความ/แจ้งเตือนจริง · ไม่ลบ/แก้ข้อมูล · map สถานะให้ตรงกับ 2 โมดูลเดิม
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 type Row = Record<string, any>
 const GREEN = '#17301F', BRASS = '#B8895A', CREAM = '#F4EFE4'
@@ -181,6 +181,12 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
     fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: 'daily-brief', item_key: it.key, brief_item: it.title, ai_recommendation: it.action, input_context: { unmute: true }, feedback: 'remind_again' }) }).then(() => flash('จะกลับมาเตือนแล้ว 🙏')).catch(() => flash('ไม่สำเร็จ'))
   }
 
+  // P0 Crisis Watch: ปิดเสียงสัญญาณต่อวัน (localStorage · ไม่แตะ DB · รีเซ็ตเองวันถัดไป)
+  const [snoozed, setSnoozed] = useState<string[]>([])
+  useEffect(() => { try { const raw = typeof window !== 'undefined' ? window.localStorage.getItem('cw_snooze_' + todayStr()) : null; setSnoozed(raw ? JSON.parse(raw) : []) } catch { setSnoozed([]) } }, [])
+  const snoozeSignal = (brief: string) => { try { const next = Array.from(new Set([...snoozed, brief])); setSnoozed(next); window.localStorage.setItem('cw_snooze_' + todayStr(), JSON.stringify(next)); flash('ปิดเสียงวันนี้แล้ว 🔕') } catch { /* noop */ } }
+  const unsnoozeAll = () => { try { window.localStorage.removeItem('cw_snooze_' + todayStr()); setSnoozed([]); flash('ยกเลิกปิดเสียงแล้ว') } catch { /* noop */ } }
+
   const leadName = (id?: string) => { if (!id) return ''; const l = leads.find((x) => x.id === id); return l ? (l.name || '(lead)') : '' }
   const leadModelPart = (id?: string) => { const l = leads.find((x) => x.id === id); return l ? `${partOf(l)}${l.car_model ? ` (${l.car_model})` : ''}` : '' }
 
@@ -310,11 +316,21 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   const crisisLead = leads.filter((l) => leadOpen(l) && (leadOverdue(l) || (!l.follow_due && daysSinceContact(l) >= 1)))
   const crisisTaskNoOwner = tasks.filter(taskNoOwner)
   const crisisTaskOverdueOwned = tasks.filter((t) => taskOverdue(t) && !!t.owner && !!String(t.owner).trim())
-  const crisisSignals: { brief: string; sev: 'red' | 'yellow'; title: string }[] = []
-  if (crisisLead.length >= 5) crisisSignals.push({ brief: 'lead', sev: 'red', title: `Lead ค้างไม่ได้ตาม >24 ชม. ${crisisLead.length} ราย` })
-  else if (crisisLead.length >= 2) crisisSignals.push({ brief: 'lead', sev: 'yellow', title: `Lead ค้างไม่ได้ตาม >24 ชม. ${crisisLead.length} ราย` })
-  if (crisisTaskNoOwner.length >= 1) crisisSignals.push({ brief: 'task', sev: 'red', title: `งานไม่มีเจ้าของ ${crisisTaskNoOwner.length} งาน${crisisTaskOverdueOwned.length ? ` · เกินกำหนด ${crisisTaskOverdueOwned.length}` : ''}` })
-  else if (crisisTaskOverdueOwned.length >= 3) crisisSignals.push({ brief: 'task', sev: 'yellow', title: `งานเกินกำหนด ${crisisTaskOverdueOwned.length} งาน` })
+  const crisisSignals: { brief: string; sev: 'red' | 'yellow'; title: string; lines?: string[]; navLabel?: string; navHref?: string }[] = []
+  // Lead Risk: เพิ่มชั้น "สำคัญ (มูลค่าสูง) ค้าง >3 วัน" → ยกเป็นแดง + ปุ่มไปที่ lead
+  const crisisLeadImportant = crisisLead.filter((l) => daysSinceContact(l) >= 3 && /W140|W126|W120|W119|M104|M119|M120|เครื่อง|ล้อ|AMG/i.test(String(l.car_model || '') + ' ' + partOf(l)))
+  if (crisisLead.length >= 2 || crisisLeadImportant.length >= 1) {
+    const sev: 'red' | 'yellow' = (crisisLead.length >= 5 || crisisLeadImportant.length >= 1) ? 'red' : 'yellow'
+    const extra = crisisLeadImportant.length ? ` · ⭐ สำคัญค้าง >3 วัน ${crisisLeadImportant.length} ราย` : ''
+    crisisSignals.push({ brief: 'lead', sev, title: `Lead ค้างไม่ได้ตาม >24 ชม. ${crisisLead.length} ราย${extra}`, navLabel: 'ไปที่ Leads', navHref: '/ops-x7k2m9/parts-desk' })
+  }
+  // Task Risk: ลิสต์ 3-5 งานเด่นในตัวสัญญาณ + ปุ่มไปที่งาน
+  const crisisTaskItems = [
+    ...crisisTaskNoOwner.map((t) => `• ${t.title || '(ไม่มีชื่องาน)'} — ไม่มีเจ้าของ`),
+    ...crisisTaskOverdueOwned.map((t) => `• ${t.title || '(ไม่มีชื่องาน)'} — เกินกำหนด${t.owner ? ` (${t.owner})` : ''}`),
+  ].slice(0, 5)
+  if (crisisTaskNoOwner.length >= 1) crisisSignals.push({ brief: 'task', sev: 'red', title: `งานไม่มีเจ้าของ ${crisisTaskNoOwner.length} งาน${crisisTaskOverdueOwned.length ? ` · เกินกำหนด ${crisisTaskOverdueOwned.length}` : ''}`, lines: crisisTaskItems, navLabel: 'ไปที่ Tasks', navHref: '/ops-x7k2m9/parts-desk?tab=tasks' })
+  else if (crisisTaskOverdueOwned.length >= 3) crisisSignals.push({ brief: 'task', sev: 'yellow', title: `งานเกินกำหนด ${crisisTaskOverdueOwned.length} งาน`, lines: crisisTaskItems, navLabel: 'ไปที่ Tasks', navHref: '/ops-x7k2m9/parts-desk?tab=tasks' })
   // Stock (P2 · read-only จาก props): รุ่นที่ลูกค้าถาม (leads) × ของ published ไม่มีรูป ≥3 ชิ้น = ของมีแต่มองไม่เห็น
   const crisisNorm = (s: any) => String(s || '').trim().toUpperCase()
   const demandByModel: Record<string, number> = {}
@@ -326,18 +342,25 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
     .filter((m) => noPhotoByModel[m] >= 3 && (demandByModel[m] || 0) >= 1)
     .map((m) => ({ model: m, noPhoto: noPhotoByModel[m] }))
     .sort((a, b) => b.noPhoto - a.noPhoto)
-  if (stockHidden.length >= 1) crisisSignals.push({ brief: 'stock', sev: 'yellow', title: `ของไม่มีรูปตรงรุ่นที่ลูกค้าถาม/ค้น: ${stockHidden.slice(0, 3).map((h) => `${h.model} ${h.noPhoto} ชิ้น`).join(' · ')}` })
+  // Stock Risk: รวม ขายดีใกล้หมด + ไม่มีรูปตรงดีมานด์ + สต็อกไม่อัปเดต ≥X วัน (owner เห็นครบ · Daily Brief = owner-only)
+  const stockParts: string[] = []
+  if (reorderUrgent >= 1) stockParts.push(`ขายดีแต่หมด/ใกล้หมด ${reorderUrgent} รายการ`)
+  if (stockHidden.length >= 1) stockParts.push(`ไม่มีรูปตรงรุ่นที่ลูกค้าถาม: ${stockHidden.slice(0, 2).map((h) => `${h.model} ${h.noPhoto} ชิ้น`).join(' · ')}`)
+  if (P.stale.length >= 1) stockParts.push(`สต็อกไม่อัปเดต ≥${STALE_DAYS} วัน ${P.stale.length} รายการ`)
+  if (stockParts.length) crisisSignals.push({ brief: 'stock', sev: reorderUrgent >= 1 ? 'red' : 'yellow', title: `สต็อก: ${stockParts.join(' · ')}`, navLabel: 'ไปที่ Stock', navHref: '/ops-x7k2m9/stock-source' })
   // Web (P2b · read-only จาก search_queries): คำค้นที่ลูกค้าหาแต่ "ไม่เจอ" สะสม = ดีมานด์หลุด/เว็บไม่มีของ
   const searchRecent = searches.filter((r) => daysSince(r.created_at) <= 30)
   const notFoundQ = new Set(searchRecent.filter((r) => !(r.had_results === true || r.had_results === 'true')).map((r) => crisisNorm(r.query_text)).filter((q) => q))
-  if (notFoundQ.size >= 3) crisisSignals.push({ brief: 'web', sev: 'yellow', title: `คำค้นที่ลูกค้าหาแต่ไม่เจอ ${notFoundQ.size} คำ (30 วัน) — ดีมานด์หลุด/เว็บไม่มีของ` })
+  if (notFoundQ.size >= 3) crisisSignals.push({ brief: 'web', sev: 'yellow', title: `คำค้นที่ลูกค้าหาแต่ไม่เจอ ${notFoundQ.size} คำ (30 วัน) — ดีมานด์หลุด/เว็บไม่มีของ`, lines: ['🩺 Monitor: ยังไม่พบผลตรวจอัตโนมัติล่าสุด — กด “ตรวจเว็บ” เพื่อเช็กสด (เว็บ/ฟอร์ม/CTA)'], navLabel: 'ตรวจเว็บ (Monitor)', navHref: '/ops-x7k2m9/web-checker' })
   // Profit (P2b · read-only จาก sales 90 วัน): ขายขาดทุน (แดง) / กำไรบางผิดปกติ <15% (เหลือง) · cost=0 (ของดิจิทัล) ไม่นับ · policy ไม่ลดราคายกเว้นโปร
   const crisisMargin = (r: Row) => { const sp = Number(r.sale_price) || 0; if (sp <= 0) return null; return (sp - (Number(r.cost) || 0)) / sp }
   const salesRecent = sales.filter((r) => r.sale_date && daysSince(r.sale_date) <= 90)
   const lossSales = salesRecent.filter((r) => { const m = crisisMargin(r); return m !== null && m < 0 })
   const thinSales = salesRecent.filter((r) => { const m = crisisMargin(r); return m !== null && m >= 0 && m < 0.15 && (Number(r.cost) || 0) > 0 })
-  if (lossSales.length >= 1) crisisSignals.push({ brief: 'profit', sev: 'red', title: `ขายขาดทุน ${lossSales.length} รายการ (90 วัน) — เช็กต้นทุน/ราคาด่วน` })
-  else if (thinSales.length >= 1) crisisSignals.push({ brief: 'profit', sev: 'yellow', title: `กำไรบางผิดปกติ (<15%) ${thinSales.length} รายการ — เช็ก landed cost ครบไหม` })
+  if (lossSales.length >= 1) crisisSignals.push({ brief: 'profit', sev: 'red', title: `ขายขาดทุน ${lossSales.length} รายการ (90 วัน) — เช็กต้นทุน/ราคาด่วน`, navLabel: 'ไปที่ Ledger', navHref: '/ops-x7k2m9/ledger' })
+  else if (thinSales.length >= 1) crisisSignals.push({ brief: 'profit', sev: 'yellow', title: `กำไรบางผิดปกติ (<15%) ${thinSales.length} รายการ — เช็ก landed cost ครบไหม`, navLabel: 'ไปที่ Ledger', navHref: '/ops-x7k2m9/ledger' })
+
+  const visibleCrisis = crisisSignals.filter((s) => !snoozed.includes(s.brief))
 
   const goto = (anchor: string) => {
     if (anchor.startsWith('/')) { window.location.href = anchor; return }
@@ -474,22 +497,36 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
         <div style={{ marginBottom: 14 }}>
           {crisisSignals.length === 0 ? (
             <div style={{ ...card, color: '#0F6E56', fontSize: 12.5 }}>✅ วันนี้ไม่มีสัญญาณเสี่ยง — ร้านปกติ</div>
+          ) : visibleCrisis.length === 0 ? (
+            <div style={{ ...card, color: '#5F5E5A', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              🔕 ปิดเสียงสัญญาณทั้งหมดสำหรับวันนี้
+              <button onClick={unsnoozeAll} style={{ ...qbtn, padding: '4px 10px', fontSize: 11.5 }}>ยกเลิกปิดเสียง</button>
+            </div>
           ) : (
             <div style={{ background: '#fff', border: '1px solid #e7e3d8', borderRadius: 10, padding: '11px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
                 <span style={{ fontSize: 16 }}>⚠️</span>
                 <span style={{ fontSize: 15, fontWeight: 700, color: GREEN }}>สัญญาณเสี่ยงวันนี้</span>
-                <span style={{ marginLeft: 'auto', background: '#FAEEDA', color: '#854F0B', fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 999 }}>{crisisSignals.length} เรื่อง</span>
+                <span style={{ marginLeft: 'auto', background: '#FAEEDA', color: '#854F0B', fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 999 }}>{visibleCrisis.length} เรื่อง</span>
               </div>
-              {crisisSignals.map((s) => {
+              {visibleCrisis.map((s) => {
                 const b = CRISIS_BRIEFS[s.brief]
                 const isRed = s.sev === 'red'
                 const isOpen = openBrief === s.brief
                 return (
                   <div key={s.brief} style={{ background: isRed ? '#FCEBEB' : '#FAEEDA', borderLeft: `3px solid ${isRed ? '#A32D2D' : '#854F0B'}`, padding: '9px 11px', marginBottom: 8 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 600, color: isRed ? '#501313' : '#412402' }}>{s.title}</div>
+                    {s.lines && s.lines.length > 0 && (
+                      <div style={{ fontSize: 12, color: isRed ? '#791F1F' : '#633806', margin: '4px 0 2px', lineHeight: 1.6 }}>
+                        {s.lines.map((ln, i) => <div key={i}>{ln}</div>)}
+                      </div>
+                    )}
                     <div style={{ fontSize: 12.5, color: isRed ? '#791F1F' : '#633806', margin: '2px 0 8px' }}>→ เปิด “{b.title}”</div>
-                    <button onClick={() => setOpenBrief(isOpen ? '' : s.brief)} style={{ ...qbtn, padding: '5px 11px', fontSize: 12 }}>{isOpen ? 'ซ่อน checklist' : 'ดู checklist 15 นาทีแรก'}</button>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button onClick={() => setOpenBrief(isOpen ? '' : s.brief)} style={{ ...qbtn, padding: '5px 11px', fontSize: 12 }}>{isOpen ? 'ซ่อน checklist' : 'ดู checklist 15 นาทีแรก'}</button>
+                      {s.navHref && <button onClick={() => goto(s.navHref!)} style={{ ...qbtn, padding: '5px 11px', fontSize: 12 }}>{s.navLabel || 'ไปที่หน้า'}</button>}
+                      <button onClick={() => snoozeSignal(s.brief)} style={{ ...qbtn, padding: '5px 11px', fontSize: 12 }}>🔕 ปิดเสียงวันนี้</button>
+                    </div>
                     {isOpen && (
                       <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: 8, padding: '9px 11px', marginTop: 8 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 700, color: GREEN, marginBottom: 4 }}>15 นาทีแรก</div>
@@ -508,7 +545,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
                   </div>
                 )
               })}
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>เกณฑ์: Lead ≥5 แดง/2–4 เหลือง · งานไม่มีเจ้าของ ≥1 แดง/เกินกำหนด ≥3 เหลือง · ของไม่มีรูป ≥3 ตรงรุ่นที่ลูกค้าถาม/ค้น เหลือง · คำค้นไม่เจอ ≥3 คำ เหลือง · ขายขาดทุน แดง/กำไรต่ำกว่า 15% เหลือง · playbook เต็ม 5 เรื่องในคลัง</div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>เกณฑ์: Lead ≥5 หรือมีรายสำคัญค้างเกิน 3 วัน = แดง · 2–4 เหลือง · งานไม่มีเจ้าของ ≥1 แดง/เกินกำหนด ≥3 เหลือง · สต็อก: ขายดีแต่หมด = แดง · ไม่มีรูป ≥3/ไม่อัปเดต ≥{STALE_DAYS}วัน = เหลือง · คำค้นไม่เจอ ≥3 คำ เหลือง · ขายขาดทุน แดง/กำไรต่ำกว่า 15% เหลือง · ปิดเสียงได้ต่อวัน · playbook เต็ม 5 เรื่องในคลัง</div>
             </div>
           )}
         </div>
