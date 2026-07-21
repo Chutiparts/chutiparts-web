@@ -8,6 +8,7 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import FinanceClient from '../finance/FinanceClient'
 import StockLinkDraft from './StockLinkDraft'
+import StockSuggestion from './StockSuggestion'
 type Row = Record<string, any>
 const GREEN = '#17301F', BRASS = '#B8895A', CREAM = '#F4EFE4'
 const PAY: Record<string, { th: string; bg: string; fg: string }> = {
@@ -76,7 +77,7 @@ export default function LedgerClient({ sales, stock, addSale, updateSale, addSto
         {tab === 'sales'
           ? <><StockLinkDraft sales={sales} stock={stock} /><SalesTab rows={sales} skus={saleSkus} onAdd={(fd, d) => submit(addSale, fd, 'บันทึกการขายแล้ว', d)} onSave={(fd) => submit(updateSale, fd, 'อัปเดตแล้ว')} flash={flash} /></>
           : tab === 'stock'
-          ? <StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} />
+          ? <><StockSuggestion sales={sales} stock={stock} /><StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} /></>
           : (addEntry && deleteEntry ? <FinanceClient entries={entries} addEntry={addEntry} deleteEntry={deleteEntry} /> : <div style={{ ...card, padding: 16, color: '#999' }}>Finance Lite ไม่พร้อมใช้</div>)}
       </div>
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: GREEN, color: '#fff', padding: '8px 16px', borderRadius: 999, fontSize: 13, zIndex: 20 }}>{toast}</div>}
