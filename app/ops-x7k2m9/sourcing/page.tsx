@@ -12,16 +12,24 @@ const COOKIE = 'ops_admin'
 
 async function authed(): Promise<boolean> {
   const secret = process.env.ADMIN_OPS_SECRET
-  if (!secret) return false // fail-closed
-  return (await cookies()).get(COOKIE)?.value === secret
+  const c = await cookies() // fail-closed
+  if (secret && c.get(COOKIE)?.value === secret) return true
+  const team = process.env.TEAM_OPS_SECRET
+  return !!team && c.get('ops_team')?.value === team
 }
 
 async function loginOps(formData: FormData) {
   'use server'
   const pw = String(formData.get('password') || '')
   const secret = process.env.ADMIN_OPS_SECRET
+  const team = process.env.TEAM_OPS_SECRET
+  const opts = { httpOnly: true, secure: true, sameSite: 'lax' as const, path: '/ops-x7k2m9', maxAge: 60 * 60 * 24 * 30 }
   if (secret && pw === secret) {
-    ;(await cookies()).set(COOKIE, secret, { httpOnly: true, secure: true, sameSite: 'lax', path: '/ops-x7k2m9', maxAge: 60 * 60 * 24 * 30 })
+    ;(await cookies()).set(COOKIE, secret, opts)
+    ;(await cookies()).delete('ops_team')
+  } else if (team && pw === team) {
+    ;(await cookies()).set('ops_team', team, opts)
+    ;(await cookies()).delete(COOKIE)
   }
   revalidatePath('/ops-x7k2m9/sourcing')
 }
