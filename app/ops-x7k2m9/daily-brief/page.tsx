@@ -51,14 +51,16 @@ export default async function DailyBriefPage() {
 
   // อ่านล้วน — leads 500 + tasks 500 + sales/stock + products (Level B: Risk section merge) + search_queries (P2b Crisis Watch)
   // graceful: ถ้าตาราง search_queries ยังไม่มี/error → [] (ไม่พังหน้า)
-  const [leadsRes, tasksRes, salesRes, stockRes, productsRes, searchesRes] = await Promise.all([
+  const [leadsRes, tasksRes, salesRes, stockRes, productsRes, searchesRes, feedbackRes] = await Promise.all([
     svc().from('contact_leads').select('*').order('created_at', { ascending: false }).limit(500),
     svc().from('ops_tasks').select('*').order('created_at', { ascending: false }).limit(500),
     svc().from('sales_records').select('*').order('sale_date', { ascending: false }).limit(1000),
     svc().from('stock_records').select('*').order('date_in', { ascending: true }).limit(1000),
     svc().from('products').select('*').limit(2000),
     svc().from('search_queries').select('*').order('created_at', { ascending: false }).limit(5000),
+    // Phase 4a · brief_feedback (ถ้าตารางยังไม่มี = คืน null → [] ปลอดภัย)
+    svc().from('brief_feedback').select('item_key,feedback,created_at').order('created_at', { ascending: false }).limit(2000),
   ])
 
-  return <DailyBriefClient leads={leadsRes.data || []} tasks={tasksRes.data || []} sales={salesRes.data || []} stock={stockRes.data || []} products={productsRes.data || []} searches={searchesRes.data || []} />
+  return <DailyBriefClient leads={leadsRes.data || []} tasks={tasksRes.data || []} sales={salesRes.data || []} stock={stockRes.data || []} products={productsRes.data || []} searches={searchesRes.data || []} feedback={feedbackRes.data || []} />
 }
