@@ -86,6 +86,9 @@ function Badge({ label, bg, fg }: { label: string; bg: string; fg: string }) {
 }
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e7e3d8', borderRadius: 8, padding: '9px 11px', marginBottom: 6 }
 const qbtn: React.CSSProperties = { background: '#fff', border: '1px solid #ddd', color: '#333', borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }
+// Phase 2 · Feedback (Gold Dataset)
+const fbbtn: React.CSSProperties = { background: '#fff', border: '1px solid #e0ddd4', color: '#555', borderRadius: 999, padding: '2px 8px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }
+const FBLABEL: Record<string, string> = { correct: '👍 ถูก', not_important: 'ไม่สำคัญ', remind_again: 'เตือนอีก', mute: 'ไม่ต้องเตือน' }
 
 // ===== Crisis Watch playbooks (P0 live: lead + task) — เกณฑ์ owner เคาะ 18 ก.ค. 2026 =====
 // อ่านล้วนจาก props เดิม (leads/tasks) · ไม่มี SQL/fetch ใหม่ · playbook เต็ม 5 เรื่องอยู่ที่ products/crisis-watch/CRISIS-BRIEFS-ChutiBenz-5playbooks.md
@@ -158,12 +161,18 @@ const CRISIS_BRIEFS: Record<string, CrisisBrief> = {
   },
 }
 
-export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [], searches = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[]; searches?: Row[] }) {
+export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [], searches = [], feedback = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[]; searches?: Row[]; feedback?: Row[] }) {
   const [toast, setToast] = useState('')
   const [openBrief, setOpenBrief] = useState('')
   const [showDetail, setShowDetail] = useState(false)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
   const copy = (text: string, m = 'คัดลอกแล้ว') => navigator.clipboard?.writeText(text).then(() => flash(m))
+  const [fb, setFb] = useState<Record<string, string>>({})
+  // Phase 2 · Gold Dataset — บันทึกความเห็นเจ้าของต่อคำแนะนำ (ถูก/ไม่สำคัญ/เตือนอีก/ไม่ต้องเตือน) → /api/feedback
+  const sendFeedback = (it: any, feedback: string) => {
+    setFb((p) => ({ ...p, [it.key]: feedback }))
+    fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module: 'daily-brief', item_key: it.key, brief_item: it.title, ai_recommendation: it.action, input_context: { detail: it.detail, owner: it.owner, score: it.score }, feedback }) }).then(() => flash('บันทึกความเห็นแล้ว 🙏')).catch(() => flash('บันทึกไม่สำเร็จ'))
+  }
 
   const leadName = (id?: string) => { if (!id) return ''; const l = leads.find((x) => x.id === id); return l ? (l.name || '(lead)') : '' }
   const leadModelPart = (id?: string) => { const l = leads.find((x) => x.id === id); return l ? `${partOf(l)}${l.car_model ? ` (${l.car_model})` : ''}` : '' }
@@ -356,7 +365,15 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   B.unassignedTasks.forEach((t) => { seenTask.add(String(t.id)); topItems.push({ key: 'UT' + t.id, icon: '🧑‍🔧', color: '#A32D2D', bg: '#FCEBEB', title: `งานไม่มีเจ้าของ: ${t.title || '(ไม่มีชื่องาน)'}`, detail: t.task_type || 'งาน', action: 'Assign owner', owner: 'none', score: 590 }) })
   B.overdueTasks.forEach((t) => { if (seenTask.has(String(t.id))) return; topItems.push({ key: 'OT' + t.id, icon: '⏰', color: '#854F0B', bg: '#FAEEDA', title: `งานเกินกำหนด: ${t.title || '(ไม่มีชื่องาน)'}`, detail: `กำหนด ${fmtDate(t.due_date)}`, action: 'ปิดงาน/เลื่อน', owner: (t.owner && String(t.owner).trim()) ? t.owner : 'none', score: 400 + Math.min(daysSince(t.due_date) * 3, 100) }) })
   sheetStock.filter((x) => x.qty === 0).forEach((x) => { const dem = demandByModel[String(x.model).toUpperCase()] || 0; topItems.push({ key: 'S' + x.sku, icon: '📦', color: '#A32D2D', bg: '#FCEBEB', title: `สต็อกหมด: ${x.name}`, detail: `${x.model} · SKU ${x.sku}${dem ? ` · มีคนถาม/ค้น ${dem}` : ''}`, action: dem ? 'หาเพิ่มด่วน' : 'หาเพิ่ม/ถ่ายรูป', owner: 'wait', score: 200 + (dem ? 80 : 0) }) })
-  const top5 = [...topItems].sort((a, b) => b.score - a.score).slice(0, 5)
+  // Phase 4a · เคารพ feedback "ไม่ต้องเตือน" (mute) — ซ่อนเรื่องนั้นจาก Top 5 (14 วันแล้วกลับมา · ไม่หายถาวร)
+  const mutedKeys = useMemo(() => {
+    const seen = new Set<string>(); const muted = new Set<string>(); const cutoff = Date.now() - 14 * 86400000
+    ;(feedback || []).forEach((f: any) => { const k = String(f.item_key || ''); if (!k || seen.has(k)) return; seen.add(k); if (String(f.feedback || '') === 'mute' && new Date(f.created_at).getTime() >= cutoff) muted.add(k) })
+    return muted
+  }, [feedback])
+  const rankedItems = [...topItems].sort((a, b) => b.score - a.score)
+  const mutedCount = rankedItems.filter((it) => mutedKeys.has(it.key)).length
+  const top5 = rankedItems.filter((it) => !mutedKeys.has(it.key)).slice(0, 5)
   const dhLeadNoNext = leads.filter((l) => leadOpen(l) && !l.follow_due).length
   const dhTaskStale = tasks.filter((t) => taskOpen(t) && daysSince(t.updated_at || t.created_at) >= 3).length
   const dhCostMissing = sales.filter((r) => Number(r.sale_price) > 0 && r.cost == null).length
@@ -387,7 +404,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
         {/* 🎯 Top 5 วันนี้ — hero (มือถืออ่าน 10 วิ) */}
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 16, color: GREEN, marginBottom: 8 }}>🎯 วันนี้ทำอะไรก่อน — Top {top5.length}</div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: GREEN, marginBottom: 8 }}>🎯 วันนี้ทำอะไรก่อน — Top {top5.length}{mutedCount > 0 && <span style={{ fontWeight: 400, fontSize: 12, color: '#999' }}> · 🔕 ปิดเสียง {mutedCount}</span>}</div>
           {top5.length === 0 ? (
             <div style={{ ...card, color: '#0F6E56' }}>✅ ไม่มีเรื่องด่วนวันนี้ — เยี่ยม!</div>
           ) : top5.map((it, i) => (
@@ -403,6 +420,14 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
                       : it.owner === 'wait' ? <span style={{ fontSize: 11.5, color: '#854F0B', fontWeight: 600 }}>⏳ รอเจ้าของตัดสินใจ</span>
                       : <span style={{ fontSize: 11.5, color: '#0F6E56', fontWeight: 600 }}>👤 {it.owner}</span>}
                     {it.copyText && <button onClick={() => copy(it.copyText || '', 'คัดลอกข้อความแล้ว')} style={{ ...qbtn, padding: '3px 9px', fontSize: 11.5 }}>คัดลอกข้อความ</button>}
+                    {fb[it.key]
+                      ? <span style={{ fontSize: 11, color: '#0F6E56', fontWeight: 600 }}>✓ {FBLABEL[fb[it.key]]}</span>
+                      : <>
+                          <span style={{ fontSize: 10.5, color: '#aaa' }}>คำแนะนำนี้:</span>
+                          {(['correct', 'not_important', 'remind_again', 'mute'] as const).map((f) => (
+                            <button key={f} onClick={() => sendFeedback(it, f)} style={fbbtn}>{FBLABEL[f]}</button>
+                          ))}
+                        </>}
                   </div>
                 </div>
               </div>
