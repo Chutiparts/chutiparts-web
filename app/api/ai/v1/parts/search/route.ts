@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       const soldBySku: Record<string, number> = {}
       ;(salesRes.data || []).forEach((r: any) => {
         const k = String(r.sku || '').trim().toUpperCase()
-        if (k) soldBySku[k] = (soldBySku[k] || 0) + 1
+        if (k) soldBySku[k] = (soldBySku[k] || 0) + Number(r.qty || 1)
       })
 
       const qLower = q.toLowerCase()
