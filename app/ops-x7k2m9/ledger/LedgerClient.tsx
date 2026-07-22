@@ -3,6 +3,7 @@
 // 2 แท็บ: Sales Record (ขายจริง+กำไร) · Stock Record (สต็อก+อายุ) · add/edit/filter/export · ไม่ลบ (ใช้ status)
 // P3.3: เพิ่มช่อง "แหล่งซื้อ" (stock_records.source)
 // PathB: เพิ่มช่อง SKU ในฟอร์มขาย (+datalist จาก stock) → เว็บตัดสต็อกตาม SKU (คงเหลือ=รับเข้า−ขาย)
+// QuickEntry(22ก.ค.): ฟอร์มบันทึกขาย/สต็อกเปิดพร้อมใช้ทันที + ยุบ draft/suggestion เป็นแถบพับ (กันดันปุ่มบันทึกลงล่าง)
 // #22: แท็บ Sales มี StockLinkDraft (ผูก SKU รายการขายที่ยังไม่มี SKU → ตัดสต็อก Path B · owner confirm)
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -75,9 +76,9 @@ export default function LedgerClient({ sales, stock, addSale, updateSale, addSto
       </div>
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
         {tab === 'sales'
-          ? <><StockLinkDraft sales={sales} stock={stock} /><SalesTab rows={sales} skus={saleSkus} onAdd={(fd, d) => submit(addSale, fd, 'บันทึกการขายแล้ว', d)} onSave={(fd) => submit(updateSale, fd, 'อัปเดตแล้ว')} flash={flash} /></>
+          ? <><Collapsible title="🔗 ผูก SKU รายการขายที่ยังไม่ตัดสต็อก (Path B)"><StockLinkDraft sales={sales} stock={stock} /></Collapsible><SalesTab rows={sales} skus={saleSkus} onAdd={(fd, d) => submit(addSale, fd, 'บันทึกการขายแล้ว', d)} onSave={(fd) => submit(updateSale, fd, 'อัปเดตแล้ว')} flash={flash} /></>
           : tab === 'stock'
-          ? <><StockSuggestion sales={sales} stock={stock} /><StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} /></>
+          ? <><Collapsible title="🛒 คำแนะนำ: ของขายดีใกล้หมด ควรสั่งเพิ่ม"><StockSuggestion sales={sales} stock={stock} /></Collapsible><StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} /></>
           : (addEntry && deleteEntry ? <FinanceClient entries={entries} addEntry={addEntry} deleteEntry={deleteEntry} /> : <div style={{ ...card, padding: 16, color: '#999' }}>Finance Lite ไม่พร้อมใช้</div>)}
       </div>
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: GREEN, color: '#fff', padding: '8px 16px', borderRadius: 999, fontSize: 13, zIndex: 20 }}>{toast}</div>}
@@ -88,9 +89,20 @@ function Stat({ label, val, color }: { label: string; val: string; color: string
   return <div style={{ flex: 1, minWidth: 90, background: '#fff', borderRadius: 10, padding: '10px', textAlign: 'center', border: '1px solid #e7e3d8' }}>
     <div style={{ fontSize: 19, fontWeight: 700, color }}>{val}</div><div style={{ fontSize: 11, color: '#777' }}>{label}</div></div>
 }
+function Collapsible({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <button onClick={() => setOpen((v) => !v)} style={{ width: '100%', textAlign: 'left', background: '#fff', border: '1px solid #e7e3d8', borderRadius: 10, padding: '9px 12px', fontSize: 13, fontWeight: 600, color: GREEN, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>{title}</span><span style={{ color: '#999', fontSize: 12 }}>{open ? '▲ ซ่อน' : '▼ เปิดดู'}</span>
+      </button>
+      {open && <div style={{ marginTop: 8 }}>{children}</div>}
+    </div>
+  )
+}
 /* ===================== SALES ===================== */
 function SalesTab({ rows, skus, onAdd, onSave, flash }: { rows: Row[]; skus: string[]; onAdd: (fd: FormData, done: () => void) => void; onSave: (fd: FormData) => void; flash: (m: string) => void }) {
-  const [showAdd, setShowAdd] = useState(false)
+  const [showAdd, setShowAdd] = useState(true)
   const [q, setQ] = useState(''); const [payF, setPayF] = useState(''); const [openId, setOpenId] = useState<string | null>(null)
   const totalSales = rows.reduce((a, r) => a + num(r.sale_price), 0)
   const totalProfit = rows.reduce((a, r) => a + profitOf(r), 0)
@@ -195,7 +207,7 @@ function SaleEdit({ r, skus, onSave }: { r: Row; skus: string[]; onSave: (fd: Fo
 }
 /* ===================== STOCK ===================== */
 function StockTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: FormData, done: () => void) => void; onSave: (fd: FormData) => void; flash: (m: string) => void }) {
-  const [showAdd, setShowAdd] = useState(false)
+  const [showAdd, setShowAdd] = useState(true)
   const [q, setQ] = useState(''); const [stF, setStF] = useState(''); const [openId, setOpenId] = useState<string | null>(null)
   const inStock = rows.filter((r) => (r.status || 'in_stock') === 'in_stock')
   const stockValue = inStock.reduce((a, r) => a + num(r.cost), 0)
