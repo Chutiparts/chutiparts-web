@@ -58,6 +58,7 @@ export default function LedgerClient({ sales, stock, addSale, updateSale, addSto
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
   const saleSkus = useMemo(() => Array.from(new Set((stock || []).map((s) => String(s.sku || '').trim()).filter(Boolean))).sort(), [stock])
+  const saleStock = useMemo(() => (stock || []).map((s) => ({ sku: String(s.sku || '').trim(), part_name: s.part_name || '', car_model: s.car_model || '', cost: s.cost ?? '' })).filter((s) => s.sku), [stock])
   function submit(action: (fd: FormData) => Promise<void>, fd: FormData, msg: string, done?: () => void) {
     start(async () => { await action(fd); router.refresh(); flash(msg); done?.() })
   }
@@ -76,9 +77,9 @@ export default function LedgerClient({ sales, stock, addSale, updateSale, addSto
       </div>
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
         {tab === 'sales'
-          ? <><Collapsible title="🔗 ผูก SKU รายการขายที่ยังไม่ตัดสต็อก (Path B)"><StockLinkDraft sales={sales} stock={stock} /></Collapsible><SalesTab rows={sales} skus={saleSkus} onAdd={(fd, d) => submit(addSale, fd, 'บันทึกการขายแล้ว', d)} onSave={(fd) => submit(updateSale, fd, 'อัปเดตแล้ว')} flash={flash} /></>
+          ? <><Collapsible key="sales-link" title="🔗 ผูก SKU รายการขายที่ยังไม่ตัดสต็อก (Path B)"><StockLinkDraft sales={sales} stock={stock} /></Collapsible><SalesTab rows={sales} skus={saleSkus} saleStock={saleStock} onAdd={(fd, d) => submit(addSale, fd, 'บันทึกการขายแล้ว', d)} onSave={(fd) => submit(updateSale, fd, 'อัปเดตแล้ว')} flash={flash} /></>
           : tab === 'stock'
-          ? <><Collapsible title="🛒 คำแนะนำ: ของขายดีใกล้หมด ควรสั่งเพิ่ม"><StockSuggestion sales={sales} stock={stock} /></Collapsible><StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} /></>
+          ? <><Collapsible key="stock-suggest" title="🛒 คำแนะนำ: ของขายดีใกล้หมด ควรสั่งเพิ่ม"><StockSuggestion sales={sales} stock={stock} /></Collapsible><StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} /></>
           : (addEntry && deleteEntry ? <FinanceClient entries={entries} addEntry={addEntry} deleteEntry={deleteEntry} /> : <div style={{ ...card, padding: 16, color: '#999' }}>Finance Lite ไม่พร้อมใช้</div>)}
       </div>
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: GREEN, color: '#fff', padding: '8px 16px', borderRadius: 999, fontSize: 13, zIndex: 20 }}>{toast}</div>}
@@ -101,9 +102,12 @@ function Collapsible({ title, children }: { title: string; children: React.React
   )
 }
 /* ===================== SALES ===================== */
-function SalesTab({ rows, skus, onAdd, onSave, flash }: { rows: Row[]; skus: string[]; onAdd: (fd: FormData, done: () => void) => void; onSave: (fd: FormData) => void; flash: (m: string) => void }) {
+function SalesTab({ rows, skus, saleStock, onAdd, onSave, flash }: { rows: Row[]; skus: string[]; saleStock: { sku: string; part_name: string; car_model: string; cost: any }[]; onAdd: (fd: FormData, done: () => void) => void; onSave: (fd: FormData) => void; flash: (m: string) => void }) {
   const [showAdd, setShowAdd] = useState(true)
   const [q, setQ] = useState(''); const [payF, setPayF] = useState(''); const [openId, setOpenId] = useState<string | null>(null)
+  const stockBySku = useMemo(() => { const m: Record<string, any> = {}; (saleStock || []).forEach((s) => { if (s.sku) m[s.sku] = s }); return m }, [saleStock])
+  const [addForm, setAddForm] = useState<{ sku: string; part_sold: string; car_model: string; cost: string }>({ sku: '', part_sold: '', car_model: '', cost: '' })
+  const pickSku = (v: string) => { const m = stockBySku[v.trim()]; setAddForm((p) => ({ ...p, sku: v, ...(m ? { part_sold: m.part_name || '', car_model: m.car_model || '', cost: m.cost != null && m.cost !== '' ? String(m.cost) : '' } : {}) })) }
   const totalSales = rows.reduce((a, r) => a + num(r.sale_price), 0)
   const totalProfit = rows.reduce((a, r) => a + profitOf(r), 0)
   const unpaid = rows.filter((r) => (r.payment_status || 'unpaid') === 'unpaid').length
@@ -123,7 +127,7 @@ function SalesTab({ rows, skus, onAdd, onSave, flash }: { rows: Row[]; skus: str
   const exportJson = () => dl(`sales-${todayStr()}.json`, JSON.stringify(filtered.map((r) => ({ sale_date: r.sale_date, sku: r.sku, customer: r.customer, car_model: r.car_model, part_sold: r.part_sold, sale_price: num(r.sale_price), cost: num(r.cost), profit: profitOf(r), margin_pct: marginOf(r), payment_status: r.payment_status || 'unpaid', delivery_status: r.delivery_status || 'pending', tracking_no: r.tracking_no, note: r.note })), null, 2), 'application/json')
   return (
     <>
-      <datalist id="salesku">{skus.map((s2) => <option key={s2} value={s2} />)}</datalist>
+      <datalist id="salesku">{saleStock.map((s2) => <option key={s2.sku} value={s2.sku}>{s2.sku} · {s2.part_name}{s2.car_model ? ' · ' + s2.car_model : ''}</option>)}</datalist>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
         <Stat label="ยอดขายรวม" val={baht(totalSales)} color={GREEN} />
         <Stat label="กำไรรวม" val={baht(totalProfit)} color="#0F6E56" />
@@ -137,16 +141,17 @@ function SalesTab({ rows, skus, onAdd, onSave, flash }: { rows: Row[]; skus: str
         <button onClick={exportCsv} style={qbtn}>⬇ CSV</button><button onClick={exportTxt} style={qbtn}>⬇ TXT</button><button onClick={exportJson} style={qbtn}>⬇ JSON</button>
       </div>
       {showAdd && (
-        <form action={(fd) => onAdd(fd, () => setShowAdd(false))} style={{ ...card, padding: 12, border: '1px solid #e7e3d8' }}>
-          <div style={{ fontWeight: 700, color: GREEN, marginBottom: 8, fontSize: 14 }}>บันทึกการขายใหม่</div>
+        <form action={(fd) => onAdd(fd, () => { setShowAdd(false); setAddForm({ sku: '', part_sold: '', car_model: '', cost: '' }) })} style={{ ...card, padding: 12, border: '1px solid #e7e3d8' }}>
+          <div style={{ fontWeight: 700, color: GREEN, marginBottom: 4, fontSize: 14 }}>บันทึกการขายใหม่</div>
+          <div style={{ fontSize: 11.5, color: '#888', marginBottom: 8 }}>💡 พิมพ์ชื่ออะไหล่ในช่อง SKU (เช่น “กันชน”) แล้วเลือก → ชื่อ/รุ่น/ต้นทุน เติมให้อัตโนมัติ</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <label style={lbl}>SKU สินค้า (ตัดสต็อกตามนี้)<input name="sku" list="salesku" style={inp} placeholder="เช่น 140-001" /></label>
-            <label style={lbl}>อะไหล่ที่ขาย<input name="part_sold" style={inp} placeholder="เช่น ไฟหน้า" /></label>
+            <label style={lbl}>SKU — พิมพ์ชื่อหรือรหัส<input name="sku" list="salesku" value={addForm.sku} onChange={(e) => pickSku(e.target.value)} style={inp} placeholder='พิมพ์ เช่น "กันชน" หรือ 140-001' /></label>
+            <label style={lbl}>อะไหล่ที่ขาย<input name="part_sold" value={addForm.part_sold} onChange={(e) => setAddForm((p) => ({ ...p, part_sold: e.target.value }))} style={inp} placeholder="เช่น ไฟหน้า" /></label>
             <label style={lbl}>ลูกค้า<input name="customer" style={inp} placeholder="ชื่อลูกค้า" /></label>
-            <label style={lbl}>รุ่นรถ<input name="car_model" style={inp} placeholder="เช่น W124" /></label>
+            <label style={lbl}>รุ่นรถ<input name="car_model" value={addForm.car_model} onChange={(e) => setAddForm((p) => ({ ...p, car_model: e.target.value }))} style={inp} placeholder="เช่น W124" /></label>
             <label style={lbl}>วันที่ขาย<input name="sale_date" type="date" defaultValue={todayStr()} style={inp} /></label>
             <label style={lbl}>ราคาขาย (฿)<input name="sale_price" type="number" inputMode="numeric" style={inp} /></label>
-            <label style={lbl}>ต้นทุน (฿)<input name="cost" type="number" inputMode="numeric" style={inp} /></label>
+            <label style={lbl}>ต้นทุน (฿) — เติมจากสต็อก<input name="cost" type="number" inputMode="numeric" value={addForm.cost} onChange={(e) => setAddForm((p) => ({ ...p, cost: e.target.value }))} style={inp} /></label>
             <label style={lbl}>สถานะชำระเงิน<select name="payment_status" defaultValue="unpaid" style={inp}>{PAY_ORDER.map((p) => <option key={p} value={p}>{PAY[p].th}</option>)}</select></label>
             <label style={lbl}>สถานะส่งของ<select name="delivery_status" defaultValue="pending" style={inp}>{DELIV_ORDER.map((d) => <option key={d} value={d}>{DELIV[d].th}</option>)}</select></label>
             <label style={lbl}>เลขพัสดุ<input name="tracking_no" style={inp} /></label>
