@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       const soldBySku: Record<string, number> = {}
       sales.forEach((r: any) => {
         const k = String(r.sku || '').trim().toUpperCase()
-        if (k) soldBySku[k] = (soldBySku[k] || 0) + 1
+        if (k) soldBySku[k] = (soldBySku[k] || 0) + Number(r.qty || 1)
       })
       const sheetStock = stock
         .filter((s: any) => s.qty != null && !isNaN(Number(s.qty)))
