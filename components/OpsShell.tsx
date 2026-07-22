@@ -24,6 +24,7 @@ const GROUPS: Group[] = [
     { href: `${BASE}/stock-source`, label: 'Stock', icon: '📦', ownerOnly: true },
     { href: `${BASE}/sync-stock`, label: 'Sync สต็อก', icon: '🔄' },
     { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
+    { href: `${BASE}/sell`, label: 'ขายออก', icon: '🧾' },
   ]},
   { title: 'ระบบ', items: [
     { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺', ownerOnly: true },
