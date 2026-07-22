@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
 
   // === Ops role gate: team เข้าได้เฉพาะหน้าที่อนุญาต · owner-only → /unauthorized ===
   if (pathname.startsWith('/ops-x7k2m9')) {
-    const TEAM_ALLOWED = ['/ops-x7k2m9/parts-desk', '/ops-x7k2m9/sync-stock', '/ops-x7k2m9/sourcing', '/ops-x7k2m9/unauthorized']
+    const TEAM_ALLOWED = ['/ops-x7k2m9/parts-desk', '/ops-x7k2m9/sync-stock', '/ops-x7k2m9/sourcing', '/ops-x7k2m9/sell', '/ops-x7k2m9/unauthorized']
     const allowed = TEAM_ALLOWED.some((p) => pathname === p || pathname.startsWith(p + '/'))
     const isOwner = request.cookies.get('ops_admin')?.value === process.env.ADMIN_OPS_SECRET
     const team = process.env.TEAM_OPS_SECRET
