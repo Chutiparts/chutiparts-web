@@ -16,7 +16,7 @@ export default function StockSuggestion({ sales = [], stock = [] }: { sales?: Ro
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2000) }
 
   // Path B: คงเหลือ = รับเข้า(stock.qty) − ขาย(นับ sales ตาม sku) · + ขาย 90 วัน (ดีมานด์)
-  const soldBySku = useMemo(() => { const m: Record<string, number> = {}; sales.forEach((s) => { const k = U(s.sku); if (k) m[k] = (m[k] || 0) + 1 }); return m }, [sales])
+  const soldBySku = useMemo(() => { const m: Record<string, number> = {}; sales.forEach((s) => { const k = U(s.sku); if (k) m[k] = (m[k] || 0) + Number(s.qty || 1) }); return m }, [sales])
   const sold90BySku = useMemo(() => { const m: Record<string, number> = {}; sales.forEach((s) => { const k = U(s.sku); if (k && s.sale_date && daysSince(s.sale_date) <= 90) m[k] = (m[k] || 0) + 1 }); return m }, [sales])
 
   const suggestions = useMemo(() => {
