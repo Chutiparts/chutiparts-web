@@ -5,6 +5,8 @@ import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import QuoteDetailActions from './QuoteDetailActions'
+import { opsAuthed } from '@/lib/ops-auth'
+import OpsGate from '@/components/OpsGate'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -42,6 +44,8 @@ async function getQuote(id: string) {
 }
 
 export default async function QuoteDetailPage(props: { params: Promise<{ id: string }> }) {
+  if (!(await opsAuthed())) return <OpsGate title="📋 Quote Detail" />
+
   const { id } = await props.params
   const result = await getQuote(id)
   if (!result) return notFound()

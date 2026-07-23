@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { internalToken } from '@/lib/ops-auth'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30  // 30 sec for image uploads
@@ -146,7 +147,9 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        authorization: `Bearer ${process.env.QUOTE_ANALYZE_SECRET || ''}`,
+        // ใช้ QUOTE_ANALYZE_SECRET ถ้าตั้งไว้ · ถ้าไม่ตั้งก็ใช้โทเคนภายในที่คำนวณจาก
+        // ADMIN_OPS_SECRET (มีใน Vercel อยู่แล้ว) → ไม่ต้องเพิ่ม env ใหม่ให้ลืม
+        authorization: `Bearer ${process.env.QUOTE_ANALYZE_SECRET || internalToken()}`,
       },
       body: JSON.stringify({ quote_id: quoteRow.id }),
     }).catch((e) => console.error('[quotes/create] analyze trigger failed:', e))

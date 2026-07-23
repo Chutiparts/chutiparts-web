@@ -1,6 +1,9 @@
-// app/ops-x7k2m9/ebook-stats/page.tsx — สถิติยอดโหลด eBook (path ลับ ไม่ต้องล็อกอิน)
+// app/ops-x7k2m9/ebook-stats/page.tsx — สถิติยอดโหลด eBook (หน้า ops · ต้องใส่รหัส)
 // ดึงจากตาราง events (event_name='ebook_download') แล้วสรุปยอดต่อรุ่น
+// 2026-07-23: เดิมเปิดด้วย "URL ลับ" อย่างเดียว → ปิดด้วยรหัส owner (cookie ops_admin)
 import { createClient } from '@/utils/supabase/server'
+import { opsAuthed } from '@/lib/ops-auth'
+import OpsGate from '@/components/OpsGate'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +18,8 @@ const NAMES: Record<string, string> = {
 }
 
 export default async function EbookStatsPage() {
+  if (!(await opsAuthed())) return <OpsGate title="📊 ยอดดาวน์โหลด eBook" />
+
   const supabase = await createClient()
 
   const { data, error } = await supabase

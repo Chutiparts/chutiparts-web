@@ -1,14 +1,15 @@
 // app/ops-x7k2m9/quotes/page.tsx — Admin Quote Inbox (Secret URL)
 // Phase 1A · Day 3 — 2026-06-09
 //
-// Note: This is a SECRET URL (Mr.Chuti's choice B — no login).
-// The path "ops-x7k2m9" is hard to guess (random suffix).
-// Anyone with the URL has full read/update access.
-// Add /robots noindex + Vercel headers protect against indexing.
+// 2026-07-23: เดิมเป็น "SECRET URL" ไม่มีล็อกอิน — ใครได้ลิงก์ไปก็เห็นข้อมูลลูกค้า
+// ทั้งหมดและกดเปลี่ยนสถานะได้ · ตอนนี้เป็นหน้า ops เต็มตัว ต้องใส่รหัส owner
+// (หน้านี้ไม่ได้ให้ลูกค้าเปิด — ลูกค้าใช้ฟอร์ม /quote ซึ่งยังเปิดสาธารณะเหมือนเดิม)
 
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import QuotesList from './QuotesList'
+import { opsAuthed } from '@/lib/ops-auth'
+import OpsGate from '@/components/OpsGate'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -54,6 +55,8 @@ async function getQuotes() {
 }
 
 export default async function QuoteInboxPage() {
+  if (!(await opsAuthed())) return <OpsGate title="📋 Quote Inbox" />
+
   const { quotes, summary } = await getQuotes()
 
   return (

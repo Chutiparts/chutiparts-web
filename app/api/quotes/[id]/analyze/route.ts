@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { opsAuthed, internalToken, safeEqual } from '@/lib/ops-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -398,18 +399,23 @@ export async function POST(
 ) {
   const { id } = await context.params
 
-  // Optional auth check (when called from create endpoint with secret)
-  const auth = request.headers.get('authorization') || ''
-  if (ANALYZE_SECRET && auth !== `Bearer ${ANALYZE_SECRET}`) {
-    // Allow without secret if called from same origin (admin manual trigger)
-    const referer = request.headers.get('referer') || ''
-    const host = request.headers.get('host') || ''
-    if (!referer.includes(host)) {
-      return NextResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'Invalid secret' } },
-        { status: 401 }
-      )
-    }
+  // 2026-07-23: เดิมถ้าไม่ได้ตั้ง QUOTE_ANALYZE_SECRET จะไม่ตรวจอะไรเลย และ fallback
+  // เป็น referer ซึ่งปลอมได้ → ใครก็ยิงให้เผาเงินค่า Claude Vision ได้ไม่จำกัด
+  // ตอนนี้ต้องเข้าทางใดทางหนึ่งเท่านั้น:
+  //   1) โทเคนภายใน (create เรียกเองอัตโนมัติ)
+  //   2) QUOTE_ANALYZE_SECRET (ถ้าตั้งไว้ · ของเดิม ไม่พัง)
+  //   3) cookie owner (กดปุ่ม "วิเคราะห์ใหม่" ในหน้า admin)
+  const bearer = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
+  const allowed =
+    safeEqual(bearer, internalToken()) ||
+    (!!ANALYZE_SECRET && safeEqual(bearer, ANALYZE_SECRET)) ||
+    (await opsAuthed())
+
+  if (!allowed) {
+    return NextResponse.json(
+      { error: { code: 'UNAUTHORIZED', message: 'ต้องเข้าสู่ระบบ' } },
+      { status: 401 }
+    )
   }
 
   // Validate UUID

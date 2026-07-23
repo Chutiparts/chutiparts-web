@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { opsAuthed } from '@/lib/ops-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,13 +19,12 @@ export async function POST(
 ) {
   const { id } = await context.params
 
-  // Minimal protection: only accept POST from same origin (since secret URL has no auth)
-  const referer = request.headers.get('referer') || ''
-  const host = request.headers.get('host') || ''
-  if (!referer.includes(host) && !referer.includes('chutibenz.com')) {
+  // 2026-07-23: เดิมกันด้วย referer อย่างเดียว ซึ่งปลอมได้ง่ายมาก (แค่ใส่ header เอง)
+  // ตอนนี้ต้องมี cookie owner จริง ๆ เท่านั้นถึงจะเปลี่ยนสถานะใบเสนอราคาได้
+  if (!(await opsAuthed())) {
     return NextResponse.json(
-      { error: { code: 'FORBIDDEN', message: 'Same-origin only' } },
-      { status: 403 }
+      { error: { code: 'UNAUTHORIZED', message: 'ต้องเข้าสู่ระบบ' } },
+      { status: 401 }
     )
   }
 
