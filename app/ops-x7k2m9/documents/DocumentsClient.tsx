@@ -68,7 +68,7 @@ const readyToConfirm = (d: Doc) => !!d.doc_no?.trim() && d.grand_total != null &
 
 export default function DocumentsClient({
   docs, uploadDocuments, extractDocuments, saveReview, confirmDocument, rejectDocument,
-  exportDocuments, sheetConfigured, getPreviewUrl, retryDocument, maxRetry, vendors,
+  exportDocuments, sheetConfigured, getPreviewUrl, retryDocument, maxRetry, maxExportRetry, vendors,
 }: {
   docs: Doc[]
   uploadDocuments: (fd: FormData) => Promise<void>
@@ -81,8 +81,12 @@ export default function DocumentsClient({
   getPreviewUrl: (id: string) => Promise<string | null>
   retryDocument: (fd: FormData) => Promise<void>
   maxRetry: number
+  maxExportRetry: number
   vendors: string[]
 }) {
+  // ส่ง Sheet ใหม่ไม่เสียเงิน (ไม่เรียก AI) → ให้ลองได้เยอะกว่าการอ่านเอกสารใหม่
+  const retryLimit = (d: Doc) => (d.error_category === 'export_failed' ? maxExportRetry : maxRetry)
+
   const inputRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const [picked, setPicked] = useState(0)
@@ -252,20 +256,20 @@ export default function DocumentsClient({
                             อ่านข้อมูล
                           </button>
                         )}
-                        {d.state === 'failed' && d.error_category !== 'intake_error' && (d.retry_count ?? 0) < maxRetry && (
+                        {d.state === 'failed' && d.error_category !== 'intake_error' && (d.retry_count ?? 0) < retryLimit(d) && (
                           <form action={retryDocument} style={{ display: 'inline' }}>
                             <input type="hidden" name="id" value={d.id} />
                             <button type="submit"
                               style={{ marginRight: 6, padding: '5px 11px', borderRadius: 7, border: '1px solid #7c3aed', fontSize: 12, fontWeight: 600, background: '#fff', color: '#6d28d9', cursor: 'pointer' }}>
-                              ลองใหม่ {(d.retry_count ?? 0) > 0 ? `(${d.retry_count}/${maxRetry})` : ''}
+                              ลองใหม่ {(d.retry_count ?? 0) > 0 ? `(${d.retry_count}/${retryLimit(d)})` : ''}
                             </button>
                           </form>
                         )}
                         {d.state === 'failed' && d.error_category === 'intake_error' && (
                           <span style={{ fontSize: 11.5, color: '#9ca3af' }}>ต้องอัปโหลดใหม่</span>
                         )}
-                        {d.state === 'failed' && d.error_category !== 'intake_error' && (d.retry_count ?? 0) >= maxRetry && (
-                          <span style={{ fontSize: 11.5, color: '#b91c1c' }}>ลองครบ {maxRetry} ครั้งแล้ว</span>
+                        {d.state === 'failed' && d.error_category !== 'intake_error' && (d.retry_count ?? 0) >= retryLimit(d) && (
+                          <span style={{ fontSize: 11.5, color: '#b91c1c' }}>ลองครบ {retryLimit(d)} ครั้งแล้ว</span>
                         )}
                         {d.state === 'confirmed' && (
                           <button type="button" disabled={pending || !sheetConfigured} onClick={() => doExport([d.id])}

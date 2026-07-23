@@ -212,8 +212,17 @@ async function getPreviewUrl(id: string): Promise<string | null> {
   return data?.signedUrl ?? null
 }
 
-// ===== §12 Retry — เอกสารที่ failed ต้องกลับเข้าคิวได้ (เพดาน 3 ครั้ง/ใบ) =====
+// ===== §12 Retry — เอกสารที่ failed ต้องกลับเข้าคิวได้ =====
+//
+// แยกเพดานตามว่า "ลองใหม่แล้วเสียเงินไหม":
+//   อ่านเอกสารใหม่ = เรียก Claude = เสียเงินทุกครั้ง → คุมไว้ 3 ครั้งตามสเปก §12
+//   ส่ง Sheet ใหม่ = ยิง HTTP เปล่า ๆ ไม่เสียเงิน → ให้ 20 ครั้ง
+//
+// ทำไมต้องแยก: ส่ง Sheet พังมักเกิดจาก "ตั้งค่าผิด" (URL/รหัสไม่ตรง) ไม่ใช่ข้อมูลเสีย
+// ถ้าเพดานเท่ากัน กว่าจะแก้ค่าถูกก็กดครบ 3 ครั้งแล้ว → ใบนั้นค้างถาวร
+// ต้องเข้าไปแก้ในฐานข้อมูลถึงจะปลดได้ ซึ่งไม่ควรเป็นเรื่องที่ owner ต้องเจอ
 const MAX_RETRY = 3
+const MAX_EXPORT_RETRY = 20
 async function retryDocument(formData: FormData) {
   'use server'
   if (!(await authed())) return
@@ -223,9 +232,10 @@ async function retryDocument(formData: FormData) {
   const { data: d } = await db.from('doc_documents')
     .select('state, error_category, retry_count, storage_path').eq('id', id).single()
   if (!d || d.state !== 'failed') return
-  if ((d.retry_count ?? 0) >= MAX_RETRY) return
   // อัปโหลดไม่ผ่านตั้งแต่แรก = ไฟล์เสีย ต้องอัปใหม่ ลองซ้ำไม่ช่วย
   if (d.error_category === 'intake_error' || !d.storage_path) return
+  const limit = d.error_category === 'export_failed' ? MAX_EXPORT_RETRY : MAX_RETRY
+  if ((d.retry_count ?? 0) >= limit) return
 
   // export พังหลังยืนยันแล้ว → กลับไป confirmed เพื่อกดส่งใหม่
   // อ่าน/แปลงพัง → กลับเข้าคิวเพื่ออ่านใหม่
@@ -237,7 +247,7 @@ async function retryDocument(formData: FormData) {
   await db.from('doc_audit').insert({
     document_id: id, actor: 'owner', action: 'document.retried',
     from_state: 'failed', to_state: back,
-    metadata: { attempt: (d.retry_count ?? 0) + 1, max: MAX_RETRY },
+    metadata: { attempt: (d.retry_count ?? 0) + 1, max: limit },
   })
   revalidatePath(PATH)
 }
@@ -287,6 +297,7 @@ export default async function DocumentsPage() {
       getPreviewUrl={getPreviewUrl}
       retryDocument={retryDocument}
       maxRetry={MAX_RETRY}
+      maxExportRetry={MAX_EXPORT_RETRY}
       vendors={vendors}
       sheetConfigured={!!process.env.DOCBRIEF_SHEET_WEBHOOK_URL && !!process.env.DOCBRIEF_SHEET_SECRET}
     />
