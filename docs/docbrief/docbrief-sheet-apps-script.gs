@@ -45,14 +45,18 @@ function doPost(e) {
     var row = null;
 
     // ---- ชั้น 1+2: ตรวจ signature + timestamp (ทางใหม่) ----
-    if (body.sig && body.ts && body.payload) {
+    if (body.sig && body.ts && (body.payload_b64 || body.payload)) {
       var age = Math.abs(Date.now() - Number(body.ts));
       if (!(age < MAX_CLOCK_SKEW_MS)) return reject('stale request (' + Math.round(age / 1000) + 's)');
 
-      var expected = sign(String(body.ts) + '.' + body.payload);
+      // เซ็นบนสตริงที่ส่งมาตรง ๆ · แบบ b64 เป็น ASCII ล้วน จึงไม่มีปัญหาเรื่องภาษา
+      var signedPart = body.payload_b64 || body.payload;
+      var expected = sign(String(body.ts) + '.' + signedPart);
       if (!safeEqual(expected, String(body.sig))) return reject('bad signature');
 
-      row = JSON.parse(body.payload);
+      row = JSON.parse(body.payload_b64
+        ? Utilities.newBlob(Utilities.base64Decode(body.payload_b64)).getDataAsString('UTF-8')
+        : body.payload);
 
     // ---- ทางเก่า (ปิดได้ด้วย ALLOW_LEGACY) ----
     } else if (ALLOW_LEGACY && body.secret) {
@@ -97,7 +101,9 @@ function doPost(e) {
 // ===== ความปลอดภัย =====
 
 function sign(message) {
-  var raw = Utilities.computeHmacSha256Signature(message, SECRET);
+  // ต้องระบุ UTF-8 ให้ชัด — ไม่งั้น Apps Script แปลงอักษรไทยเป็นไบต์คนละแบบกับ Node
+  // แล้วลายเซ็นจะไม่ตรงเฉพาะเอกสารที่มีภาษาไทย (บั๊กที่เจอตอนใช้จริง 2026-07-23)
+  var raw = Utilities.computeHmacSha256Signature(message, SECRET, Utilities.Charset.UTF_8);
   return raw.map(function (b) {
     return ('0' + (b & 0xff).toString(16)).slice(-2);
   }).join('');

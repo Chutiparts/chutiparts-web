@@ -116,17 +116,21 @@ async function push(
   }
 
   // ส่งแบบ HMAC — รหัสลับไม่ถูกส่งผ่านเน็ต ส่งแค่ลายเซ็นที่คำนวณจากรหัส
-  // เซ็นบน payload string ตัวเดิมที่ส่งไป เพื่อให้ 2 ฝั่งเห็น byte เดียวกันแน่นอน
+  //
+  // เซ็นบน base64 ไม่ใช่ JSON ดิบ เพราะ Apps Script แปลงสตริงที่มีอักษรไทย
+  // เป็นไบต์คนละแบบกับ Node → ลายเซ็นไม่ตรงทุกครั้งที่ชื่อผู้ขายเป็นภาษาไทย
+  // (เจอตอนใช้จริง 2026-07-23 · ชื่ออังกฤษผ่าน ชื่อไทยไม่ผ่าน)
+  // base64 เป็น ASCII ล้วน → ทั้งสองฝั่งเห็นไบต์ชุดเดียวกันแน่นอน ไม่ขึ้นกับภาษา
   const ts = Date.now()
-  const payload = JSON.stringify(row)
-  const sig = createHmac('sha256', secret).update(`${ts}.${payload}`).digest('hex')
+  const payloadB64 = Buffer.from(JSON.stringify(row), 'utf8').toString('base64')
+  const sig = createHmac('sha256', secret).update(`${ts}.${payloadB64}`).digest('hex')
 
   let res: Response
   try {
     res = await fetch(webhook, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ts, sig, payload }),
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ ts, sig, payload_b64: payloadB64 }),
     })
   } catch (e) {
     return fail(`ต่อ Google Sheet ไม่ได้: ${e instanceof Error ? e.message : String(e)}`)
