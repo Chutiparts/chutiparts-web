@@ -68,7 +68,7 @@ const readyToConfirm = (d: Doc) => !!d.doc_no?.trim() && d.grand_total != null &
 
 export default function DocumentsClient({
   docs, uploadDocuments, extractDocuments, saveReview, confirmDocument, rejectDocument,
-  exportDocuments, sheetConfigured, getPreviewUrl, retryDocument, maxRetry,
+  exportDocuments, sheetConfigured, getPreviewUrl, retryDocument, maxRetry, vendors,
 }: {
   docs: Doc[]
   uploadDocuments: (fd: FormData) => Promise<void>
@@ -81,6 +81,7 @@ export default function DocumentsClient({
   getPreviewUrl: (id: string) => Promise<string | null>
   retryDocument: (fd: FormData) => Promise<void>
   maxRetry: number
+  vendors: string[]
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
@@ -123,6 +124,10 @@ export default function DocumentsClient({
 
   return (
     <div style={{ padding: '18px 16px 60px', maxWidth: 1100, margin: '0 auto' }}>
+      {/* §4.1 vendor master — อ่านจาก core + ประวัติ docbrief (read-only) */}
+      <datalist id="docbrief-vendors">
+        {vendors.map((v) => <option key={v} value={v} />)}
+      </datalist>
       <div style={{ marginBottom: 4, fontSize: 20, fontWeight: 700, color: '#17301F' }}>📄 เอกสาร</div>
       <div style={{ fontSize: 13, color: '#777', marginBottom: 18 }}>
         อัปโหลด → อ่านข้อมูล → ตรวจ/แก้ → ยืนยัน · ทุกใบต้องผ่านตาคุณก่อนเสมอ
@@ -332,7 +337,10 @@ export default function DocumentsClient({
                               <form action={saveReview}>
                                 <input type="hidden" name="id" value={d.id} />
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 11 }}>
-                                  <div><label style={labelStyle}>ผู้ขาย</label><input name="vendor_name" defaultValue={d.vendor_name ?? ''} style={inputStyle} /></div>
+                                  <div>
+                                    <label style={labelStyle}>ผู้ขาย{vendors.length > 0 && <span style={{ color: '#9ca3af' }}> · พิมพ์เพื่อค้นจาก {vendors.length} ราย</span>}</label>
+                                    <input name="vendor_name" defaultValue={d.vendor_name ?? ''} style={inputStyle} list="docbrief-vendors" autoComplete="off" />
+                                  </div>
                                   <div><label style={labelStyle}>เลขผู้เสียภาษี (13 หลัก)</label><input name="vendor_tax_id" defaultValue={d.vendor_tax_id ?? ''} style={inputStyle} /></div>
                                   <div><label style={labelStyle}>เลขที่เอกสาร *</label><input name="doc_no" defaultValue={d.doc_no ?? ''} style={inputStyle} /></div>
                                   <div><label style={labelStyle}>วันที่ (ค.ศ.) *</label><input name="doc_date" type="date" defaultValue={d.doc_date ?? ''} style={inputStyle} /></div>

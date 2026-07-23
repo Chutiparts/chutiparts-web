@@ -10,6 +10,7 @@ import { intakeFile } from '@/lib/docbrief-intake'
 import { extractDocument } from '@/lib/docbrief-extract'
 import { validateDocument, exportKey, canExport } from '@/lib/docbrief-validate'
 import { exportDocument } from '@/lib/docbrief-export'
+import { getVendorSuggestions } from '@/lib/docbrief-vendors'
 import DocumentsClient from './DocumentsClient'
 
 export const dynamic = 'force-dynamic'
@@ -236,7 +237,9 @@ export default async function DocumentsPage() {
     )
   }
 
-  const { data } = await svc().from('doc_documents')
+  const db = svc()
+  const vendors = await getVendorSuggestions(db)
+  const { data } = await db.from('doc_documents')
     .select(`id, state, original_filename, mime_type, file_size, page_count, error_message, error_category,
              duplicate_of, created_at, retry_count, storage_path,
              vendor_name, vendor_tax_id, doc_no, doc_date, subtotal, vat, grand_total, currency, confidence, review_flags`)
@@ -254,6 +257,7 @@ export default async function DocumentsPage() {
       getPreviewUrl={getPreviewUrl}
       retryDocument={retryDocument}
       maxRetry={MAX_RETRY}
+      vendors={vendors}
       sheetConfigured={!!process.env.DOCBRIEF_SHEET_WEBHOOK_URL && !!process.env.DOCBRIEF_SHEET_SECRET}
     />
   )

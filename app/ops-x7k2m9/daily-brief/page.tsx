@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import DailyBriefClient from './DailyBriefClient'
+import { getDocSummary, EMPTY_SUMMARY } from '@/lib/docbrief-summary'
 
 export const dynamic = 'force-dynamic'
 const COOKIE = 'ops_admin'
@@ -63,5 +64,8 @@ export default async function DailyBriefPage() {
     svc().from('brief_feedback').select('item_key,feedback,created_at').eq('business', 'chutibenz').order('created_at', { ascending: false }).limit(2000),
   ])
 
-  return <DailyBriefClient leads={leadsRes.data || []} tasks={tasksRes.data || []} sales={salesRes.data || []} stock={stockRes.data || []} products={productsRes.data || []} searches={searchesRes.data || []} feedback={feedbackRes.data || []} />
+  // §4.2 — ดึงสรุปเอกสารจาก docbrief (read-only · ถ้าพังคืนค่าว่าง ไม่ทำ Daily Brief ล่ม)
+  const docs = process.env.DOCBRIEF_BRIEF_CARD === 'off' ? EMPTY_SUMMARY : await getDocSummary(svc())
+
+  return <DailyBriefClient docs={docs} leads={leadsRes.data || []} tasks={tasksRes.data || []} sales={salesRes.data || []} stock={stockRes.data || []} products={productsRes.data || []} searches={searchesRes.data || []} feedback={feedbackRes.data || []} />
 }
