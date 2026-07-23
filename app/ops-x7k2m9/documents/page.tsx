@@ -170,6 +170,47 @@ async function rejectDocument(formData: FormData) {
   revalidatePath(PATH)
 }
 
+// ===== ดูไฟล์ต้นฉบับตอนตรวจ — signed URL อายุสั้น สร้างตอนกดดูเท่านั้น =====
+async function getPreviewUrl(id: string): Promise<string | null> {
+  'use server'
+  if (!(await authed())) return null
+  const db = svc()
+  const { data: d } = await db.from('doc_documents').select('storage_path').eq('id', id).single()
+  if (!d?.storage_path) return null
+  const { data } = await db.storage.from('doc-originals').createSignedUrl(d.storage_path, 600)
+  return data?.signedUrl ?? null
+}
+
+// ===== §12 Retry — เอกสารที่ failed ต้องกลับเข้าคิวได้ (เพดาน 3 ครั้ง/ใบ) =====
+const MAX_RETRY = 3
+async function retryDocument(formData: FormData) {
+  'use server'
+  if (!(await authed())) return
+  const id = String(formData.get('id') || '')
+  if (!id) return
+  const db = svc()
+  const { data: d } = await db.from('doc_documents')
+    .select('state, error_category, retry_count, storage_path').eq('id', id).single()
+  if (!d || d.state !== 'failed') return
+  if ((d.retry_count ?? 0) >= MAX_RETRY) return
+  // อัปโหลดไม่ผ่านตั้งแต่แรก = ไฟล์เสีย ต้องอัปใหม่ ลองซ้ำไม่ช่วย
+  if (d.error_category === 'intake_error' || !d.storage_path) return
+
+  // export พังหลังยืนยันแล้ว → กลับไป confirmed เพื่อกดส่งใหม่
+  // อ่าน/แปลงพัง → กลับเข้าคิวเพื่ออ่านใหม่
+  const back = d.error_category === 'export_failed' ? 'confirmed' : 'queued'
+  await db.from('doc_documents').update({
+    state: back, error_category: null, error_message: null,
+    retry_count: (d.retry_count ?? 0) + 1, updated_at: new Date().toISOString(),
+  }).eq('id', id)
+  await db.from('doc_audit').insert({
+    document_id: id, actor: 'owner', action: 'document.retried',
+    from_state: 'failed', to_state: back,
+    metadata: { attempt: (d.retry_count ?? 0) + 1, max: MAX_RETRY },
+  })
+  revalidatePath(PATH)
+}
+
 // ===== Phase 4 (Export) — ส่งไป Google Sheet · owner กดเอง =====
 async function exportDocuments(formData: FormData) {
   'use server'
@@ -196,7 +237,8 @@ export default async function DocumentsPage() {
   }
 
   const { data } = await svc().from('doc_documents')
-    .select(`id, state, original_filename, mime_type, file_size, page_count, error_message, duplicate_of, created_at,
+    .select(`id, state, original_filename, mime_type, file_size, page_count, error_message, error_category,
+             duplicate_of, created_at, retry_count, storage_path,
              vendor_name, vendor_tax_id, doc_no, doc_date, subtotal, vat, grand_total, currency, confidence, review_flags`)
     .order('created_at', { ascending: false }).limit(200)
 
@@ -209,6 +251,9 @@ export default async function DocumentsPage() {
       confirmDocument={confirmDocument}
       rejectDocument={rejectDocument}
       exportDocuments={exportDocuments}
+      getPreviewUrl={getPreviewUrl}
+      retryDocument={retryDocument}
+      maxRetry={MAX_RETRY}
       sheetConfigured={!!process.env.DOCBRIEF_SHEET_WEBHOOK_URL && !!process.env.DOCBRIEF_SHEET_SECRET}
     />
   )

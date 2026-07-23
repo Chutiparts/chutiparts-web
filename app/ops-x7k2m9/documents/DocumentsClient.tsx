@@ -25,6 +25,9 @@ type Doc = {
   confidence?: Record<string, number> | null
   review_flags?: string[] | null
   raw_extraction?: { _issues?: Issue[]; notes?: string } | null
+  error_category?: string | null
+  retry_count?: number | null
+  storage_path?: string | null
 }
 
 const STATE_LABEL: Record<string, { text: string; bg: string; fg: string }> = {
@@ -65,7 +68,7 @@ const readyToConfirm = (d: Doc) => !!d.doc_no?.trim() && d.grand_total != null &
 
 export default function DocumentsClient({
   docs, uploadDocuments, extractDocuments, saveReview, confirmDocument, rejectDocument,
-  exportDocuments, sheetConfigured,
+  exportDocuments, sheetConfigured, getPreviewUrl, retryDocument, maxRetry,
 }: {
   docs: Doc[]
   uploadDocuments: (fd: FormData) => Promise<void>
@@ -75,11 +78,28 @@ export default function DocumentsClient({
   rejectDocument: (fd: FormData) => Promise<void>
   exportDocuments: (fd: FormData) => Promise<void>
   sheetConfigured: boolean
+  getPreviewUrl: (id: string) => Promise<string | null>
+  retryDocument: (fd: FormData) => Promise<void>
+  maxRetry: number
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [pending, start] = useTransition()
   const [picked, setPicked] = useState(0)
   const [open, setOpen] = useState<string | null>(null)
+  const [preview, setPreview] = useState<{ id: string; url: string } | null>(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+
+  const toggleDetail = (d: Doc) => {
+    const next = open === d.id ? null : d.id
+    setOpen(next)
+    if (next && d.storage_path && preview?.id !== d.id) {
+      setLoadingPreview(true)
+      getPreviewUrl(d.id).then((url) => {
+        if (url) setPreview({ id: d.id, url })
+        setLoadingPreview(false)
+      })
+    }
+  }
 
   const upload = (fd: FormData) => start(async () => {
     await uploadDocuments(fd)
@@ -227,6 +247,21 @@ export default function DocumentsClient({
                             อ่านข้อมูล
                           </button>
                         )}
+                        {d.state === 'failed' && d.error_category !== 'intake_error' && (d.retry_count ?? 0) < maxRetry && (
+                          <form action={retryDocument} style={{ display: 'inline' }}>
+                            <input type="hidden" name="id" value={d.id} />
+                            <button type="submit"
+                              style={{ marginRight: 6, padding: '5px 11px', borderRadius: 7, border: '1px solid #7c3aed', fontSize: 12, fontWeight: 600, background: '#fff', color: '#6d28d9', cursor: 'pointer' }}>
+                              ลองใหม่ {(d.retry_count ?? 0) > 0 ? `(${d.retry_count}/${maxRetry})` : ''}
+                            </button>
+                          </form>
+                        )}
+                        {d.state === 'failed' && d.error_category === 'intake_error' && (
+                          <span style={{ fontSize: 11.5, color: '#9ca3af' }}>ต้องอัปโหลดใหม่</span>
+                        )}
+                        {d.state === 'failed' && d.error_category !== 'intake_error' && (d.retry_count ?? 0) >= maxRetry && (
+                          <span style={{ fontSize: 11.5, color: '#b91c1c' }}>ลองครบ {maxRetry} ครั้งแล้ว</span>
+                        )}
                         {d.state === 'confirmed' && (
                           <button type="button" disabled={pending || !sheetConfigured} onClick={() => doExport([d.id])}
                             style={{
@@ -239,7 +274,7 @@ export default function DocumentsClient({
                           </button>
                         )}
                         {(d.state === 'pending_review' || d.state === 'confirmed' || d.state === 'exported') && (
-                          <button type="button" onClick={() => setOpen(isOpen ? null : d.id)}
+                          <button type="button" onClick={() => toggleDetail(d)}
                             style={{ padding: '5px 11px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 12, background: '#fff', color: '#374151', cursor: 'pointer' }}>
                             {isOpen ? 'ปิด' : d.state === 'pending_review' ? 'ตรวจ' : 'ดู'}
                           </button>
@@ -250,6 +285,33 @@ export default function DocumentsClient({
                     {isOpen && (
                       <tr key={`${d.id}-detail`} style={{ background: '#fafafa' }}>
                         <td colSpan={6} style={{ padding: '14px 16px' }}>
+                          {/* ===== บิลต้นฉบับ — ดูควบคู่ตอนตรวจ ===== */}
+                          {d.storage_path && (
+                            <div style={{ marginBottom: 14 }}>
+                              {loadingPreview && preview?.id !== d.id ? (
+                                <div style={{ fontSize: 12.5, color: '#9ca3af' }}>กำลังโหลดรูปบิล…</div>
+                              ) : preview?.id === d.id ? (
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>บิลต้นฉบับ</span>
+                                    <a href={preview.url} target="_blank" rel="noopener noreferrer"
+                                      style={{ fontSize: 11.5, color: '#2563eb', textDecoration: 'none' }}>
+                                      เปิดเต็มจอ ↗
+                                    </a>
+                                  </div>
+                                  {d.mime_type === 'application/pdf' ? (
+                                    <iframe src={preview.url} title="บิล"
+                                      style={{ width: '100%', height: 420, border: '1px solid #e5e7eb', borderRadius: 9, background: '#fff' }} />
+                                  ) : (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                    <img src={preview.url} alt="บิลต้นฉบับ"
+                                      style={{ maxWidth: '100%', maxHeight: 460, border: '1px solid #e5e7eb', borderRadius: 9, background: '#fff', objectFit: 'contain' }} />
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+
                           {/* ปัญหาที่ตรวจพบ */}
                           {(d.raw_extraction?._issues || []).length > 0 && (
                             <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 9, padding: '10px 12px', marginBottom: 14 }}>
