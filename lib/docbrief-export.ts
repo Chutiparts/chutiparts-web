@@ -4,6 +4,7 @@
 //
 // วิธีเชื่อม: Apps Script Web App (ไม่เพิ่ม dependency · ไม่ต้องทำ service account)
 //   env: DOCBRIEF_SHEET_WEBHOOK_URL · DOCBRIEF_SHEET_SECRET
+import { createHmac } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { exportKey, canExport, type DocFields } from './docbrief-validate'
 
@@ -114,12 +115,18 @@ async function push(
     return { status: 'failed' as const, message: msg }
   }
 
+  // ส่งแบบ HMAC — รหัสลับไม่ถูกส่งผ่านเน็ต ส่งแค่ลายเซ็นที่คำนวณจากรหัส
+  // เซ็นบน payload string ตัวเดิมที่ส่งไป เพื่อให้ 2 ฝั่งเห็น byte เดียวกันแน่นอน
+  const ts = Date.now()
+  const payload = JSON.stringify(row)
+  const sig = createHmac('sha256', secret).update(`${ts}.${payload}`).digest('hex')
+
   let res: Response
   try {
     res = await fetch(webhook, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ secret, row }),
+      body: JSON.stringify({ ts, sig, payload }),
     })
   } catch (e) {
     return fail(`ต่อ Google Sheet ไม่ได้: ${e instanceof Error ? e.message : String(e)}`)

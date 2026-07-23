@@ -11,6 +11,7 @@ import { extractDocument } from '@/lib/docbrief-extract'
 import { validateDocument, exportKey, canExport } from '@/lib/docbrief-validate'
 import { exportDocument } from '@/lib/docbrief-export'
 import { getVendorSuggestions } from '@/lib/docbrief-vendors'
+import { checkExtractLimit, checkUploadLimit, loginThrottleDelayMs, recordLoginFailure } from '@/lib/docbrief-ratelimit'
 import DocumentsClient from './DocumentsClient'
 
 export const dynamic = 'force-dynamic'
@@ -33,8 +34,18 @@ async function authed(): Promise<boolean> {
 
 async function loginOps(formData: FormData) {
   'use server'
+  const db = svc()
+  // กันเดารหัส: หน่วงเวลาถ้าใส่ผิดถี่ — ไม่บล็อก เพื่อไม่ให้ owner ถูกล็อกออกจากระบบ
+  const delay = await loginThrottleDelayMs(db)
+  if (delay > 0) await new Promise((r) => setTimeout(r, delay))
+
   const pw = String(formData.get('pw') || '')
   const secret = process.env.ADMIN_OPS_SECRET
+  if (!secret || pw !== secret) {
+    await recordLoginFailure(db)
+    revalidatePath(PATH)
+    return
+  }
   if (secret && pw === secret) {
     // secure: true บังคับ HTTPS — บน localhost (http) เบราว์เซอร์จะทิ้ง cookie ทิ้ง
     // จึงเปิดเฉพาะ production · prod ยังปลอดภัยเหมือนเดิม
@@ -52,6 +63,15 @@ async function uploadDocuments(formData: FormData) {
   if (!(await authed())) return
   const files = formData.getAll('file').filter((f): f is File => f instanceof File && f.size > 0)
   const db = svc()
+  const gate = await checkUploadLimit(db)
+  if (!gate.ok) {
+    await db.from('doc_audit').insert({
+      document_id: null, actor: 'owner', action: 'ratelimit.blocked',
+      metadata: { kind: 'upload', used: gate.used, limit: gate.limit },
+    })
+    revalidatePath(PATH)
+    return
+  }
   for (const f of files) {
     await intakeFile(db, { name: f.name, type: f.type, buffer: Buffer.from(await f.arrayBuffer()) })
   }
@@ -64,7 +84,17 @@ async function extractDocuments(formData: FormData) {
   if (!(await authed())) return
   const ids = formData.getAll('id').map(String).filter(Boolean)
   const db = svc()
-  for (const id of ids) await extractDocument(db, id)
+  for (const id of ids) {
+    const gate = await checkExtractLimit(db)
+    if (!gate.ok) {
+      await db.from('doc_audit').insert({
+        document_id: id, actor: 'owner', action: 'ratelimit.blocked',
+        metadata: { kind: 'extract', used: gate.used, limit: gate.limit, message: gate.message },
+      })
+      break // หยุดทั้งชุด ไม่ใช่ข้ามใบเดียว
+    }
+    await extractDocument(db, id)
+  }
   revalidatePath(PATH)
 }
 
