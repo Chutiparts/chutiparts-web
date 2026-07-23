@@ -161,7 +161,9 @@ const CRISIS_BRIEFS: Record<string, CrisisBrief> = {
   },
 }
 
-export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [], searches = [], feedback = [] }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[]; searches?: Row[]; feedback?: Row[] }) {
+type DocSummary = { enabled: boolean; queued: number; pending_review: number; confirmed: number; failed: number; exported_today: number; oldest_pending_days: number | null }
+
+export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [], searches = [], feedback = [], docs }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[]; searches?: Row[]; feedback?: Row[]; docs?: DocSummary }) {
   const [toast, setToast] = useState('')
   const [openBrief, setOpenBrief] = useState('')
   const [showDetail, setShowDetail] = useState(false)
@@ -434,6 +436,31 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
       </div>
 
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
+        {/* ===== เอกสาร (docbrief) — §4.2 read-only summary ===== */}
+        {docs?.enabled && (docs.pending_review + docs.queued + docs.confirmed + docs.failed > 0 || docs.exported_today > 0) && (
+          <a href="/ops-x7k2m9/documents" style={{ textDecoration: 'none', display: 'block', marginBottom: 10 }}>
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderLeft: '4px solid #C9A961', borderRadius: 10, padding: '11px 13px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: docs.pending_review + docs.queued + docs.confirmed + docs.failed > 0 ? 7 : 0 }}>
+                <span style={{ fontSize: 15 }}>📄</span>
+                <span style={{ fontSize: 13.5, fontWeight: 700, color: '#17301F' }}>เอกสาร</span>
+                {docs.oldest_pending_days !== null && docs.oldest_pending_days >= 3 && (
+                  <span style={{ background: '#fee2e2', color: '#991b1b', borderRadius: 5, padding: '1px 6px', fontSize: 10.5, fontWeight: 700 }}>
+                    ค้างนานสุด {docs.oldest_pending_days} วัน
+                  </span>
+                )}
+                <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#9ca3af' }}>เปิดดู →</span>
+              </div>
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                {docs.pending_review > 0 && <span style={{ background: '#fef9c3', color: '#854d0e', borderRadius: 6, padding: '3px 9px', fontSize: 12, fontWeight: 600 }}>รอตรวจ {docs.pending_review}</span>}
+                {docs.queued > 0 && <span style={{ background: '#dcfce7', color: '#166534', borderRadius: 6, padding: '3px 9px', fontSize: 12, fontWeight: 600 }}>รออ่าน {docs.queued}</span>}
+                {docs.confirmed > 0 && <span style={{ background: '#dbeafe', color: '#1e40af', borderRadius: 6, padding: '3px 9px', fontSize: 12, fontWeight: 600 }}>รอส่ง Sheet {docs.confirmed}</span>}
+                {docs.failed > 0 && <span style={{ background: '#fee2e2', color: '#991b1b', borderRadius: 6, padding: '3px 9px', fontSize: 12, fontWeight: 600 }}>ไม่ผ่าน {docs.failed}</span>}
+                {docs.exported_today > 0 && <span style={{ background: '#d1fae5', color: '#065f46', borderRadius: 6, padding: '3px 9px', fontSize: 12, fontWeight: 600 }}>ส่งออกวันนี้ {docs.exported_today}</span>}
+              </div>
+            </div>
+          </a>
+        )}
+
         {/* 🎯 Top 5 วันนี้ — hero (มือถืออ่าน 10 วิ) */}
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 16, color: GREEN, marginBottom: 8 }}>🎯 วันนี้ทำอะไรก่อน — Top {top5.length}{mutedCount > 0 && <span style={{ fontWeight: 400, fontSize: 12, color: '#999' }}> · 🔕 ปิดเสียง {mutedCount}</span>}</div>
