@@ -5,8 +5,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DOC_BUCKET } from './docbrief-intake'
 import { extractStockBill, type StockLine } from './docbrief-extract-stock'
+import { guessCategory } from './docbrief-stock-categories'
 
-const THB_PER_USD = Number(process.env.THB_PER_USD || 35)
+// สภาพเริ่มต้นของอะไหล่นำเข้า (owner แก้เป็น A/B/C ได้ตอนตรวจ)
+const DEFAULT_CONDITION = process.env.DOCBRIEF_DEFAULT_CONDITION || 'มือสอง-A'
 
 async function audit(
   db: SupabaseClient, documentId: string | null, actor: string,
@@ -49,29 +51,45 @@ async function maxRunning(db: SupabaseClient, chassis: string): Promise<number> 
 }
 
 /**
- * เติม SKU อัตโนมัติให้บรรทัดที่ยังว่าง — เรียงต่อจากเลขสูงสุดจริงต่อรุ่น
- * ไม่ทับ SKU ที่ owner กรอกเองไว้แล้ว
+ * เติมอัตโนมัติให้บรรทัดที่ยังว่าง: SKU (เรียงต่อจากเลขสูงสุดต่อรุ่น) +
+ * หมวดหมู่ (จับคู่จากชื่อ) + สภาพ (default) — ไม่ทับค่าที่ owner กรอกเองแล้ว
  */
 export async function assignSkusForDocument(
   db: SupabaseClient, documentId: string, actor = 'owner',
 ): Promise<{ ok: boolean; assigned: number }> {
   const { data: lines } = await db.from('doc_line_items')
-    .select('id, line_no, car_model, part_name, sku').eq('document_id', documentId).order('line_no', { ascending: true })
+    .select('id, line_no, car_model, part_name, sku, category, condition').eq('document_id', documentId).order('line_no', { ascending: true })
   if (!lines?.length) return { ok: true, assigned: 0 }
 
   const next: Record<string, number> = {} // chassis → เลขถัดไปที่จะใช้
   let assigned = 0
   for (const l of lines) {
-    if (l.sku && String(l.sku).trim()) continue // มีแล้ว ไม่ทับ
-    const chassis = chassisOf(l.car_model, l.part_name)
-    if (!chassis) continue // ไม่รู้รุ่น → ปล่อยว่างให้ owner กรอก
-    if (next[chassis] === undefined) next[chassis] = (await maxRunning(db, chassis)) + 1
-    const sku = `${chassis}-${String(next[chassis]).padStart(3, '0')}`
-    next[chassis]++
-    await db.from('doc_line_items').update({ sku, updated_at: new Date().toISOString() }).eq('id', l.id)
-    assigned++
+    const patch: Record<string, unknown> = {}
+
+    // SKU — เรียงต่อต่อรุ่น
+    if (!l.sku || !String(l.sku).trim()) {
+      const chassis = chassisOf(l.car_model, l.part_name)
+      if (chassis) {
+        if (next[chassis] === undefined) next[chassis] = (await maxRunning(db, chassis)) + 1
+        patch.sku = `${chassis}-${String(next[chassis]).padStart(3, '0')}`
+        next[chassis]++
+      }
+    }
+    // หมวดหมู่ — จับคู่จากชื่ออะไหล่
+    if (!l.category || !String(l.category).trim()) {
+      const cat = guessCategory(l.part_name)
+      if (cat) patch.category = cat
+    }
+    // สภาพ — ใส่ default ถ้ายังว่าง
+    if (!l.condition || !String(l.condition).trim()) patch.condition = DEFAULT_CONDITION
+
+    if (Object.keys(patch).length) {
+      patch.updated_at = new Date().toISOString()
+      await db.from('doc_line_items').update(patch).eq('id', l.id)
+      assigned++
+    }
   }
-  if (assigned) await audit(db, documentId, actor, 'sku.auto_assigned', null, null, { count: assigned })
+  if (assigned) await audit(db, documentId, actor, 'autofill.applied', null, null, { count: assigned })
   return { ok: true, assigned }
 }
 

@@ -149,13 +149,13 @@ export default function StockIntakeClient({
               <div style={{ borderTop: '1px solid #e5e7eb', background: '#fafafa', padding: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <div style={{ fontSize: 12, color: '#6b7280', flex: 1 }}>
-                    💡 ช่องจาก AI: <b>จำนวน · ชื่อ · ต้นทุน</b> (แก้ได้) · เติมเอง: <b>ราคาขาย · ที่เก็บ</b> · SKU เติมอัตโนมัติแล้ว
+                    💡 จาก AI: <b>จำนวน · ชื่อ · ต้นทุน</b> · เติมอัตโนมัติ: <b>SKU · หมวดหมู่ · สภาพ</b> · เติมเอง: <b>ราคาขาย · ที่เก็บ</b>
                   </div>
                   <form action={autoSku}>
                     <input type="hidden" name="id" value={d.id} />
                     <button type="submit" disabled={pending}
                       style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #C9A961', background: '#fffbea', color: '#8a6d2f', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                      🔢 เติม SKU อัตโนมัติ
+                      🔢 เติมอัตโนมัติ
                     </button>
                   </form>
                 </div>
