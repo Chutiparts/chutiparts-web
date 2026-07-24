@@ -103,7 +103,7 @@ function Collapsible({ title, children }: { title: string; children: React.React
 }
 /* ===================== SALES ===================== */
 function SalesTab({ rows, skus, saleStock, onAdd, onSave, flash }: { rows: Row[]; skus: string[]; saleStock: { sku: string; part_name: string; car_model: string; cost: any }[]; onAdd: (fd: FormData, done: () => void) => void; onSave: (fd: FormData) => void; flash: (m: string) => void }) {
-  const [showAdd, setShowAdd] = useState(true)
+  const [showAdd, setShowAdd] = useState(false) // ลงขายใหม่ย้ายไปเมนู "ขายออก" — ที่นี่เหลือดู/แก้ (กันลงซ้ำ 2 ที่)
   const [q, setQ] = useState(''); const [payF, setPayF] = useState(''); const [openId, setOpenId] = useState<string | null>(null)
   const stockBySku = useMemo(() => { const m: Record<string, any> = {}; (saleStock || []).forEach((s) => { if (s.sku) m[s.sku] = s }); return m }, [saleStock])
   const [addForm, setAddForm] = useState<{ sku: string; part_sold: string; car_model: string; cost: string }>({ sku: '', part_sold: '', car_model: '', cost: '' })
@@ -135,7 +135,7 @@ function SalesTab({ rows, skus, saleStock, onAdd, onSave, flash }: { rows: Row[]
         <Stat label="รอส่ง" val={String(toShip)} color="#854F0B" />
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button onClick={() => setShowAdd((v) => !v)} style={{ background: GREEN, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{showAdd ? '× ปิดฟอร์ม' : '+ บันทึกการขาย'}</button>
+        <a href="/ops-x7k2m9/sell" style={{ background: GREEN, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', whiteSpace: 'nowrap' }}>+ ลงขายที่เมนู “ขายออก” →</a>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ลูกค้า/อะไหล่/รุ่น/SKU/พัสดุ" style={{ flex: 1, minWidth: 150, padding: '8px 11px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14 }} />
         <select value={payF} onChange={(e) => setPayF(e.target.value)} style={sel}><option value="">ทุกสถานะเงิน</option>{PAY_ORDER.map((p) => <option key={p} value={p}>{PAY[p].th}</option>)}</select>
         <button onClick={exportCsv} style={qbtn}>⬇ CSV</button><button onClick={exportTxt} style={qbtn}>⬇ TXT</button><button onClick={exportJson} style={qbtn}>⬇ JSON</button>
