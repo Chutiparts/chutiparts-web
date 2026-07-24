@@ -17,6 +17,64 @@ async function audit(
   })
 }
 
+// ── Auto-SKU (สเปกจาก owner 2026-07-24) ────────────────────────────────
+// รูปแบบจริงในระบบ: {chassis}-{NNN} เช่น 140-032 (chassis = รุ่นตัดตัว W ออก)
+// นับต่อจากเลขสูงสุดของรุ่นนั้นใน stock_records + doc_line_items (กันชนกับใบที่ยังไม่ยืนยัน)
+
+/** ดึงเลข chassis 3 หลักจากรุ่น/ชื่อ เช่น "W140" → "140", "กระจังหน้า W140" → "140" */
+function chassisOf(carModel: string | null, partName: string | null): string | null {
+  for (const s of [carModel, partName]) {
+    const m = s && /w?\s*([12]\d{2})\b/i.exec(s)
+    if (m) return m[1]
+  }
+  return null
+}
+
+/** เลขรันสูงสุดของ chassis นั้น จากทั้ง stock_records และ doc_line_items */
+async function maxRunning(db: SupabaseClient, chassis: string): Promise<number> {
+  let max = 0
+  const scan = (rows: { sku: string | null }[] | null) => {
+    for (const r of rows ?? []) {
+      const m = r.sku && new RegExp(`^${chassis}-(\\d+)$`).exec(r.sku.trim())
+      if (m) max = Math.max(max, Number(m[1]))
+    }
+  }
+  const [stock, lines] = await Promise.all([
+    db.from('stock_records').select('sku').ilike('sku', `${chassis}-%`),
+    db.from('doc_line_items').select('sku').ilike('sku', `${chassis}-%`),
+  ])
+  scan(stock.data as { sku: string | null }[] | null)
+  scan(lines.data as { sku: string | null }[] | null)
+  return max
+}
+
+/**
+ * เติม SKU อัตโนมัติให้บรรทัดที่ยังว่าง — เรียงต่อจากเลขสูงสุดจริงต่อรุ่น
+ * ไม่ทับ SKU ที่ owner กรอกเองไว้แล้ว
+ */
+export async function assignSkusForDocument(
+  db: SupabaseClient, documentId: string, actor = 'owner',
+): Promise<{ ok: boolean; assigned: number }> {
+  const { data: lines } = await db.from('doc_line_items')
+    .select('id, line_no, car_model, part_name, sku').eq('document_id', documentId).order('line_no', { ascending: true })
+  if (!lines?.length) return { ok: true, assigned: 0 }
+
+  const next: Record<string, number> = {} // chassis → เลขถัดไปที่จะใช้
+  let assigned = 0
+  for (const l of lines) {
+    if (l.sku && String(l.sku).trim()) continue // มีแล้ว ไม่ทับ
+    const chassis = chassisOf(l.car_model, l.part_name)
+    if (!chassis) continue // ไม่รู้รุ่น → ปล่อยว่างให้ owner กรอก
+    if (next[chassis] === undefined) next[chassis] = (await maxRunning(db, chassis)) + 1
+    const sku = `${chassis}-${String(next[chassis]).padStart(3, '0')}`
+    next[chassis]++
+    await db.from('doc_line_items').update({ sku, updated_at: new Date().toISOString() }).eq('id', l.id)
+    assigned++
+  }
+  if (assigned) await audit(db, documentId, actor, 'sku.auto_assigned', null, null, { count: assigned })
+  return { ok: true, assigned }
+}
+
 export interface StockExtractOutcome {
   ok: boolean
   message?: string
@@ -97,6 +155,9 @@ export async function extractStockDocument(
   await audit(db, documentId, actor, 'state.transition', 'extracting', 'pending_review', {
     lines: ex.lines.length, total_check_ok: ex.total_check_ok, cost_thb: r.costThb,
   })
+
+  // เติม SKU อัตโนมัติทันที (owner แก้ทับได้ในหน้าตรวจ)
+  await assignSkusForDocument(db, documentId, actor)
 
   return { ok: true, lineCount: ex.lines.length, costThb: r.costThb }
 }

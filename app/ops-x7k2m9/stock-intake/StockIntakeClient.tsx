@@ -33,13 +33,14 @@ const lbl: React.CSSProperties = { fontSize: 11, color: '#6b7280', display: 'blo
 const GREEN = '#17301F'
 
 export default function StockIntakeClient({
-  docs, linesByDoc, uploadBills, extractBills, saveLine, rejectBill, getPreviewUrl,
+  docs, linesByDoc, uploadBills, extractBills, saveLine, autoSku, rejectBill, getPreviewUrl,
 }: {
   docs: Doc[]
   linesByDoc: Record<string, Line[]>
   uploadBills: (fd: FormData) => Promise<void>
   extractBills: (fd: FormData) => Promise<void>
   saveLine: (fd: FormData) => Promise<void>
+  autoSku: (fd: FormData) => Promise<void>
   rejectBill: (fd: FormData) => Promise<void>
   getPreviewUrl: (id: string) => Promise<string | null>
 }) {
@@ -143,8 +144,17 @@ export default function StockIntakeClient({
             {/* ตารางรายการ (ตรวจ/แก้) */}
             {isOpen && lines.length > 0 && (
               <div style={{ borderTop: '1px solid #e5e7eb', background: '#fafafa', padding: 12 }}>
-                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                  💡 ช่องจาก AI: <b>จำนวน · ชื่อ · ต้นทุน</b> (แก้ได้) · ช่องที่ต้องเติมเอง: <b>SKU · ราคาขาย · ที่เก็บ</b>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', flex: 1 }}>
+                    💡 ช่องจาก AI: <b>จำนวน · ชื่อ · ต้นทุน</b> (แก้ได้) · เติมเอง: <b>ราคาขาย · ที่เก็บ</b> · SKU เติมอัตโนมัติแล้ว
+                  </div>
+                  <form action={autoSku}>
+                    <input type="hidden" name="id" value={d.id} />
+                    <button type="submit" disabled={pending}
+                      style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #C9A961', background: '#fffbea', color: '#8a6d2f', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      🔢 เติม SKU อัตโนมัติ
+                    </button>
+                  </form>
                 </div>
                 {lines.map((l) => <LineForm key={l.id} line={l} saveLine={saveLine} pending={pending} start={start} />)}
               </div>

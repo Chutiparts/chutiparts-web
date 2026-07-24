@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { opsAuthed } from '@/lib/ops-auth'
 import OpsGate from '@/components/OpsGate'
 import { intakeFile, DOC_BUCKET } from '@/lib/docbrief-intake'
-import { extractStockDocument, saveStockLine, type LinePatch } from '@/lib/docbrief-stock'
+import { extractStockDocument, saveStockLine, assignSkusForDocument, type LinePatch } from '@/lib/docbrief-stock'
 import { checkExtractLimit, checkUploadLimit } from '@/lib/docbrief-ratelimit'
 import StockIntakeClient from './StockIntakeClient'
 
@@ -92,6 +92,15 @@ async function saveLine(formData: FormData) {
   revalidatePath(PATH)
 }
 
+async function autoSku(formData: FormData) {
+  'use server'
+  if (!(await opsAuthed())) return
+  const id = String(formData.get('id') || '')
+  if (!id) return
+  await assignSkusForDocument(svc(), id)
+  revalidatePath(PATH)
+}
+
 async function rejectBill(formData: FormData) {
   'use server'
   if (!(await opsAuthed())) return
@@ -142,6 +151,7 @@ export default async function StockIntakePage() {
       uploadBills={uploadBills}
       extractBills={extractBills}
       saveLine={saveLine}
+      autoSku={autoSku}
       rejectBill={rejectBill}
       getPreviewUrl={getPreviewUrl}
     />
