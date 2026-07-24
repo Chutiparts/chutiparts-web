@@ -206,3 +206,85 @@ export async function saveStockLine(
   await audit(db, documentId, actor, 'line.edited', null, null, { line_id: id, fields: Object.keys(clean) })
   return { ok: true }
 }
+
+// ── A3: ยืนยัน → เข้าสต็อกจริง (stock_records) ──────────────────────────
+// ต้องครบทุกช่องจำเป็นก่อน: sku · part_name · qty · ต้นทุน · ราคาขาย · ที่เก็บ
+// insert เพิ่มอย่างเดียว · ถ้า SKU ซ้ำของเดิม = บล็อก (กันเขียนทับ) ให้ owner จัดการ restock เอง
+// idempotent: บรรทัดที่มี stock_record_id แล้วจะข้าม (กดซ้ำไม่เพิ่มซ้ำ)
+
+const REQUIRED = ['sku', 'part_name', 'qty', 'unit_price', 'set_price', 'location'] as const
+
+export interface ConfirmResult {
+  ok: boolean
+  message?: string
+  inserted?: number
+  problems?: { line_no: number; missing: string[] }[]
+}
+
+export async function confirmStockDocument(
+  db: SupabaseClient, documentId: string, actor = 'owner',
+): Promise<ConfirmResult> {
+  const { data: doc } = await db.from('doc_documents')
+    .select('state, profile, vendor_name, doc_date').eq('id', documentId).single()
+  if (!doc || doc.profile !== 'stock') return { ok: false, message: 'ไม่พบเอกสารสต็อก' }
+  if (doc.state !== 'pending_review') return { ok: false, message: `ยืนยันได้เฉพาะตอนรอตรวจ (${doc.state})` }
+
+  const { data: lines } = await db.from('doc_line_items')
+    .select('*').eq('document_id', documentId).order('line_no', { ascending: true })
+  if (!lines?.length) return { ok: false, message: 'ไม่มีรายการ' }
+
+  // 1) เช็กครบทุกช่องจำเป็น
+  const problems: { line_no: number; missing: string[] }[] = []
+  const FIELD_TH: Record<string, string> = {
+    sku: 'SKU', part_name: 'ชื่อ', qty: 'จำนวน', unit_price: 'ต้นทุน', set_price: 'ราคาขาย', location: 'ที่เก็บ',
+  }
+  for (const l of lines) {
+    const missing = REQUIRED.filter((f) => l[f] == null || String(l[f]).trim() === '').map((f) => FIELD_TH[f])
+    if (missing.length) problems.push({ line_no: l.line_no, missing })
+  }
+  if (problems.length) return { ok: false, message: 'กรอกไม่ครบบางบรรทัด', problems }
+
+  // 2) เช็ก SKU ซ้ำของเดิมใน stock_records (กันเขียนทับ)
+  const skus = lines.map((l) => String(l.sku).trim())
+  const { data: existing } = await db.from('stock_records').select('sku').in('sku', skus)
+  const dup = new Set((existing ?? []).map((r) => r.sku))
+  const dupLines = lines.filter((l) => dup.has(String(l.sku).trim()) && !l.stock_record_id)
+  if (dupLines.length) {
+    return {
+      ok: false,
+      message: `SKU ซ้ำของเดิม: ${dupLines.map((l) => l.sku).join(', ')} — ถ้าเป็นการเติมของเดิม ให้แก้จำนวนในสต็อกเอง หรือเปลี่ยน SKU เป็นเลขใหม่`,
+    }
+  }
+
+  // 3) insert เข้า stock_records (ข้ามบรรทัดที่ทำไปแล้ว)
+  let inserted = 0
+  for (const l of lines) {
+    if (l.stock_record_id) continue // ทำไปแล้ว — idempotent
+    const { data: rec, error } = await db.from('stock_records').insert({
+      sku: String(l.sku).trim(),
+      part_name: l.part_name,
+      car_model: l.car_model,
+      qty: l.qty,
+      cost: l.unit_price,
+      set_price: l.set_price,
+      location: l.location,
+      status: 'in_stock',
+      has_image: false,
+      source: doc.vendor_name,
+      date_in: doc.doc_date,
+      note: [l.category, l.oem, l.condition, l.note].filter(Boolean).join(' · ') || null,
+    }).select('id').single()
+    if (error) {
+      await audit(db, documentId, actor, 'stock.insert_failed', null, null, { line_no: l.line_no, error: error.message })
+      return { ok: false, message: `บรรทัด ${l.line_no} เข้าสต็อกไม่สำเร็จ: ${error.message}`, inserted }
+    }
+    await db.from('doc_line_items').update({ stock_record_id: rec!.id, updated_at: new Date().toISOString() }).eq('id', l.id)
+    inserted++
+  }
+
+  // 4) เอกสาร → exported
+  await db.from('doc_documents').update({ state: 'exported', updated_at: new Date().toISOString() }).eq('id', documentId)
+  await audit(db, documentId, actor, 'document.exported', 'pending_review', 'exported', { inserted, skus })
+
+  return { ok: true, inserted }
+}

@@ -1,5 +1,5 @@
 'use client'
-import { useRef, useState, useTransition } from 'react'
+import { useRef, useState, useTransition, useActionState } from 'react'
 
 type Line = {
   id: string; document_id: string; line_no: number
@@ -32,8 +32,10 @@ const inp: React.CSSProperties = { width: '100%', padding: '6px 8px', border: '1
 const lbl: React.CSSProperties = { fontSize: 11, color: '#6b7280', display: 'block', marginBottom: 2 }
 const GREEN = '#17301F'
 
+type ConfirmState = { ok: boolean; message?: string } | null
+
 export default function StockIntakeClient({
-  docs, linesByDoc, uploadBills, extractBills, saveLine, autoSku, rejectBill, getPreviewUrl,
+  docs, linesByDoc, uploadBills, extractBills, saveLine, autoSku, confirmStock, rejectBill, getPreviewUrl,
 }: {
   docs: Doc[]
   linesByDoc: Record<string, Line[]>
@@ -41,6 +43,7 @@ export default function StockIntakeClient({
   extractBills: (fd: FormData) => Promise<void>
   saveLine: (fd: FormData) => Promise<void>
   autoSku: (fd: FormData) => Promise<void>
+  confirmStock: (prev: ConfirmState, fd: FormData) => Promise<{ ok: boolean; message?: string }>
   rejectBill: (fd: FormData) => Promise<void>
   getPreviewUrl: (id: string) => Promise<string | null>
 }) {
@@ -160,19 +163,54 @@ export default function StockIntakeClient({
               </div>
             )}
 
-            {/* ปฏิเสธ */}
+            {/* ยืนยัน / ปฏิเสธ */}
             {d.state === 'pending_review' && (
-              <div style={{ padding: '8px 16px', borderTop: '1px solid #f3f4f6', textAlign: 'right' }}>
-                <form action={rejectBill} style={{ display: 'inline' }}>
-                  <input type="hidden" name="id" value={d.id} />
-                  <button type="submit" style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: 12, cursor: 'pointer' }}>ปฏิเสธใบนี้</button>
-                </form>
-              </div>
+              <ConfirmFooter docId={d.id} lines={lines} confirmStock={confirmStock} rejectBill={rejectBill} />
             )}
           </div>
         )
       })}
     </section>
+  )
+}
+
+function ConfirmFooter({ docId, lines, confirmStock, rejectBill }: {
+  docId: string; lines: Line[]
+  confirmStock: (prev: ConfirmState, fd: FormData) => Promise<{ ok: boolean; message?: string }>
+  rejectBill: (fd: FormData) => Promise<void>
+}) {
+  const [state, action, busy] = useActionState(confirmStock, null)
+  // เช็กครบทุกช่องจำเป็นก่อน (กันกดทั้งที่ยังไม่พร้อม)
+  const REQ: (keyof Line)[] = ['sku', 'part_name', 'qty', 'unit_price', 'set_price', 'location']
+  const incomplete = lines.filter((l) => REQ.some((f) => l[f] == null || String(l[f]).trim() === ''))
+  const ready = incomplete.length === 0
+
+  return (
+    <div style={{ padding: '10px 16px', borderTop: '1px solid #f3f4f6' }}>
+      {!ready && (
+        <div style={{ fontSize: 12, color: '#b45309', marginBottom: 8 }}>
+          ⚠️ ยังกรอกไม่ครบ {incomplete.length} บรรทัด — ต้องมี SKU · ราคาขาย · ที่เก็บ ครบทุกบรรทัดก่อนยืนยัน (อย่าลืมกด &quot;บันทึกบรรทัด&quot;)
+        </div>
+      )}
+      {state?.message && (
+        <div style={{ fontSize: 12, color: state.ok ? '#059669' : '#b91c1c', marginBottom: 8 }}>
+          {state.ok ? '✓ ' : '⚠️ '}{state.message}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <form action={rejectBill}>
+          <input type="hidden" name="id" value={docId} />
+          <button type="submit" style={{ padding: '7px 14px', borderRadius: 7, border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280', fontSize: 13, cursor: 'pointer' }}>ปฏิเสธใบนี้</button>
+        </form>
+        <form action={action}>
+          <input type="hidden" name="id" value={docId} />
+          <button type="submit" disabled={!ready || busy}
+            style={{ padding: '7px 18px', borderRadius: 7, border: 'none', background: ready ? '#166534' : '#d1d5db', color: '#fff', fontWeight: 700, fontSize: 13, cursor: ready ? 'pointer' : 'not-allowed' }}>
+            {busy ? 'กำลังเข้าสต็อก…' : '✓ ยืนยันเข้าสต็อก'}
+          </button>
+        </form>
+      </div>
+    </div>
   )
 }
 

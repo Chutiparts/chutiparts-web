@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { opsAuthed } from '@/lib/ops-auth'
 import OpsGate from '@/components/OpsGate'
 import { intakeFile, DOC_BUCKET } from '@/lib/docbrief-intake'
-import { extractStockDocument, saveStockLine, assignSkusForDocument, type LinePatch } from '@/lib/docbrief-stock'
+import { extractStockDocument, saveStockLine, assignSkusForDocument, confirmStockDocument, type LinePatch } from '@/lib/docbrief-stock'
 import { checkExtractLimit, checkUploadLimit } from '@/lib/docbrief-ratelimit'
 import StockIntakeClient from './StockIntakeClient'
 
@@ -101,6 +101,20 @@ async function autoSku(formData: FormData) {
   revalidatePath(PATH)
 }
 
+async function confirmStock(_prev: { ok: boolean; message?: string } | null, formData: FormData): Promise<{ ok: boolean; message?: string }> {
+  'use server'
+  if (!(await opsAuthed())) return { ok: false, message: 'ต้องเข้าสู่ระบบ' }
+  const id = String(formData.get('id') || '')
+  if (!id) return { ok: false, message: 'ไม่พบเอกสาร' }
+  const r = await confirmStockDocument(svc(), id)
+  revalidatePath(PATH)
+  if (r.ok) return { ok: true, message: `เข้าสต็อกแล้ว ${r.inserted} รายการ` }
+  const detail = r.problems?.length
+    ? r.problems.map((p) => `บรรทัด ${p.line_no}: ขาด ${p.missing.join(', ')}`).join(' · ')
+    : r.message
+  return { ok: false, message: detail }
+}
+
 async function rejectBill(formData: FormData) {
   'use server'
   if (!(await opsAuthed())) return
@@ -152,6 +166,7 @@ export default async function StockIntakePage() {
       extractBills={extractBills}
       saveLine={saveLine}
       autoSku={autoSku}
+      confirmStock={confirmStock}
       rejectBill={rejectBill}
       getPreviewUrl={getPreviewUrl}
     />
