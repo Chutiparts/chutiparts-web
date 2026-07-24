@@ -25,6 +25,7 @@ export async function intakeFile(
   db: SupabaseClient,
   file: { name: string; type: string; buffer: Buffer },
   actor = 'owner',
+  profile: 'accounting' | 'stock' = 'accounting',
 ): Promise<IntakeOutcome> {
   const buf = file.buffer
   const size = buf.byteLength
@@ -70,7 +71,7 @@ export async function intakeFile(
 
   const { data: doc } = await db.from('doc_documents').insert({
     state: 'received', file_hash: hash, original_filename: file.name, mime_type: mime,
-    file_size: size, page_count: v.pageCount, storage_path: storagePath,
+    file_size: size, page_count: v.pageCount, storage_path: storagePath, profile,
   }).select('id').single()
   await audit(db, doc!.id, actor, 'document.received', null, 'received', { storage_path: storagePath, page_count: v.pageCount })
 
