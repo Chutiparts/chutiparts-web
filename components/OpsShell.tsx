@@ -1,56 +1,64 @@
 'use client'
-// components/OpsShell.tsx — Mini ERP Command Center shell (navigation layer เท่านั้น)
-// Desktop = เมนูซ้าย · Mobile = แท็บล่าง · ห่อทุกหน้า ops ผ่าน layout · ไม่แตะ logic/data/URL เดิม
-// เมนูเป็นแค่ลิงก์ไปหน้าเดิม (แต่ละหน้ายังโหลดข้อมูลตัวเอง) — รู้สึกเหมือนแอปเดียว
-// PathB: เพิ่มเมนู "🔄 Sync สต็อก" (/sync-stock) ใต้กลุ่มเงิน&สต็อก
-import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+// components/OpsShell.tsx — Mini ERP shell (เมนู navigation)
+// โครงใหม่: หลัก · ปฏิบัติการ (3 hub แบบ accordion: การเงิน/สต็อก/เอกสาร) · ระบบ
+// RBAC: พนักงาน docbrief (reviewer/operator/viewer) เห็นเฉพาะเมนูเอกสารที่จำเป็น
+//   owner เห็นครบ · team (parts-desk) เห็นเมนูทั่วไป · ซ่อน (hidden) = ไม่โชว์ แต่โค้ด+URL ยังอยู่
+import { usePathname, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
 
 const BASE = '/ops-x7k2m9'
-// doc: true = เมนู docbrief (เห็นได้ทุกบทบาท RBAC owner/reviewer/operator/viewer)
-// ownerOnly: true = เมนูการเงิน/ระบบ (owner เท่านั้น)
-type Item = { href: string; label: string; icon: string; match?: string; ownerOnly?: boolean; doc?: boolean }
-// P0.2 Lean: regroup เป็น Lean 8 · Daily Brief = home · ซ่อนเมนูเดี่ยว CRM/RiskGuard/Finance/ProfitGuard
-// (หน้าเดิมยังเปิดได้ตรง URL — แค่ไม่อยู่ top-level · Level B ค่อยรวมเนื้อหาเข้าโมดูลแม่)
-// #7 AI Search = หน้า public /search (ไม่อยู่เมนู ops · roadmap เดือน 3) · WebChecker → System Monitor (#8)
-type Group = { title: string; items: Item[] }
-const GROUPS: Group[] = [
-  { title: 'หลัก', items: [
-    { href: `${BASE}/daily-brief`, label: 'Daily Brief', icon: '☀️', ownerOnly: true },
-    { href: `${BASE}/parts-desk`, label: 'Leads', icon: '📇' },
-    { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk` },
-  ]},
-  { title: 'เงิน & สต็อก', items: [
+// doc = เมนู docbrief (พนักงาน+owner เห็น) · docOwner = docbrief แต่ owner เท่านั้น
+// ownerOnly = การเงิน/ระบบ (owner) · hidden = ไม่โชว์ (เก็บโค้ดไว้) · plain = ทั่วไป (team เห็น)
+type Item = { href: string; label: string; icon: string; match?: string; doc?: boolean; docOwner?: boolean; ownerOnly?: boolean; hidden?: boolean }
+type Hub = { key: string; label: string; icon: string; items: Item[] }
+
+const MAIN: Item[] = [
+  { href: `${BASE}/daily-brief`, label: 'Daily Brief', icon: '☀️', ownerOnly: true },
+  { href: `${BASE}/parts-desk`, label: 'Leads', icon: '📇' },
+  { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk` },
+]
+const HUBS: Hub[] = [
+  { key: 'finance', label: 'การเงิน', icon: '💰', items: [
     { href: `${BASE}/ledger`, label: 'Ledger', icon: '📒', ownerOnly: true },
-    { href: `${BASE}/landed-cost`, label: 'Landed Cost', icon: '🧮', ownerOnly: true },
-    { href: `${BASE}/stock-source`, label: 'Stock', icon: '📦', ownerOnly: true },
-    { href: `${BASE}/sync-stock`, label: 'Sync สต็อก', icon: '🔄' },
-    { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
     { href: `${BASE}/sell`, label: 'ขายออก', icon: '🧾' },
+    { href: `${BASE}/landed-cost`, label: 'Landed Cost', icon: '🧮', ownerOnly: true },
+  ]},
+  { key: 'stock', label: 'สต็อก', icon: '📦', items: [
+    { href: `${BASE}/stock-source`, label: 'Stock', icon: '📦', ownerOnly: true },
+    { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
+    { href: `${BASE}/sync-stock`, label: 'Sync สต็อก', icon: '🔄', ownerOnly: true, hidden: true }, // แทนด้วย "รับเข้าสต็อก" แล้ว
+  ]},
+  { key: 'docs', label: 'เอกสาร', icon: '📄', items: [
     { href: `${BASE}/inbox`, label: 'กล่องงาน', icon: '📥', doc: true },
-    { href: `${BASE}/documents`, label: 'เอกสาร', icon: '📄', doc: true },
+    { href: `${BASE}/documents`, label: 'บัญชี', icon: '📄', doc: true },
     { href: `${BASE}/stock-intake`, label: 'รับเข้าสต็อก', icon: '📦', doc: true },
     { href: `${BASE}/repository`, label: 'คลังเอกสาร', icon: '🗂️', doc: true },
-    { href: `${BASE}/doc-metrics`, label: 'ต้นทุน AI', icon: '📊', doc: true },
-    { href: `${BASE}/trash`, label: 'ถังทิ้ง', icon: '🗑', doc: true },
-  ]},
-  { title: 'ระบบ', items: [
-    { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺', ownerOnly: true },
+    { href: `${BASE}/doc-metrics`, label: 'ต้นทุน AI', icon: '📊', docOwner: true },
+    { href: `${BASE}/trash`, label: 'ถังทิ้ง', icon: '🗑', docOwner: true },
   ]},
 ]
-const ITEMS: Item[] = GROUPS.flatMap((g) => g.items)
-// mobile: Daily Brief ขึ้นแท็บแรก (หน้าที่เปิดบ่อยสุด — ไม่ต้องเลื่อนหา) ที่เหลือเรียงตามกลุ่ม
-const MOBILE_ITEMS: Item[] = [...ITEMS.filter((i) => i.label === 'Daily Brief'), ...ITEMS.filter((i) => i.label !== 'Daily Brief')]
+const SYSTEM: Item[] = [
+  { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺', ownerOnly: true },
+]
+const ALL_ITEMS: Item[] = [...MAIN, ...HUBS.flatMap((h) => h.items), ...SYSTEM]
+
+const ROLE_LABEL: Record<string, string> = { owner: 'Owner', reviewer: 'ผู้ตรวจ', operator: 'ผู้ปฏิบัติงาน', viewer: 'ผู้ดู', team: 'ทีม' }
 
 const CSS = `
 .opsx-shell{--w:210px}
-.opsx-side{position:fixed;top:0;left:0;bottom:0;width:var(--w);background:#17301F;border-right:1px solid rgba(255,255,255,.1);padding:14px 10px;overflow-y:auto;z-index:100;display:flex;flex-direction:column;gap:4px;box-sizing:border-box}
+.opsx-side{position:fixed;top:0;left:0;bottom:0;width:var(--w);background:#17301F;border-right:1px solid rgba(255,255,255,.1);padding:14px 10px;overflow-y:auto;z-index:100;display:flex;flex-direction:column;gap:2px;box-sizing:border-box}
 .opsx-brand{color:#C9A961;font-family:Georgia,serif;font-weight:700;font-size:16px;padding:4px 10px 12px;line-height:1.2}
 .opsx-brand small{display:block;color:#8fae99;font-family:-apple-system,sans-serif;font-size:10.5px;font-weight:400;margin-top:2px}
-.opsx-link{display:flex;align-items:center;gap:9px;text-decoration:none;border-radius:10px;padding:10px 12px;font-size:14px;font-weight:600;color:#e8efe9;border:1px solid transparent}
+.opsx-link{display:flex;align-items:center;gap:9px;text-decoration:none;border-radius:10px;padding:9px 12px;font-size:14px;font-weight:600;color:#e8efe9;border:1px solid transparent}
 .opsx-link:hover{background:rgba(255,255,255,.07)}
 .opsx-link.active{background:#C9A961;color:#17301F}
+.opsx-sub{padding-left:20px;font-size:13.5px}
 .opsx-ghead{color:#8fae99;font-size:10.5px;font-weight:700;letter-spacing:.08em;padding:12px 12px 3px;user-select:none}
+.opsx-hub{display:flex;align-items:center;gap:9px;width:100%;background:none;border:1px solid transparent;border-radius:10px;padding:9px 12px;font-size:14px;font-weight:600;color:#e8efe9;cursor:pointer;text-align:left}
+.opsx-hub:hover{background:rgba(255,255,255,.07)}
+.opsx-hub.has-active{color:#C9A961}
+.opsx-caret{margin-left:auto;font-size:10px;opacity:.7;transition:transform .15s}
+.opsx-caret.open{transform:rotate(90deg)}
 .opsx-main{margin-left:var(--w);min-height:100vh}
 .opsx-bottom{display:none}
 @media (max-width:768px){
@@ -65,51 +73,76 @@ const CSS = `
 
 export default function OpsShell({ children, role = 'owner' }: { children: React.ReactNode; role?: string }) {
   const path = usePathname() || ''
-  // role-access:
-  //  - เมนู docbrief (doc) → เห็นได้ทุกบทบาท RBAC (owner/reviewer/operator/viewer)
-  //  - เมนู ownerOnly (การเงิน/ระบบ) → owner เท่านั้น
-  //  - เมนูทั่วไป → ทุกคนที่ล็อกอิน
   const DOC_ROLES = new Set(['owner', 'reviewer', 'operator', 'viewer'])
+  const isDocStaff = role === 'reviewer' || role === 'operator' || role === 'viewer'
   const canSee = (it: Item) => {
-    if (it.doc) return DOC_ROLES.has(role)
-    if (it.ownerOnly) return role === 'owner'
-    return true
+    if (it.hidden) return false
+    if (it.docOwner) return role === 'owner'          // เมนู docbrief เฉพาะ owner (ต้นทุน AI / ถังทิ้ง)
+    if (it.doc) return DOC_ROLES.has(role)            // เมนู docbrief พนักงานเห็น
+    if (isDocStaff) return false                       // พนักงาน docbrief → เห็นเฉพาะเมนูเอกสาร
+    if (it.ownerOnly) return role === 'owner'          // การเงิน/ระบบ
+    return true                                        // ทั่วไป (team เห็น)
   }
-  const visGroups = GROUPS.map((g) => ({ ...g, items: g.items.filter(canSee) })).filter((g) => g.items.length > 0)
-  const visMobile = MOBILE_ITEMS.filter(canSee)
-  // ไฮไลต์ทีละปุ่มเดียว: parts-desk แยก Leads/Tasks ด้วย ?tab=tasks · หน้าอื่นเทียบ pathname ตรง ๆ
-  const [search, setSearch] = useState('')
-  useEffect(() => { setSearch(typeof window !== 'undefined' ? window.location.search : '') }, [path])
+
+  const linkTarget = (h: string) => (h.endsWith('.html') ? { target: '_blank', rel: 'noopener' } : {})
+  const sp = useSearchParams()
   const activeHref = (() => {
     const pd = `${BASE}/parts-desk`
-    if (path === pd || path.startsWith(pd + '/')) return search.includes('tab=tasks') ? `${pd}?tab=tasks` : pd
-    const hit = ITEMS.find((it) => { const b = it.href.split('?')[0]; return path === b || path.startsWith(b + '/') })
+    if (path === pd || path.startsWith(pd + '/')) return sp?.get('tab') === 'tasks' ? `${pd}?tab=tasks` : pd
+    const hit = ALL_ITEMS.find((it) => { const b = it.href.split('?')[0]; return path === b || path.startsWith(b + '/') })
     return hit ? hit.href : ''
   })()
   const isActive = (it: Item) => it.href === activeHref
+  const activeHubKey = HUBS.find((h) => h.items.some((it) => it.href === activeHref))?.key ?? ''
+
+  // accordion: ค่าเริ่มต้น = เปิด hub ที่มีหน้าปัจจุบัน · ผู้ใช้กดเปิด/ปิดเองได้
+  const [toggled, setToggled] = useState<Record<string, boolean>>({})
+  const isHubOpen = (key: string) => toggled[key] ?? (key === activeHubKey)
+
+  const visMain = MAIN.filter(canSee)
+  const visHubs = HUBS.map((h) => ({ ...h, items: h.items.filter(canSee) })).filter((h) => h.items.length > 0)
+  const visSystem = SYSTEM.filter(canSee)
+  const visMobile = [...visMain, ...visHubs.flatMap((h) => h.items), ...visSystem]
+
+  const Link = ({ it, sub }: { it: Item; sub?: boolean }) => (
+    <a href={it.href} {...linkTarget(it.href)} className={`opsx-link${sub ? ' opsx-sub' : ''}${isActive(it) ? ' active' : ''}`}>
+      <span>{it.icon}</span><span>{it.label}</span>
+    </a>
+  )
+
   return (
     <div className="opsx-shell">
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
-      {/* Desktop = เมนูซ้าย */}
       <aside className="opsx-side">
-        <div className="opsx-brand">ChutiBenz<small>Mini ERP · Command Center</small></div>
-        {visGroups.map((g) => (
-          <div key={g.title}>
-            <div className="opsx-ghead">{g.title}</div>
-            {g.items.map((it) => (
-              <a key={it.label} href={it.href} target={it.href.endsWith('.html') ? '_blank' : undefined} rel={it.href.endsWith('.html') ? 'noopener' : undefined} className={`opsx-link${isActive(it) ? ' active' : ''}`}>
-                <span>{it.icon}</span><span>{it.label}</span>
-              </a>
-            ))}
-          </div>
-        ))}
+        <div className="opsx-brand">ChutiBenz<small>Mini ERP · {ROLE_LABEL[role] || 'Command Center'}</small></div>
+
+        {visMain.length > 0 && <><div className="opsx-ghead">หลัก</div>{visMain.map((it) => <Link key={it.label} it={it} />)}</>}
+
+        {visHubs.length > 0 && (
+          <>
+            <div className="opsx-ghead">ปฏิบัติการ</div>
+            {visHubs.map((h) => {
+              const open = isHubOpen(h.key)
+              const hasActive = h.key === activeHubKey
+              return (
+                <div key={h.key}>
+                  <button type="button" className={`opsx-hub${hasActive ? ' has-active' : ''}`} onClick={() => setToggled((t) => ({ ...t, [h.key]: !open }))}>
+                    <span>{h.icon}</span><span>{h.label}</span><span className={`opsx-caret${open ? ' open' : ''}`}>▶</span>
+                  </button>
+                  {open && h.items.map((it) => <Link key={it.label} it={it} sub />)}
+                </div>
+              )
+            })}
+          </>
+        )}
+
+        {visSystem.length > 0 && <><div className="opsx-ghead">ระบบ</div>{visSystem.map((it) => <Link key={it.label} it={it} />)}</>}
       </aside>
 
-      {/* Mobile = แท็บล่าง */}
       <nav className="opsx-bottom">
         {visMobile.map((it) => (
-          <a key={it.label} href={it.href} target={it.href.endsWith('.html') ? '_blank' : undefined} rel={it.href.endsWith('.html') ? 'noopener' : undefined} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
+          <a key={it.label} href={it.href} {...linkTarget(it.href)} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
             <span className="opsx-bicon">{it.icon}</span><span>{it.label}</span>
           </a>
         ))}
