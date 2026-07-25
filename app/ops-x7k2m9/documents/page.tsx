@@ -294,6 +294,7 @@ export default async function DocumentsPage() {
              duplicate_of, created_at, retry_count, storage_path,
              vendor_name, vendor_tax_id, doc_no, doc_date, subtotal, vat, grand_total, currency, confidence, review_flags`)
     .is('deleted_at', null)
+    .eq('profile', 'accounting') // หน้านี้ = บัญชี · ใบส่งของสต็อกอยู่หน้ารับเข้าสต็อก
     .order('created_at', { ascending: false }).limit(200)
 
   return (
