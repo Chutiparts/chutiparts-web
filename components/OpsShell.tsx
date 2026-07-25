@@ -25,6 +25,7 @@ const GROUPS: Group[] = [
     { href: `${BASE}/sync-stock`, label: 'Sync สต็อก', icon: '🔄' },
     { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
     { href: `${BASE}/sell`, label: 'ขายออก', icon: '🧾' },
+    { href: `${BASE}/inbox`, label: 'กล่องงาน', icon: '📥', ownerOnly: true },
     { href: `${BASE}/documents`, label: 'เอกสาร', icon: '📄', ownerOnly: true },
     { href: `${BASE}/stock-intake`, label: 'รับเข้าสต็อก', icon: '📦', ownerOnly: true },
     { href: `${BASE}/doc-metrics`, label: 'ต้นทุน AI', icon: '📊', ownerOnly: true },
