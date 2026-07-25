@@ -31,17 +31,20 @@ interface HeaderDoc {
 function scorePair(a: HeaderDoc, b: HeaderDoc): { score: number; reasons: string[] } {
   const reasons: string[] = []
   let score = 0
+  // น้ำหนัก: เลขที่ 0.4 · ยอด 0.4 · ผู้ขาย 0.15 · วันที่ 0.15
+  // ตั้งให้ "ยอดตรง + วันที่ตรง" = 0.55 (เกินเกณฑ์) — เผื่อใบส่งของที่ไม่มีเลขที่
+  // แต่ "ยอดตรงอย่างเดียว" = 0.4 (ไม่ถึง) — กันเตือนมั่วกรณีสองบิลคนละใบยอดบังเอิญเท่ากัน
   const aNo = norm(a.doc_no), bNo = norm(b.doc_no)
   if (aNo && bNo && aNo === bNo) { score += 0.4; reasons.push('doc_no_match') }
 
   if (a.grand_total != null && b.grand_total != null && Math.abs(a.grand_total - b.grand_total) < 0.01) {
-    score += 0.35; reasons.push('amount_match')
+    score += 0.4; reasons.push('amount_match')
   }
   const aV = norm(a.vendor_name), bV = norm(b.vendor_name)
   if (aV && bV && (aV === bV || aV.includes(bV) || bV.includes(aV))) { score += 0.15; reasons.push('vendor_similar') }
 
   const d = daysApart(a.doc_date, b.doc_date)
-  if (d <= 3) { score += 0.1; reasons.push('date_proximity') }
+  if (d <= 3) { score += 0.15; reasons.push('date_proximity') }
 
   return { score: Math.min(1, score), reasons }
 }

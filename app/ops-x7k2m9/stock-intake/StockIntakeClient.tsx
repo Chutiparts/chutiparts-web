@@ -26,6 +26,7 @@ const STATE: Record<string, { th: string; bg: string; fg: string }> = {
 const FLAG_TH: Record<string, string> = {
   arithmetic_mismatch: 'ตัวเลขไม่ลงตัว', name_missing: 'ไม่มีชื่อ', name_uncertain: 'ชื่ออ่านไม่ชัด',
   qty_missing: 'ไม่มีจำนวน', price_missing: 'ไม่มีราคา', total_mismatch: 'ยอดรวมไม่ตรง', name_review: 'ควรตรวจชื่อ',
+  possible_duplicate: 'อาจซ้ำ',
 }
 
 const inp: React.CSSProperties = { width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
@@ -118,8 +119,11 @@ export default function StockIntakeClient({
                   {d.original_filename}{d.doc_date ? ` · ${d.doc_date}` : ''}{lines.length ? ` · ${lines.length} รายการ` : ''}
                 </div>
                 {(d.review_flags?.length > 0) && (
-                  <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                     {d.review_flags.map((f) => <span key={f} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e' }}>{FLAG_TH[f] ?? f}</span>)}
+                    {d.review_flags.includes('possible_duplicate') && (
+                      <a href={`/ops-x7k2m9/compare/${d.id}`} style={{ fontSize: 10, fontWeight: 700, color: '#6d28d9', textDecoration: 'underline' }}>เทียบ →</a>
+                    )}
                   </div>
                 )}
                 {d.state === 'failed' && d.error_message && <div style={{ fontSize: 11, color: '#b91c1c', marginTop: 4 }}>{d.error_message}</div>}
