@@ -7,6 +7,7 @@ import { opsAuthed } from '@/lib/ops-auth'
 import OpsGate from '@/components/OpsGate'
 import { intakeFile, DOC_BUCKET } from '@/lib/docbrief-intake'
 import { extractStockDocument, saveStockLine, assignSkusForDocument, confirmStockDocument, type LinePatch } from '@/lib/docbrief-stock'
+import { trashDocument } from '@/lib/docbrief-trash'
 import { checkExtractLimit, checkUploadLimit } from '@/lib/docbrief-ratelimit'
 import StockIntakeClient from './StockIntakeClient'
 
@@ -126,6 +127,15 @@ async function rejectBill(formData: FormData) {
   revalidatePath(PATH)
 }
 
+async function trashBill(formData: FormData) {
+  'use server'
+  if (!(await opsAuthed())) return
+  const id = String(formData.get('id') || '')
+  if (!id) return
+  await trashDocument(svc(), id)
+  revalidatePath(PATH)
+}
+
 async function getPreviewUrl(id: string): Promise<string | null> {
   'use server'
   if (!(await opsAuthed())) return null
@@ -143,6 +153,7 @@ export default async function StockIntakePage() {
   const { data: docs } = await db.from('doc_documents')
     .select('id, state, original_filename, vendor_name, doc_date, grand_total, review_flags, error_category, error_message, retry_count, created_at')
     .eq('profile', 'stock')
+    .is('deleted_at', null)
     .not('state', 'in', '(rejected,duplicate)')
     .order('created_at', { ascending: false })
     .limit(200)
@@ -168,6 +179,7 @@ export default async function StockIntakePage() {
       autoSku={autoSku}
       confirmStock={confirmStock}
       rejectBill={rejectBill}
+      trashBill={trashBill}
       getPreviewUrl={getPreviewUrl}
     />
   )

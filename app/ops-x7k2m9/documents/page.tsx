@@ -12,6 +12,7 @@ import { validateDocument, exportKey, canExport } from '@/lib/docbrief-validate'
 import { exportDocument } from '@/lib/docbrief-export'
 import { getVendorSuggestions } from '@/lib/docbrief-vendors'
 import { checkExtractLimit, checkUploadLimit, loginThrottleDelayMs, recordLoginFailure } from '@/lib/docbrief-ratelimit'
+import { trashDocument } from '@/lib/docbrief-trash'
 import DocumentsClient from './DocumentsClient'
 
 export const dynamic = 'force-dynamic'
@@ -201,6 +202,15 @@ async function rejectDocument(formData: FormData) {
   revalidatePath(PATH)
 }
 
+async function trashDoc(formData: FormData) {
+  'use server'
+  if (!(await authed())) return
+  const id = String(formData.get('id') || '')
+  if (!id) return
+  await trashDocument(svc(), id)
+  revalidatePath(PATH)
+}
+
 // ===== ดูไฟล์ต้นฉบับตอนตรวจ — signed URL อายุสั้น สร้างตอนกดดูเท่านั้น =====
 async function getPreviewUrl(id: string): Promise<string | null> {
   'use server'
@@ -283,6 +293,7 @@ export default async function DocumentsPage() {
     .select(`id, state, original_filename, mime_type, file_size, page_count, error_message, error_category,
              duplicate_of, created_at, retry_count, storage_path,
              vendor_name, vendor_tax_id, doc_no, doc_date, subtotal, vat, grand_total, currency, confidence, review_flags`)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false }).limit(200)
 
   return (
@@ -296,6 +307,7 @@ export default async function DocumentsPage() {
       exportDocuments={exportDocuments}
       getPreviewUrl={getPreviewUrl}
       retryDocument={retryDocument}
+      trashDoc={trashDoc}
       maxRetry={MAX_RETRY}
       maxExportRetry={MAX_EXPORT_RETRY}
       vendors={vendors}

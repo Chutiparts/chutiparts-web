@@ -35,7 +35,7 @@ const GREEN = '#17301F'
 type ConfirmState = { ok: boolean; message?: string } | null
 
 export default function StockIntakeClient({
-  docs, linesByDoc, uploadBills, extractBills, saveLine, autoSku, confirmStock, rejectBill, getPreviewUrl,
+  docs, linesByDoc, uploadBills, extractBills, saveLine, autoSku, confirmStock, rejectBill, trashBill, getPreviewUrl,
 }: {
   docs: Doc[]
   linesByDoc: Record<string, Line[]>
@@ -45,6 +45,7 @@ export default function StockIntakeClient({
   autoSku: (fd: FormData) => Promise<void>
   confirmStock: (prev: ConfirmState, fd: FormData) => Promise<{ ok: boolean; message?: string }>
   rejectBill: (fd: FormData) => Promise<void>
+  trashBill: (fd: FormData) => Promise<void>
   getPreviewUrl: (id: string) => Promise<string | null>
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -134,6 +135,11 @@ export default function StockIntakeClient({
               )}
               <button onClick={() => showPreview(d.id)}
                 style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12, cursor: 'pointer' }}>ดู</button>
+              <form action={trashBill} style={{ display: 'inline' }}>
+                <input type="hidden" name="id" value={d.id} />
+                <button type="submit" title="ทิ้งลงถัง (กู้คืนได้)"
+                  style={{ padding: '6px 9px', borderRadius: 7, border: '1px solid #e5e7eb', background: '#fff', color: '#9ca3af', fontSize: 12, cursor: 'pointer' }}>🗑</button>
+              </form>
             </div>
 
             {/* พรีวิวรูป */}

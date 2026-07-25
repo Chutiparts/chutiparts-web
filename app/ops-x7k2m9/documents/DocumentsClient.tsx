@@ -68,7 +68,7 @@ const readyToConfirm = (d: Doc) => !!d.doc_no?.trim() && d.grand_total != null &
 
 export default function DocumentsClient({
   docs, uploadDocuments, extractDocuments, saveReview, confirmDocument, rejectDocument,
-  exportDocuments, sheetConfigured, getPreviewUrl, retryDocument, maxRetry, maxExportRetry, vendors,
+  exportDocuments, sheetConfigured, getPreviewUrl, retryDocument, trashDoc, maxRetry, maxExportRetry, vendors,
 }: {
   docs: Doc[]
   uploadDocuments: (fd: FormData) => Promise<void>
@@ -80,6 +80,7 @@ export default function DocumentsClient({
   sheetConfigured: boolean
   getPreviewUrl: (id: string) => Promise<string | null>
   retryDocument: (fd: FormData) => Promise<void>
+  trashDoc: (fd: FormData) => Promise<void>
   maxRetry: number
   maxExportRetry: number
   vendors: string[]
@@ -288,6 +289,11 @@ export default function DocumentsClient({
                             {isOpen ? 'ปิด' : d.state === 'pending_review' ? 'ตรวจ' : 'ดู'}
                           </button>
                         )}
+                        <form action={trashDoc} style={{ display: 'inline' }}>
+                          <input type="hidden" name="id" value={d.id} />
+                          <button type="submit" title="ทิ้งลงถัง (กู้คืนได้)"
+                            style={{ marginLeft: 6, padding: '5px 8px', borderRadius: 7, border: '1px solid #e5e7eb', fontSize: 12, background: '#fff', color: '#9ca3af', cursor: 'pointer' }}>🗑</button>
+                        </form>
                       </td>
                     </tr>
 

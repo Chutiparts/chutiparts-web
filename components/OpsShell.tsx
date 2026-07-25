@@ -29,6 +29,7 @@ const GROUPS: Group[] = [
     { href: `${BASE}/documents`, label: 'เอกสาร', icon: '📄', ownerOnly: true },
     { href: `${BASE}/stock-intake`, label: 'รับเข้าสต็อก', icon: '📦', ownerOnly: true },
     { href: `${BASE}/doc-metrics`, label: 'ต้นทุน AI', icon: '📊', ownerOnly: true },
+    { href: `${BASE}/trash`, label: 'ถังทิ้ง', icon: '🗑', ownerOnly: true },
   ]},
   { title: 'ระบบ', items: [
     { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺', ownerOnly: true },

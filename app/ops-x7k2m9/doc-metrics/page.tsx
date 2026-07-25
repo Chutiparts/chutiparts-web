@@ -28,7 +28,7 @@ export default async function DocMetricsPage() {
 
   const [mRes, dRes] = await Promise.all([
     db.from('doc_metrics').select('cost_thb, latency_ms, created_at').gte('created_at', since),
-    db.from('doc_documents').select('state, review_flags, profile, created_at'),
+    db.from('doc_documents').select('state, review_flags, profile, created_at').is('deleted_at', null),
   ])
   const metrics = mRes.data ?? []
   const docs = dRes.data ?? []

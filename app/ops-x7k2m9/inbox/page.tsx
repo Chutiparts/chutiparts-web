@@ -44,6 +44,7 @@ export default async function InboxPage() {
   const { data } = await db.from('doc_documents')
     .select('id, profile, state, vendor_name, original_filename, doc_no, grand_total, review_flags, error_category, error_message, retry_count, created_at, updated_at')
     .in('state', ['pending_review', 'confirmed', 'failed'])
+    .is('deleted_at', null)
     .order('created_at', { ascending: true }) // เก่าสุดก่อน = ค้างนานสุดขึ้นก่อน
     .limit(500)
   const docs = (data ?? []) as Doc[]

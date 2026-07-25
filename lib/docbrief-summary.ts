@@ -25,6 +25,7 @@ export async function getDocSummary(db: SupabaseClient): Promise<DocSummary> {
     const { data, error } = await db
       .from('doc_documents')
       .select('state, created_at, updated_at')
+      .is('deleted_at', null)
       .in('state', ['queued', 'pending_review', 'confirmed', 'failed', 'exported'])
 
     if (error) return EMPTY_SUMMARY // ตารางยังไม่มี / ไม่มีสิทธิ์ → เงียบ ไม่ทำ Daily Brief พัง
