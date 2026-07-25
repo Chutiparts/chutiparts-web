@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { DOC_BUCKET } from './docbrief-intake'
 import { extractStockBill, type StockLine } from './docbrief-extract-stock'
 import { guessCategory } from './docbrief-stock-categories'
+import { checkPossibleDuplicate } from './docbrief-dedup'
 
 // สภาพเริ่มต้นของอะไหล่นำเข้า (owner แก้เป็น A/B/C ได้ตอนตรวจ)
 const DEFAULT_CONDITION = process.env.DOCBRIEF_DEFAULT_CONDITION || 'มือสอง-A'
@@ -176,6 +177,9 @@ export async function extractStockDocument(
 
   // เติม SKU อัตโนมัติทันที (owner แก้ทับได้ในหน้าตรวจ)
   await assignSkusForDocument(db, documentId, actor)
+
+  // ตรวจ "อาจซ้ำ" (blueprint §14)
+  await checkPossibleDuplicate(db, documentId)
 
   return { ok: true, lineCount: ex.lines.length, costThb: r.costThb }
 }

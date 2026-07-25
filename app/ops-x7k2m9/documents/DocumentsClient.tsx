@@ -233,12 +233,15 @@ export default function DocumentsClient({
                         {d.error_message && <div style={{ fontSize: 11.5, color: '#b91c1c' }}>{d.error_message}</div>}
                         {d.duplicate_of && <div style={{ fontSize: 11.5, color: '#b45309' }}>ซ้ำกับเอกสารก่อนหน้า</div>}
                         {flags.length > 0 && (
-                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4, alignItems: 'center' }}>
                             {flags.map((f) => (
                               <span key={f} style={{ background: '#fef3c7', color: '#92400e', borderRadius: 5, padding: '1px 6px', fontSize: 10.5, fontWeight: 600 }}>
                                 {FLAG_LABEL[f] || f}
                               </span>
                             ))}
+                            {flags.includes('possible_duplicate') && (
+                              <a href={`/ops-x7k2m9/compare/${d.id}`} style={{ fontSize: 10.5, fontWeight: 700, color: '#6d28d9', textDecoration: 'underline' }}>เทียบ →</a>
+                            )}
                           </div>
                         )}
                       </td>

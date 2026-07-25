@@ -26,6 +26,7 @@ const FLAG_TH: Record<string, string> = {
   vat_mismatch: 'VAT ผิดปกติ', invalid_tax_id: 'เลขภาษีผิด', future_date: 'วันที่อนาคต',
   arithmetic_mismatch: 'ตัวเลขไม่ลงตัว', name_missing: 'ไม่มีชื่อ', name_uncertain: 'ชื่ออ่านไม่ชัด',
   qty_missing: 'ไม่มีจำนวน', price_missing: 'ไม่มีราคา', total_mismatch: 'ยอดไม่ตรง', name_review: 'ควรตรวจชื่อ',
+  possible_duplicate: 'อาจซ้ำ',
 }
 
 const AGO = (iso: string) => {
@@ -70,8 +71,10 @@ export default async function InboxPage() {
           {items.map((d) => {
             const p = profileBadge(d.profile)
             const flags = (d.review_flags ?? []).filter((f) => FLAG_TH[f])
+            const isDup = (d.review_flags ?? []).includes('possible_duplicate')
+            const href = isDup ? `/ops-x7k2m9/compare/${d.id}` : p.href
             return (
-              <a key={d.id} href={p.href}
+              <a key={d.id} href={href}
                 style={{ display: 'block', border: '1px solid #e5e7eb', borderLeft: `3px solid ${color}`, borderRadius: 10, padding: '10px 14px', background: '#fff', textDecoration: 'none', color: 'inherit' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, background: '#f3f4f6', color: '#374151', whiteSpace: 'nowrap' }}>{p.icon} {p.th}</span>

@@ -4,6 +4,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { DOC_BUCKET } from './docbrief-intake'
 import { validateDocument } from './docbrief-validate'
+import { checkPossibleDuplicate } from './docbrief-dedup'
 
 const API_URL = 'https://api.anthropic.com/v1/messages'
 const MODEL = 'claude-opus-4-8'
@@ -205,6 +206,9 @@ export async function extractDocument(
     cost_thb: Number(costThb.toFixed(4)), input_tokens: inTok, output_tokens: outTok,
     latency_ms: latencyMs, flags, issues,
   })
+
+  // ตรวจ "อาจซ้ำ" หลังมี header ครบ (blueprint §14 · เป็นธงเตือน ไม่ block)
+  await checkPossibleDuplicate(db, documentId)
 
   return { ok: true, costThb }
 }
