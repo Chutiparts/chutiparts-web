@@ -27,8 +27,8 @@ interface HeaderDoc {
   vendor_name: string | null; doc_no: string | null; grand_total: number | null; doc_date: string | null
 }
 
-/** ให้คะแนนความซ้ำระหว่าง 2 ใบ + เหตุผล */
-function scorePair(a: HeaderDoc, b: HeaderDoc): { score: number; reasons: string[] } {
+/** ให้คะแนนความซ้ำระหว่าง 2 ใบ + เหตุผล (export เพื่อทดสอบ) */
+export function scorePair(a: HeaderDoc, b: HeaderDoc): { score: number; reasons: string[] } {
   const reasons: string[] = []
   let score = 0
   // น้ำหนัก: เลขที่ 0.4 · ยอด 0.4 · ผู้ขาย 0.15 · วันที่ 0.15

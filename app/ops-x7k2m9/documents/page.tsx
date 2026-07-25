@@ -13,6 +13,7 @@ import { exportDocument } from '@/lib/docbrief-export'
 import { getVendorSuggestions } from '@/lib/docbrief-vendors'
 import { checkExtractLimit, checkUploadLimit, loginThrottleDelayMs, recordLoginFailure } from '@/lib/docbrief-ratelimit'
 import { trashDocument } from '@/lib/docbrief-trash'
+import { opsAuthed, requirePerm, currentActor, matchRole } from '@/lib/ops-auth'
 import DocumentsClient from './DocumentsClient'
 
 export const dynamic = 'force-dynamic'
@@ -27,10 +28,9 @@ function svc() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+// view gate = ล็อกอินบทบาทใดก็ได้ (RBAC — viewer ก็เปิดดูได้)
 async function authed(): Promise<boolean> {
-  const secret = process.env.ADMIN_OPS_SECRET
-  if (!secret) return false
-  return (await cookies()).get(COOKIE)?.value === secret
+  return opsAuthed()
 }
 
 async function loginOps(formData: FormData) {
@@ -41,33 +41,29 @@ async function loginOps(formData: FormData) {
   if (delay > 0) await new Promise((r) => setTimeout(r, delay))
 
   const pw = String(formData.get('pw') || '')
-  const secret = process.env.ADMIN_OPS_SECRET
-  if (!secret || pw !== secret) {
+  // รับรหัสของบทบาทใดก็ได้ (owner/reviewer/operator/viewer)
+  if (!matchRole(pw)) {
     await recordLoginFailure(db)
     revalidatePath(PATH)
     return
   }
-  if (secret && pw === secret) {
-    // secure: true บังคับ HTTPS — บน localhost (http) เบราว์เซอร์จะทิ้ง cookie ทิ้ง
-    // จึงเปิดเฉพาะ production · prod ยังปลอดภัยเหมือนเดิม
-    ;(await cookies()).set(COOKIE, secret, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30,
-    })
-  }
+  ;(await cookies()).set(COOKIE, pw, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30,
+  })
   revalidatePath(PATH)
 }
 
 async function uploadDocuments(formData: FormData) {
   'use server'
-  if (!(await authed())) return
+  if (!(await requirePerm('upload'))) return
   const files = formData.getAll('file').filter((f): f is File => f instanceof File && f.size > 0)
   const db = svc()
   const gate = await checkUploadLimit(db)
   if (!gate.ok) {
     await db.from('doc_audit').insert({
-      document_id: null, actor: 'owner', action: 'ratelimit.blocked',
+      document_id: null, actor: await currentActor(), action: 'ratelimit.blocked',
       metadata: { kind: 'upload', used: gate.used, limit: gate.limit },
     })
     revalidatePath(PATH)
@@ -82,14 +78,14 @@ async function uploadDocuments(formData: FormData) {
 // Phase 2 (Parse) — อ่านข้อมูลจากบิลด้วย Claude vision · owner กดเอง = คุมต้นทุนชัดเจน
 async function extractDocuments(formData: FormData) {
   'use server'
-  if (!(await authed())) return
+  if (!(await requirePerm('extract'))) return
   const ids = formData.getAll('id').map(String).filter(Boolean)
   const db = svc()
   for (const id of ids) {
     const gate = await checkExtractLimit(db)
     if (!gate.ok) {
       await db.from('doc_audit').insert({
-        document_id: id, actor: 'owner', action: 'ratelimit.blocked',
+        document_id: id, actor: await currentActor(), action: 'ratelimit.blocked',
         metadata: { kind: 'extract', used: gate.used, limit: gate.limit, message: gate.message },
       })
       break // หยุดทั้งชุด ไม่ใช่ข้ามใบเดียว
@@ -114,7 +110,7 @@ const str = (fd: FormData, k: string) => {
 // บันทึกการแก้ไขของคน (ยังไม่ยืนยัน) — validate ใหม่ทุกครั้ง
 async function saveReview(formData: FormData) {
   'use server'
-  if (!(await authed())) return
+  if (!(await requirePerm('edit'))) return
   const id = String(formData.get('id') || '')
   if (!id) return
   const db = svc()
@@ -149,7 +145,7 @@ async function saveReview(formData: FormData) {
   await db.from('doc_documents').update({ ...fields, review_flags: flags, updated_at: new Date().toISOString() }).eq('id', id)
   if (Object.keys(changed).length) {
     await db.from('doc_audit').insert({
-      document_id: id, actor: 'owner', action: 'field.corrected', metadata: { changed, flags },
+      document_id: id, actor: await currentActor(), action: 'field.corrected', metadata: { changed, flags },
     })
   }
   revalidatePath(PATH)
@@ -158,7 +154,7 @@ async function saveReview(formData: FormData) {
 // ยืนยัน — owner เท่านั้น (§8) · คำนวณ export_key จากค่าที่คนยืนยันแล้ว (§5)
 async function confirmDocument(formData: FormData) {
   'use server'
-  if (!(await authed())) return
+  if (!(await requirePerm('confirm'))) return
   const id = String(formData.get('id') || '')
   if (!id) return
   const db = svc()
@@ -178,7 +174,7 @@ async function confirmDocument(formData: FormData) {
 
   await db.from('doc_documents').update({ state: 'confirmed', updated_at: new Date().toISOString() }).eq('id', id)
   await db.from('doc_audit').insert({
-    document_id: id, actor: 'owner', action: 'document.confirmed',
+    document_id: id, actor: await currentActor(), action: 'document.confirmed',
     from_state: 'pending_review', to_state: 'confirmed',
     metadata: { export_key: key, snapshot: d, possible_duplicate: !!dup },
   })
@@ -187,7 +183,7 @@ async function confirmDocument(formData: FormData) {
 
 async function rejectDocument(formData: FormData) {
   'use server'
-  if (!(await authed())) return
+  if (!(await requirePerm('reject'))) return
   const id = String(formData.get('id') || '')
   const reason = String(formData.get('reason') || '').trim() || 'ไม่ระบุเหตุผล'
   if (!id) return
@@ -196,7 +192,7 @@ async function rejectDocument(formData: FormData) {
   if (!d || d.state !== 'pending_review') return
   await db.from('doc_documents').update({ state: 'rejected', updated_at: new Date().toISOString() }).eq('id', id)
   await db.from('doc_audit').insert({
-    document_id: id, actor: 'owner', action: 'document.rejected',
+    document_id: id, actor: await currentActor(), action: 'document.rejected',
     from_state: 'pending_review', to_state: 'rejected', metadata: { reason },
   })
   revalidatePath(PATH)
@@ -204,10 +200,10 @@ async function rejectDocument(formData: FormData) {
 
 async function trashDoc(formData: FormData) {
   'use server'
-  if (!(await authed())) return
+  if (!(await requirePerm('trash'))) return
   const id = String(formData.get('id') || '')
   if (!id) return
-  await trashDocument(svc(), id)
+  await trashDocument(svc(), id, await currentActor())
   revalidatePath(PATH)
 }
 
@@ -235,7 +231,7 @@ const MAX_RETRY = 3
 const MAX_EXPORT_RETRY = 20
 async function retryDocument(formData: FormData) {
   'use server'
-  if (!(await authed())) return
+  if (!(await requirePerm('extract'))) return
   const id = String(formData.get('id') || '')
   if (!id) return
   const db = svc()
@@ -255,7 +251,7 @@ async function retryDocument(formData: FormData) {
     retry_count: (d.retry_count ?? 0) + 1, updated_at: new Date().toISOString(),
   }).eq('id', id)
   await db.from('doc_audit').insert({
-    document_id: id, actor: 'owner', action: 'document.retried',
+    document_id: id, actor: await currentActor(), action: 'document.retried',
     from_state: 'failed', to_state: back,
     metadata: { attempt: (d.retry_count ?? 0) + 1, max: limit },
   })
@@ -265,7 +261,7 @@ async function retryDocument(formData: FormData) {
 // ===== Phase 4 (Export) — ส่งไป Google Sheet · owner กดเอง =====
 async function exportDocuments(formData: FormData) {
   'use server'
-  if (!(await authed())) return
+  if (!(await requirePerm('export'))) return
   const ids = formData.getAll('id').map(String).filter(Boolean)
   const db = svc()
   for (const id of ids) await exportDocument(db, id)

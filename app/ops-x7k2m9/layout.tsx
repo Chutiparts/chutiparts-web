@@ -3,11 +3,14 @@
 // role-access: อ่าน cookie ครั้งเดียว → ส่ง role เข้า OpsShell (team ซ่อนเมนูการเงิน/ระบบ)
 import { cookies } from 'next/headers'
 import OpsShell from '@/components/OpsShell'
+import { opsRole } from '@/lib/ops-auth'
 
 export default async function OpsLayout({ children }: { children: React.ReactNode }) {
+  // RBAC docbrief: owner/reviewer/operator/viewer (จาก cookie ops_admin ตามรหัสที่ตรง)
+  const docRole = await opsRole()
   const c = await cookies()
-  const isOwner = c.get('ops_admin')?.value === process.env.ADMIN_OPS_SECRET
-  const isTeam = !isOwner && !!process.env.TEAM_OPS_SECRET && c.get('ops_team')?.value === process.env.TEAM_OPS_SECRET
-  const role = isOwner ? 'owner' : isTeam ? 'team' : 'guest'
+  // 'team' เดิม (cookie ops_team) — ใช้กับเมนูการเงิน/CRM (ไม่ใช่ docbrief)
+  const isTeam = !docRole && !!process.env.TEAM_OPS_SECRET && c.get('ops_team')?.value === process.env.TEAM_OPS_SECRET
+  const role = docRole ?? (isTeam ? 'team' : 'guest')
   return <OpsShell role={role}>{children}</OpsShell>
 }

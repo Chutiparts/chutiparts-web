@@ -2,7 +2,7 @@
 // เอกสารที่ถูกทิ้ง (deleted_at != null) · กู้คืนได้ · ไม่มีปุ่มลบถาวร (§18)
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
-import { opsAuthed } from '@/lib/ops-auth'
+import { opsAuthed, requirePerm, currentActor } from '@/lib/ops-auth'
 import OpsGate from '@/components/OpsGate'
 import { restoreDocument } from '@/lib/docbrief-trash'
 
@@ -17,10 +17,10 @@ function svc() {
 
 async function restore(formData: FormData) {
   'use server'
-  if (!(await opsAuthed())) return
+  if (!(await requirePerm('restore'))) return // กู้คืน = owner เท่านั้น
   const id = String(formData.get('id') || '')
   if (!id) return
-  await restoreDocument(svc(), id)
+  await restoreDocument(svc(), id, await currentActor())
   revalidatePath(PATH)
 }
 

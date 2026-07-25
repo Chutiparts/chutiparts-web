@@ -7,7 +7,9 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
 const BASE = '/ops-x7k2m9'
-type Item = { href: string; label: string; icon: string; match?: string; ownerOnly?: boolean }
+// doc: true = เมนู docbrief (เห็นได้ทุกบทบาท RBAC owner/reviewer/operator/viewer)
+// ownerOnly: true = เมนูการเงิน/ระบบ (owner เท่านั้น)
+type Item = { href: string; label: string; icon: string; match?: string; ownerOnly?: boolean; doc?: boolean }
 // P0.2 Lean: regroup เป็น Lean 8 · Daily Brief = home · ซ่อนเมนูเดี่ยว CRM/RiskGuard/Finance/ProfitGuard
 // (หน้าเดิมยังเปิดได้ตรง URL — แค่ไม่อยู่ top-level · Level B ค่อยรวมเนื้อหาเข้าโมดูลแม่)
 // #7 AI Search = หน้า public /search (ไม่อยู่เมนู ops · roadmap เดือน 3) · WebChecker → System Monitor (#8)
@@ -25,11 +27,12 @@ const GROUPS: Group[] = [
     { href: `${BASE}/sync-stock`, label: 'Sync สต็อก', icon: '🔄' },
     { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
     { href: `${BASE}/sell`, label: 'ขายออก', icon: '🧾' },
-    { href: `${BASE}/inbox`, label: 'กล่องงาน', icon: '📥', ownerOnly: true },
-    { href: `${BASE}/documents`, label: 'เอกสาร', icon: '📄', ownerOnly: true },
-    { href: `${BASE}/stock-intake`, label: 'รับเข้าสต็อก', icon: '📦', ownerOnly: true },
-    { href: `${BASE}/doc-metrics`, label: 'ต้นทุน AI', icon: '📊', ownerOnly: true },
-    { href: `${BASE}/trash`, label: 'ถังทิ้ง', icon: '🗑', ownerOnly: true },
+    { href: `${BASE}/inbox`, label: 'กล่องงาน', icon: '📥', doc: true },
+    { href: `${BASE}/documents`, label: 'เอกสาร', icon: '📄', doc: true },
+    { href: `${BASE}/stock-intake`, label: 'รับเข้าสต็อก', icon: '📦', doc: true },
+    { href: `${BASE}/repository`, label: 'คลังเอกสาร', icon: '🗂️', doc: true },
+    { href: `${BASE}/doc-metrics`, label: 'ต้นทุน AI', icon: '📊', doc: true },
+    { href: `${BASE}/trash`, label: 'ถังทิ้ง', icon: '🗑', doc: true },
   ]},
   { title: 'ระบบ', items: [
     { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺', ownerOnly: true },
@@ -62,8 +65,16 @@ const CSS = `
 
 export default function OpsShell({ children, role = 'owner' }: { children: React.ReactNode; role?: string }) {
   const path = usePathname() || ''
-  // role-access: team เห็นเฉพาะเมนูที่ไม่ ownerOnly (ซ่อน Daily Brief/Ledger/Landed Cost/Monitor) · owner เห็นครบ
-  const canSee = (it: Item) => role === 'owner' || !it.ownerOnly
+  // role-access:
+  //  - เมนู docbrief (doc) → เห็นได้ทุกบทบาท RBAC (owner/reviewer/operator/viewer)
+  //  - เมนู ownerOnly (การเงิน/ระบบ) → owner เท่านั้น
+  //  - เมนูทั่วไป → ทุกคนที่ล็อกอิน
+  const DOC_ROLES = new Set(['owner', 'reviewer', 'operator', 'viewer'])
+  const canSee = (it: Item) => {
+    if (it.doc) return DOC_ROLES.has(role)
+    if (it.ownerOnly) return role === 'owner'
+    return true
+  }
   const visGroups = GROUPS.map((g) => ({ ...g, items: g.items.filter(canSee) })).filter((g) => g.items.length > 0)
   const visMobile = MOBILE_ITEMS.filter(canSee)
   // ไฮไลต์ทีละปุ่มเดียว: parts-desk แยก Leads/Tasks ด้วย ?tab=tasks · หน้าอื่นเทียบ pathname ตรง ๆ

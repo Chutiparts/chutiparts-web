@@ -3,7 +3,7 @@
 // pattern เดียวกับหน้า documents แต่เก็บ "รายการทีละบรรทัด" (doc_line_items)
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
-import { opsAuthed } from '@/lib/ops-auth'
+import { opsAuthed, requirePerm, currentActor } from '@/lib/ops-auth'
 import OpsGate from '@/components/OpsGate'
 import { intakeFile, DOC_BUCKET } from '@/lib/docbrief-intake'
 import { extractStockDocument, saveStockLine, assignSkusForDocument, confirmStockDocument, type LinePatch } from '@/lib/docbrief-stock'
@@ -23,34 +23,34 @@ function svc() {
 
 async function uploadBills(formData: FormData) {
   'use server'
-  if (!(await opsAuthed())) return
+  if (!(await requirePerm('upload'))) return
   const files = formData.getAll('file').filter((f): f is File => f instanceof File && f.size > 0)
   const db = svc()
   const gate = await checkUploadLimit(db)
   if (!gate.ok) {
     await db.from('doc_audit').insert({
-      document_id: null, actor: 'owner', action: 'ratelimit.blocked',
+      document_id: null, actor: await currentActor(), action: 'ratelimit.blocked',
       metadata: { kind: 'upload', used: gate.used, limit: gate.limit },
     })
     revalidatePath(PATH)
     return
   }
   for (const f of files) {
-    await intakeFile(db, { name: f.name, type: f.type, buffer: Buffer.from(await f.arrayBuffer()) }, 'owner', 'stock')
+    await intakeFile(db, { name: f.name, type: f.type, buffer: Buffer.from(await f.arrayBuffer()) }, await currentActor(), 'stock')
   }
   revalidatePath(PATH)
 }
 
 async function extractBills(formData: FormData) {
   'use server'
-  if (!(await opsAuthed())) return
+  if (!(await requirePerm('extract'))) return
   const ids = formData.getAll('id').map(String).filter(Boolean)
   const db = svc()
   for (const id of ids) {
     const gate = await checkExtractLimit(db)
     if (!gate.ok) {
       await db.from('doc_audit').insert({
-        document_id: id, actor: 'owner', action: 'ratelimit.blocked',
+        document_id: id, actor: await currentActor(), action: 'ratelimit.blocked',
         metadata: { kind: 'extract', used: gate.used, limit: gate.limit, message: gate.message },
       })
       break
@@ -73,7 +73,7 @@ const str = (fd: FormData, k: string) => {
 
 async function saveLine(formData: FormData) {
   'use server'
-  if (!(await opsAuthed())) return
+  if (!(await requirePerm('edit'))) return
   const documentId = String(formData.get('document_id') || '')
   const patch: LinePatch = {
     id: String(formData.get('id') || ''),
@@ -95,7 +95,7 @@ async function saveLine(formData: FormData) {
 
 async function autoSku(formData: FormData) {
   'use server'
-  if (!(await opsAuthed())) return
+  if (!(await requirePerm('edit'))) return
   const id = String(formData.get('id') || '')
   if (!id) return
   await assignSkusForDocument(svc(), id)
@@ -104,7 +104,7 @@ async function autoSku(formData: FormData) {
 
 async function confirmStock(_prev: { ok: boolean; message?: string } | null, formData: FormData): Promise<{ ok: boolean; message?: string }> {
   'use server'
-  if (!(await opsAuthed())) return { ok: false, message: 'ต้องเข้าสู่ระบบ' }
+  if (!(await requirePerm('confirm'))) return { ok: false, message: 'ต้องเข้าสู่ระบบ' }
   const id = String(formData.get('id') || '')
   if (!id) return { ok: false, message: 'ไม่พบเอกสาร' }
   const r = await confirmStockDocument(svc(), id)
@@ -118,21 +118,21 @@ async function confirmStock(_prev: { ok: boolean; message?: string } | null, for
 
 async function rejectBill(formData: FormData) {
   'use server'
-  if (!(await opsAuthed())) return
+  if (!(await requirePerm('reject'))) return
   const id = String(formData.get('id') || '')
   if (!id) return
   const db = svc()
   await db.from('doc_documents').update({ state: 'rejected', updated_at: new Date().toISOString() }).eq('id', id)
-  await db.from('doc_audit').insert({ document_id: id, actor: 'owner', action: 'document.rejected', to_state: 'rejected' })
+  await db.from('doc_audit').insert({ document_id: id, actor: await currentActor(), action: 'document.rejected', to_state: 'rejected' })
   revalidatePath(PATH)
 }
 
 async function trashBill(formData: FormData) {
   'use server'
-  if (!(await opsAuthed())) return
+  if (!(await requirePerm('trash'))) return
   const id = String(formData.get('id') || '')
   if (!id) return
-  await trashDocument(svc(), id)
+  await trashDocument(svc(), id, await currentActor())
   revalidatePath(PATH)
 }
 

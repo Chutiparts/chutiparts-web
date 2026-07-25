@@ -38,6 +38,49 @@ const AGO = (iso: string) => {
 }
 const profileBadge = (p: string) => (p === 'stock' ? { icon: '📦', th: 'สต็อก', href: '/ops-x7k2m9/stock-intake' } : { icon: '📄', th: 'บัญชี', href: '/ops-x7k2m9/documents' })
 
+function Section({ title, hint, items, color }: { title: string; hint: string; items: Doc[]; color: string }) {
+  if (!items.length) return null
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{title}</h2>
+        <span style={{ fontSize: 12, padding: '2px 9px', borderRadius: 999, background: color + '22', color }}>{items.length}</span>
+        <span style={{ fontSize: 12, color: '#9ca3af' }}>{hint}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map((d) => {
+          const p = profileBadge(d.profile)
+          const flags = (d.review_flags ?? []).filter((f) => FLAG_TH[f])
+          const isDup = (d.review_flags ?? []).includes('possible_duplicate')
+          const href = isDup ? `/ops-x7k2m9/compare/${d.id}` : p.href
+          return (
+            <a key={d.id} href={href}
+              style={{ display: 'block', border: '1px solid #e5e7eb', borderLeft: `3px solid ${color}`, borderRadius: 10, padding: '10px 14px', background: '#fff', textDecoration: 'none', color: 'inherit' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, background: '#f3f4f6', color: '#374151', whiteSpace: 'nowrap' }}>{p.icon} {p.th}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {d.vendor_name || d.original_filename}
+                    {d.grand_total != null && <span style={{ fontWeight: 400, color: '#6b7280' }}> · {d.grand_total.toLocaleString()} ฿</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9ca3af' }}>{d.doc_no ? `เลขที่ ${d.doc_no} · ` : ''}{AGO(d.created_at)}</div>
+                </div>
+                <span style={{ fontSize: 12, color: color, fontWeight: 600, whiteSpace: 'nowrap' }}>ทำ →</span>
+              </div>
+              {(flags.length > 0 || (d.state === 'failed' && d.error_message)) && (
+                <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {flags.map((f) => <span key={f} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e' }}>{FLAG_TH[f]}</span>)}
+                  {d.state === 'failed' && d.error_message && <span style={{ fontSize: 10, color: '#b91c1c' }}>{d.error_message.slice(0, 80)}</span>}
+                </div>
+              )}
+            </a>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default async function InboxPage() {
   if (!(await opsAuthed())) return <OpsGate title="📥 กล่องงาน" />
 
@@ -57,49 +100,6 @@ export default async function InboxPage() {
     failed: docs.filter((d) => d.state === 'failed'),
   }
   const total = groups.review.length + groups.send.length + groups.failed.length
-
-  const Section = ({ title, hint, items, color }: { title: string; hint: string; items: Doc[]; color: string }) => {
-    if (!items.length) return null
-    return (
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{title}</h2>
-          <span style={{ fontSize: 12, padding: '2px 9px', borderRadius: 999, background: color + '22', color }}>{items.length}</span>
-          <span style={{ fontSize: 12, color: '#9ca3af' }}>{hint}</span>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {items.map((d) => {
-            const p = profileBadge(d.profile)
-            const flags = (d.review_flags ?? []).filter((f) => FLAG_TH[f])
-            const isDup = (d.review_flags ?? []).includes('possible_duplicate')
-            const href = isDup ? `/ops-x7k2m9/compare/${d.id}` : p.href
-            return (
-              <a key={d.id} href={href}
-                style={{ display: 'block', border: '1px solid #e5e7eb', borderLeft: `3px solid ${color}`, borderRadius: 10, padding: '10px 14px', background: '#fff', textDecoration: 'none', color: 'inherit' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, background: '#f3f4f6', color: '#374151', whiteSpace: 'nowrap' }}>{p.icon} {p.th}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {d.vendor_name || d.original_filename}
-                      {d.grand_total != null && <span style={{ fontWeight: 400, color: '#6b7280' }}> · {d.grand_total.toLocaleString()} ฿</span>}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{d.doc_no ? `เลขที่ ${d.doc_no} · ` : ''}{AGO(d.created_at)}</div>
-                  </div>
-                  <span style={{ fontSize: 12, color: color, fontWeight: 600, whiteSpace: 'nowrap' }}>ทำ →</span>
-                </div>
-                {(flags.length > 0 || (d.state === 'failed' && d.error_message)) && (
-                  <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {flags.map((f) => <span key={f} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e' }}>{FLAG_TH[f]}</span>)}
-                    {d.state === 'failed' && d.error_message && <span style={{ fontSize: 10, color: '#b91c1c' }}>{d.error_message.slice(0, 80)}</span>}
-                  </div>
-                )}
-              </a>
-            )
-          })}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <section style={{ maxWidth: 760, margin: '0 auto', padding: '24px 16px' }}>

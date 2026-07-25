@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { opsAuthed } from '@/lib/ops-auth'
+import { opsAuthed, requirePerm, currentActor } from '@/lib/ops-auth'
 import OpsGate from '@/components/OpsGate'
 import { dismissDuplicate } from '@/lib/docbrief-dedup'
 import { trashDocument } from '@/lib/docbrief-trash'
@@ -25,10 +25,10 @@ const REASON_TH: Record<string, string> = {
 
 async function notDuplicate(formData: FormData) {
   'use server'
-  if (!(await opsAuthed())) return
+  if (!(await requirePerm('dedup'))) return
   const id = String(formData.get('id') || '')
   if (!id) return
-  await dismissDuplicate(svc(), id)
+  await dismissDuplicate(svc(), id, await currentActor())
   const back = String(formData.get('back') || '/ops-x7k2m9/documents')
   revalidatePath(back)
   redirect(back)
@@ -36,11 +36,11 @@ async function notDuplicate(formData: FormData) {
 
 async function isDuplicate(formData: FormData) {
   'use server'
-  if (!(await opsAuthed())) return
+  if (!(await requirePerm('dedup'))) return
   const id = String(formData.get('id') || '')
   if (!id) return
-  await trashDocument(svc(), id) // ซ้ำจริง → ลงถังทิ้ง (กู้คืนได้ ไม่ลบจริง)
-  redirect('/ops-x7k2m9/documents')
+  await trashDocument(svc(), id, await currentActor()) // ซ้ำจริง → ลงถังทิ้ง (กู้คืนได้ ไม่ลบจริง)
+  redirect(String(formData.get('back') || '/ops-x7k2m9/documents'))
 }
 
 type Doc = {
@@ -130,6 +130,7 @@ export default async function ComparePage(props: { params: Promise<{ id: string 
             </form>
             <form action={isDuplicate}>
               <input type="hidden" name="id" value={id} />
+              <input type="hidden" name="back" value={back} />
               <button type="submit" style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: '#b45309', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                 🗑 เป็นเอกสารซ้ำ → ย้ายไปถังทิ้ง
               </button>

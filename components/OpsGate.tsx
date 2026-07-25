@@ -4,14 +4,15 @@
 // secure cookie เฉพาะตอน production เท่านั้น (ไม่งั้นล็อกอินบน localhost ไม่ผ่าน)
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
-import { OPS_COOKIE } from '@/lib/ops-auth'
+import { OPS_COOKIE, matchRole } from '@/lib/ops-auth'
 
 async function loginOps(formData: FormData) {
   'use server'
   const pw = String(formData.get('pw') || '')
-  const secret = process.env.ADMIN_OPS_SECRET
-  if (secret && pw === secret) {
-    ;(await cookies()).set(OPS_COOKIE, secret, {
+  // รับรหัสของบทบาทใดก็ได้ (owner/reviewer/operator/viewer) — เก็บค่ารหัสใน cookie
+  // opsRole() จะ map ค่ากลับเป็นบทบาทเอง · ไม่ตั้ง role secret = มีแค่ owner (เดิม)
+  if (matchRole(pw)) {
+    ;(await cookies()).set(OPS_COOKIE, pw, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
