@@ -47,6 +47,34 @@ const ARITHMETIC_TOLERANCE = 0.02 // บาท (§4.1)
 const VAT_SANITY_TOLERANCE = 1.0 // บาท (§4.1)
 const CONF_THRESHOLD = 0.85 // ใช้เป็น fallback เท่านั้น (§3)
 
+const r2 = (n: number) => Math.round(n * 100) / 100
+
+export type VatModel = 'exclusive' | 'inclusive' | 'mismatch'
+
+/**
+ * เทียบยอดว่าเป็นราคาแยก VAT (exclusive) หรือราคารวม VAT (inclusive)
+ * - exclusive: subtotal + vat = grand_total (ราคายังไม่รวม VAT แล้วบวก VAT เข้า)
+ * - inclusive: grand_total รวม VAT อยู่แล้ว → VAT ที่ฝัง = grand_total × 7/107
+ *   (เคสไทยที่บิลโชว์ราคารวม VAT เป็น subtotal แล้วแตก VAT ออกมา ทำให้ subtotal+vat ≠ total)
+ * คืน model + VAT ที่ควรเป็นตาม model นั้น
+ */
+export function reconcileVat(subtotal: number, vat: number, grandTotal: number): { model: VatModel; expectedVat: number } {
+  // exclusive — ยอดบวกลงตัวตรง ๆ
+  if (Math.abs(subtotal + vat - grandTotal) <= ARITHMETIC_TOLERANCE) {
+    return { model: 'exclusive', expectedVat: r2(subtotal * VAT_RATE) }
+  }
+  // inclusive — grand_total รวม VAT แล้ว
+  const netBase = r2((grandTotal * 100) / 107)
+  const embeddedVat = r2(grandTotal - netBase)
+  const vatOk = Math.abs(vat - embeddedVat) <= VAT_SANITY_TOLERANCE
+  // subtotal ที่โชว์อาจเป็นราคารวม (≈ grand_total) หรือฐานก่อน VAT (≈ netBase)
+  const subtotalOk =
+    Math.abs(subtotal - grandTotal) <= ARITHMETIC_TOLERANCE ||
+    Math.abs(subtotal - netBase) <= VAT_SANITY_TOLERANCE
+  if (vatOk && subtotalOk) return { model: 'inclusive', expectedVat: embeddedVat }
+  return { model: 'mismatch', expectedVat: r2(subtotal * VAT_RATE) }
+}
+
 /**
  * ตรวจเอกสาร 1 ใบ คืน flags + รายละเอียดปัญหา
  * ไม่ตัดสินใจแทนคน — แค่ตั้งธงให้ owner ดู (confirm-before-write §2)
@@ -72,22 +100,25 @@ export function validateDocument(f: DocFields): { flags: string[]; issues: Issue
   let arithmeticOk = false
 
   if (hasBreakdown) {
-    const diff = Math.abs(f.subtotal! + f.vat! - f.grand_total!)
-    if (diff > ARITHMETIC_TOLERANCE) {
-      add('validation_failed', 'grand_total',
-        `ก่อน VAT + VAT ≠ ยอดสุทธิ (ต่าง ${diff.toFixed(2)} บาท)`)
-    } else {
+    const rec = reconcileVat(f.subtotal!, f.vat!, f.grand_total!)
+    if (rec.model === 'exclusive') {
       arithmeticOk = true // ← เลขบวกลงตัว = อ่านถูกแน่นอน (§3)
-    }
-
-    // VAT sanity 7%
-    const expected = Math.round(f.subtotal! * VAT_RATE * 100) / 100
-    if (f.vat === 0) {
-      add('vat_mismatch', 'vat', 'VAT = 0 (สินค้ายกเว้น VAT?) — ให้คนยืนยัน')
-    } else if (Math.abs(f.vat! - expected) > VAT_SANITY_TOLERANCE) {
-      const rate = f.subtotal ? ((f.vat! / f.subtotal!) * 100).toFixed(2) : '?'
-      add('vat_mismatch', 'vat',
-        `VAT ไม่ใช่ 7% (คิดได้ ${rate}% · คาดว่า ${expected.toFixed(2)}) — อาจเป็นราคารวม VAT หรือมีของยกเว้น`)
+      // VAT sanity 7% (เฉพาะราคาแยก VAT)
+      if (f.vat === 0) {
+        add('vat_mismatch', 'vat', 'VAT = 0 (สินค้ายกเว้น VAT?) — ให้คนยืนยัน')
+      } else if (Math.abs(f.vat! - rec.expectedVat) > VAT_SANITY_TOLERANCE) {
+        const rate = f.subtotal ? ((f.vat! / f.subtotal!) * 100).toFixed(2) : '?'
+        add('vat_mismatch', 'vat',
+          `VAT ไม่ใช่ 7% (คิดได้ ${rate}% · คาดว่า ${rec.expectedVat.toFixed(2)}) — อาจมีของยกเว้น VAT`)
+      }
+    } else if (rec.model === 'inclusive') {
+      arithmeticOk = true // ยอดสอดคล้องแบบ "ราคารวม VAT" = อ่านถูก (ไม่ใช่ fail)
+      add('vat_inclusive', 'vat',
+        `บิลนี้เป็นราคารวม VAT แล้ว (VAT ฝังใน ≈ ${rec.expectedVat.toFixed(2)} บาท) — ตรวจยอดผ่าน`)
+    } else {
+      const diff = Math.abs(f.subtotal! + f.vat! - f.grand_total!)
+      add('validation_failed', 'grand_total',
+        `ก่อน VAT + VAT ≠ ยอดสุทธิ (ต่าง ${diff.toFixed(2)} บาท) และไม่เข้าเงื่อนไขราคารวม VAT`)
     }
   }
   // ถ้าไม่มี subtotal/vat (เช่น ใบเสร็จศุลกากร/ภ.พ.30) → ข้าม ไม่ใช่ fail (§3 †)

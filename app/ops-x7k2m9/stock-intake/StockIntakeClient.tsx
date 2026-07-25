@@ -35,11 +35,14 @@ const GREEN = '#17301F'
 
 type ConfirmState = { ok: boolean; message?: string } | null
 
+type NameWarn = { part_name: string; sku: string | null; similarity: number }
+
 export default function StockIntakeClient({
-  docs, linesByDoc, uploadBills, extractBills, saveLine, autoSku, confirmStock, rejectBill, trashBill, getPreviewUrl,
+  docs, linesByDoc, warnByLine = {}, uploadBills, extractBills, saveLine, autoSku, confirmStock, rejectBill, trashBill, getPreviewUrl,
 }: {
   docs: Doc[]
   linesByDoc: Record<string, Line[]>
+  warnByLine?: Record<string, NameWarn[]>
   uploadBills: (fd: FormData) => Promise<void>
   extractBills: (fd: FormData) => Promise<void>
   saveLine: (fd: FormData) => Promise<void>
@@ -169,7 +172,7 @@ export default function StockIntakeClient({
                     </button>
                   </form>
                 </div>
-                {lines.map((l) => <LineForm key={l.id} line={l} saveLine={saveLine} pending={pending} start={start} />)}
+                {lines.map((l) => <LineForm key={l.id} line={l} warn={warnByLine[l.id]} saveLine={saveLine} pending={pending} start={start} />)}
               </div>
             )}
 
@@ -224,8 +227,8 @@ function ConfirmFooter({ docId, lines, confirmStock, rejectBill }: {
   )
 }
 
-function LineForm({ line, saveLine, pending, start }: {
-  line: Line; saveLine: (fd: FormData) => Promise<void>; pending: boolean; start: React.TransitionStartFunction
+function LineForm({ line, warn, saveLine, pending, start }: {
+  line: Line; warn?: NameWarn[]; saveLine: (fd: FormData) => Promise<void>; pending: boolean; start: React.TransitionStartFunction
 }) {
   const [saved, setSaved] = useState(false)
   const flags = line.review_flags ?? []
@@ -247,7 +250,15 @@ function LineForm({ line, saveLine, pending, start }: {
       {/* จาก AI */}
       <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 110px', gap: 8, marginBottom: 8 }}>
         <div><label style={lbl}>จำนวน</label><input name="qty" defaultValue={line.qty ?? ''} style={inp} inputMode="numeric" /></div>
-        <div><label style={lbl}>ชื่ออะไหล่</label><input name="part_name" defaultValue={line.part_name ?? ''} style={{ ...inp, borderColor: flags.includes('name_uncertain') ? '#fbbf24' : '#d1d5db' }} /></div>
+        <div>
+          <label style={lbl}>ชื่ออะไหล่</label>
+          <input name="part_name" defaultValue={line.part_name ?? ''} style={{ ...inp, borderColor: warn?.length ? '#fb923c' : flags.includes('name_uncertain') ? '#fbbf24' : '#d1d5db' }} />
+          {warn?.length ? (
+            <div style={{ fontSize: 10.5, color: '#c2410c', marginTop: 3, lineHeight: 1.4 }}>
+              ⚠️ คล้ายของเดิม: {warn.map((w) => `${w.part_name}${w.sku ? ` (${w.sku})` : ''}`).join(' · ')} — ถ้าเป็นตัวเดียวกันให้เติมจำนวนในสต็อกเดิมแทน
+            </div>
+          ) : null}
+        </div>
         <div><label style={lbl}>ต้นทุน/ชิ้น</label><input name="unit_price" defaultValue={line.unit_price ?? ''} style={inp} inputMode="numeric" /></div>
       </div>
       {/* เติมเอง */}

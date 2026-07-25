@@ -9,6 +9,7 @@ import { intakeFile, DOC_BUCKET } from '@/lib/docbrief-intake'
 import { extractStockDocument, saveStockLine, assignSkusForDocument, confirmStockDocument, type LinePatch } from '@/lib/docbrief-stock'
 import { trashDocument } from '@/lib/docbrief-trash'
 import { checkExtractLimit, checkUploadLimit } from '@/lib/docbrief-ratelimit'
+import { findSimilarNames } from '@/lib/docbrief-name-match'
 import StockIntakeClient from './StockIntakeClient'
 
 export const dynamic = 'force-dynamic'
@@ -169,10 +170,25 @@ export default async function StockIntakePage() {
     ;(byDoc[row.document_id as string] ??= []).push(row)
   }
 
+  // B2: เตือน "ชื่ออะไหล่คล้ายของเดิม" กันสร้างสต็อกซ้ำ — เฉพาะบรรทัดในใบที่รอตรวจ
+  const pendingIds = new Set((docs ?? []).filter((d) => d.state === 'pending_review').map((d) => d.id))
+  const warnByLine: Record<string, { part_name: string; sku: string | null; similarity: number }[]> = {}
+  if ((lines ?? []).some((l) => pendingIds.has((l as Record<string, unknown>).document_id as string))) {
+    const { data: stock } = await db.from('stock_records').select('sku, part_name').limit(5000)
+    const existing = (stock ?? []) as { sku: string | null; part_name: string | null }[]
+    for (const l of lines ?? []) {
+      const row = l as Record<string, unknown>
+      if (!pendingIds.has(row.document_id as string)) continue
+      const matches = findSimilarNames(row.part_name as string | null, existing).slice(0, 2)
+      if (matches.length) warnByLine[row.id as string] = matches
+    }
+  }
+
   return (
     <StockIntakeClient
       docs={docs ?? []}
       linesByDoc={byDoc as never}
+      warnByLine={warnByLine}
       uploadBills={uploadBills}
       extractBills={extractBills}
       saveLine={saveLine}

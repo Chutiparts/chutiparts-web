@@ -46,6 +46,7 @@ const FLAG_LABEL: Record<string, string> = {
   missing_doc_no: 'ไม่มีเลขที่เอกสาร',
   validation_failed: 'ข้อมูลไม่ผ่านการตรวจ',
   vat_mismatch: 'VAT ผิดปกติ',
+  vat_inclusive: 'ราคารวม VAT',
   invalid_tax_id: 'เลขภาษีไม่ถูกต้อง',
   future_date: 'วันที่อนาคต',
   low_confidence: 'อ่านไม่ชัด',
