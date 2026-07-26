@@ -97,14 +97,17 @@ const btn = (bg: string, fg = '#fff'): React.CSSProperties => ({ background: bg,
 const STATUS_TH: Record<string, string> = { raw: 'ดิบ', cleaned: 'ล้างแล้ว', reviewed: 'ตรวจแล้ว', published: 'เผยแพร่', rejected: 'ตัดทิ้ง' }
 const STATUS_COLOR: Record<string, string> = { raw: '#6b7280', cleaned: '#2563eb', reviewed: '#8a5a12', published: '#166534', rejected: '#a32d2d' }
 
-export default async function GaragesAdmin({ searchParams }: { searchParams: Promise<{ status?: string; imported?: string; updated?: string; err?: string }> }) {
+export default async function GaragesAdmin({ searchParams }: { searchParams: Promise<{ status?: string; imported?: string; updated?: string; err?: string; q?: string }> }) {
   if (!(await opsAuthed())) return <OpsGate title="🔧 อู่เบนซ์ทั่วไทย (แอดมิน)" />
   const sp = await searchParams
   const filter = sp.status && STATUSES.includes(sp.status as (typeof STATUSES)[number]) ? sp.status : 'cleaned'
+  const q = (sp.q || '').trim().replace(/[%,()]/g, '')  // sanitize ให้ ilike ปลอดภัย
 
   const db = svc()
+  let listQ = db.from('garages').select('*').eq('status', filter)
+  if (q) listQ = listQ.or(`name_th.ilike.%${q}%,province.ilike.%${q}%,slug.ilike.%${q}%`)
   const [{ data: listData }, { data: allData }] = await Promise.all([
-    db.from('garages').select('*').eq('status', filter).order('last_seen_at', { ascending: false, nullsFirst: false }).limit(200),
+    listQ.order('last_seen_at', { ascending: false, nullsFirst: false }).limit(200),
     db.from('garages').select('status'),
   ])
   const list = (listData || []) as G[]
@@ -142,16 +145,27 @@ export default async function GaragesAdmin({ searchParams }: { searchParams: Pro
         </div>
       </form>
 
+      {/* ค้นหา */}
+      <form method="get" action="/ops-x7k2m9/garages" style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <input type="hidden" name="status" value={filter} />
+        <input name="q" defaultValue={q} placeholder="🔎 ค้นหาชื่ออู่ / จังหวัด / slug (เช่น ฮีโน่, บางกะปิ)"
+          style={{ flex: 1, padding: 9, border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13 }} />
+        <button style={btn('#123a5e')}>ค้นหา</button>
+        {q && <a href={`/ops-x7k2m9/garages?status=${filter}`} style={{ ...btn('#fff', '#374151'), textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>ล้าง</a>}
+      </form>
+
       {/* status filter */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         {STATUSES.map((st) => (
-          <Link key={st} href={`/ops-x7k2m9/garages?status=${st}`}
+          <Link key={st} href={`/ops-x7k2m9/garages?status=${st}${q ? `&q=${encodeURIComponent(q)}` : ''}`}
             style={{ textDecoration: 'none', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700,
               background: filter === st ? STATUS_COLOR[st] : '#fff', color: filter === st ? '#fff' : '#374151', border: '1px solid #e5e7eb' }}>
             {STATUS_TH[st]} ({counts[st] || 0})
           </Link>
         ))}
       </div>
+
+      {q && <p style={{ fontSize: 12.5, color: '#6b7280', margin: '0 0 10px' }}>🔎 ผลค้นหา “{q}” ในสถานะ {STATUS_TH[filter]} — พบ {list.length} อู่</p>}
 
       {/* list */}
       {list.length === 0 ? (
