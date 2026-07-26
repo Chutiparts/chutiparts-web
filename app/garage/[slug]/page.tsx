@@ -10,8 +10,17 @@ export const dynamic = 'force-dynamic'
 
 type Service = { service_key: string; service_label: string | null }
 
+// slug ภาษาไทยใน URL อาจมาเป็น %-encoded / normalization ต่างกัน — ถอด + normalize ให้ตรงกับที่เก็บใน DB
+function decodeSlug(raw: string): string {
+  let s = raw
+  try { s = decodeURIComponent(raw) } catch { /* ไม่ใช่ %-encoded */ }
+  try { s = s.normalize('NFC') } catch { /* noop */ }
+  return s
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
+  const { slug: raw } = await params
+  const slug = decodeSlug(raw)
   const supabase = await createClient()
   const { data } = await supabase.from('garages').select('name_th, province, description').eq('slug', slug).eq('status', 'published').single()
   if (!data) return { title: 'ไม่พบอู่' }
@@ -23,7 +32,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function GarageDetail({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
+  const { slug: raw } = await params
+  const slug = decodeSlug(raw)
   const supabase = await createClient()
   const { data: g } = await supabase.from('garages').select('*').eq('slug', slug).eq('status', 'published').single()
   if (!g) notFound()
