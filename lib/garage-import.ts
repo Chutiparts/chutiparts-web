@@ -2,9 +2,21 @@
 // spec §Data pipeline ขั้น 2 (clean/normalize) + ขั้น 3 (dedupe)
 // pure functions ทั้งหมด (มี unit test) — ตัว write DB อยู่ในหน้า admin
 // หมายเหตุ: inline รายชื่อจังหวัด (ไม่ import benz-provinces) เพื่อให้ไฟล์นี้ test ได้ด้วย node --test
+// จังหวัดไทยครบ 77 (ให้ detectProvince ครอบทุกจังหวัด) — sync กับ lib/benz-provinces.ts
 const PROVINCE_TH = [
-  'กรุงเทพมหานคร', 'นนทบุรี', 'ปทุมธานี', 'สมุทรปราการ', 'ชลบุรี',
-  'เชียงใหม่', 'ภูเก็ต', 'ขอนแก่น', 'นครราชสีมา', 'สงขลา',
+  'กรุงเทพมหานคร', 'สมุทรปราการ', 'นนทบุรี', 'ปทุมธานี', 'พระนครศรีอยุธยา', 'อ่างทอง',
+  'ลพบุรี', 'สิงห์บุรี', 'ชัยนาท', 'สระบุรี', 'นครนายก', 'นครปฐม',
+  'สมุทรสาคร', 'สมุทรสงคราม', 'สุพรรณบุรี', 'กาญจนบุรี', 'ราชบุรี', 'เพชรบุรี',
+  'ประจวบคีรีขันธ์', 'ชลบุรี', 'ระยอง', 'จันทบุรี', 'ตราด', 'ฉะเชิงเทรา',
+  'ปราจีนบุรี', 'สระแก้ว', 'เชียงใหม่', 'เชียงราย', 'ลำพูน', 'ลำปาง',
+  'อุตรดิตถ์', 'แพร่', 'น่าน', 'พะเยา', 'แม่ฮ่องสอน', 'นครสวรรค์',
+  'อุทัยธานี', 'กำแพงเพชร', 'ตาก', 'สุโขทัย', 'พิษณุโลก', 'พิจิตร',
+  'เพชรบูรณ์', 'นครราชสีมา', 'บุรีรัมย์', 'สุรินทร์', 'ศรีสะเกษ', 'อุบลราชธานี',
+  'ยโสธร', 'ชัยภูมิ', 'อำนาจเจริญ', 'หนองบัวลำภู', 'ขอนแก่น', 'อุดรธานี',
+  'เลย', 'หนองคาย', 'มหาสารคาม', 'ร้อยเอ็ด', 'กาฬสินธุ์', 'สกลนคร',
+  'นครพนม', 'มุกดาหาร', 'บึงกาฬ', 'นครศรีธรรมราช', 'กระบี่', 'พังงา',
+  'ภูเก็ต', 'สุราษฎร์ธานี', 'ระนอง', 'ชุมพร', 'สงขลา', 'สตูล',
+  'ตรัง', 'พัทลุง', 'ปัตตานี', 'ยะลา', 'นราธิวาส',
 ]
 
 export type RawApify = Record<string, unknown>
@@ -74,6 +86,13 @@ export function detectProvince(text: string): string | null {
   return null
 }
 
+/** เดาว่า "อาจไม่ใช่อู่เบนซ์เฉพาะทาง" จากชื่อ → ให้ติดธงตรวจมือ (ไม่ auto-reject) */
+export function looksNonBenz(name: string): boolean {
+  const t = (name || '').toLowerCase()
+  if (/เบนซ์|benz|mercedes|ยุโรป|euro|amg/i.test(t)) return false
+  return /ฮีโน่|hino|อีซูซุ|isuzu|มินิบัส|รถบัส|รถบรรทุก|บรรทุก|หม้อน้ำ|ซ่อมแอร์|แอร์รถยนต์|จักรยานยนต์|มอเตอร์ไซค์/i.test(t)
+}
+
 /** raw record (Apify Google Maps) → GarageRow ที่ normalize แล้ว */
 export function normalizeApify(raw: RawApify): GarageRow {
   const name = str(get(raw, 'title') ?? get(raw, 'name') ?? get(raw, 'name_th')) || ''
@@ -93,7 +112,7 @@ export function normalizeApify(raw: RawApify): GarageRow {
   const token = placeId ? hash36(placeId) : hash36(name + (province || ''))
 
   // ต้องตรวจมือถ้า: ไม่มีชื่อ, ไม่มีจังหวัด, หรือไม่มีช่องทางติดต่อ/แผนที่เลย
-  const needsReview = !name || !province || (!phone && !website && !mapsUrl)
+  const needsReview = !name || !province || (!phone && !website && !mapsUrl) || looksNonBenz(name)
 
   return {
     name_th: name,
