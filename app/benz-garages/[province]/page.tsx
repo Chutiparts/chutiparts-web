@@ -1,10 +1,11 @@
 // app/benz-garages/[province]/page.tsx — หน้าจังหวัด (province)
 // spec §โครงหน้าเว็บ 2) หน้าจังหวัด (H1 · intro · summary · list · FAQ)
+// อัปเดต 26 ก.ค. 2026: เอาป้ายเดโมออก (มีอู่จริงแล้ว)
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { provinceBySlug } from '@/lib/benz-provinces'
-import { GarageCard, DemoBanner, type Garage } from '../../garage/_components'
+import { GarageCard, type Garage } from '../../garage/_components'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,8 +49,6 @@ export default async function ProvincePage({ params }: { params: Promise<{ provi
           รวมอู่ซ่อมเบนซ์ในพื้นที่{p.th} — พบ <b>{garages.length}</b> อู่ พร้อมข้อมูลติดต่อ พิกัด และคะแนนรีวิวเบื้องต้น
         </p>
       </header>
-
-      <DemoBanner />
 
       {garages.length === 0 ? (
         <div className="rounded-xl border bg-white p-10 text-center text-gray-500">
