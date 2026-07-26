@@ -38,6 +38,7 @@ const HUBS: Hub[] = [
   ]},
 ]
 const SYSTEM: Item[] = [
+  { href: `${BASE}/garages`, label: 'อู่เบนซ์ (directory)', icon: '🔧', ownerOnly: true },
   { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺', ownerOnly: true },
 ]
 const ALL_ITEMS: Item[] = [...MAIN, ...HUBS.flatMap((h) => h.items), ...SYSTEM]

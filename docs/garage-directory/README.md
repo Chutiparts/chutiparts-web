@@ -75,4 +75,26 @@ select id, name_th, province, status from garages;
 
 ---
 
-*Phase 1 (schema) พร้อม deploy · สร้าง 2026-07-26 · ต่อจาก garage directory spec*
+---
+
+## ✅ Importer + Admin review (พร้อมใช้ — Phase 1 ที่เหลือ + acceptance "Review")
+
+**หน้าแอดมิน:** `/ops-x7k2m9/garages` (owner login) — หรือเมนู ระบบ → "อู่เบนซ์ (directory)"
+
+**วิธีใช้กับ Apify Free:**
+1. รัน Apify Google Maps scraper — query `อู่เบนซ์ + <จังหวัด>` (ตั้ง cap ~50-100/query)
+2. ที่ Apify dataset → **Export → JSON** → copy ทั้ง array
+3. หน้าแอดมิน → กล่อง "📥 นำเข้าจาก Apify" → วาง JSON → ใส่ป้ายกำกับ → **นำเข้า + ประมวลผล**
+   - เก็บ raw ลง `garage_snapshots` อัตโนมัติ (audit-first)
+   - normalize (ชื่อ/จังหวัด/เบอร์/พิกัด) + **dedupe ด้วย place_id** (ซ้ำ→อัปเดต last_seen, ใหม่→insert status=cleaned)
+   - รองรับ field Apify: `title/name, address, phone, website, totalScore, reviewsCount, location.lat/lng, url, placeId`
+4. กรองสถานะ "ล้างแล้ว" → ตรวจแต่ละอู่ (มีธง ⚠ ต้องตรวจ ถ้าข้อมูลไม่ครบ) → กด **✓ เผยแพร่** / **ตัดทิ้ง** (พร้อมเหตุผล) / **ตรวจแล้ว**
+5. เฉพาะสถานะ **"เผยแพร่"** เท่านั้นที่ขึ้นเว็บสาธารณะ (RLS)
+
+**logic (มี unit test):** `lib/garage-import.ts` — normalizeApify · dedupeBatch · findDuplicate · detectProvince · slugify (`npm test`)
+
+**ลบ seed ตัวอย่างเมื่อมีข้อมูลจริงพอ:** `delete from garages where source='manual-seed-sample';`
+
+---
+
+*Phase 1 (schema) + Phase 2 (เว็บ) + Importer/Admin เสร็จ · อัปเดต 2026-07-26 · ต่อจาก garage directory spec*
