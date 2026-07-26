@@ -46,8 +46,8 @@ export function GarageCard({ g }: { g: Garage }) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-bold truncate">{g.name_th}</div>
-          <div className="text-xs text-gray-500 mt-0.5">
+          <div className="font-bold truncate text-gray-900">{g.name_th}</div>
+          <div className="text-xs text-gray-600 mt-0.5">
             📍 {g.province || '-'}
             {g.district && g.district !== '-' ? `, ${g.district}` : ''}
           </div>

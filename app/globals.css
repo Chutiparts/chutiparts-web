@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;              /* เว็บออกแบบเป็น light อย่างเดียว (header เขียวเข้ม + การ์ดขาว hardcode) */
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -12,12 +13,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ไม่รองรับ dark mode — การ์ด/พื้นหลังทั้งเว็บ hardcode เป็นสว่าง ถ้าปล่อย dark จะได้ตัวอักษรจางบนการ์ดขาว */
 
 body {
   background: var(--background);
