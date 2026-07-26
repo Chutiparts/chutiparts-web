@@ -1,9 +1,11 @@
 // app/benz-garages-thailand/page.tsx — หน้ารวมประเทศ "อู่เบนซ์ทั่วไทย" (country)
 // spec §โครงหน้าเว็บ 1) หน้ารวมประเทศ · §Naming
+// อัปเดต 26 ก.ค. 2026: เอาป้ายเดโมออก (มีอู่จริงแล้ว) · กริดจังหวัดไดนามิก (เฉพาะจังหวัดที่มีอู่) · เพิ่มช่องค้นหา
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
-import { PROVINCES } from '@/lib/benz-provinces'
-import { GarageCard, DemoBanner, type Garage } from '../garage/_components'
+import { provinceSlug } from '@/lib/benz-provinces'
+import { type Garage } from '../garage/_components'
+import { GarageSearch } from '../garage/GarageSearch'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,9 +33,14 @@ export default async function BenzGaragesThailand({
     .eq('status', 'published')
   const garages = (data || []) as Garage[]
 
-  // นับจำนวนต่อจังหวัด
+  // นับจำนวนต่อจังหวัด (เฉพาะที่มี province จริง)
   const countByProvince: Record<string, number> = {}
   for (const g of garages) if (g.province) countByProvince[g.province] = (countByProvince[g.province] || 0) + 1
+
+  // กริดจังหวัด = เฉพาะจังหวัดที่มีอู่จริง เรียงจากมากไปน้อย
+  const provincesWithData = Object.entries(countByProvince)
+    .map(([th, count]) => ({ th, count, slug: provinceSlug(th) }))
+    .sort((a, b) => b.count - a.count)
 
   // เรียงลิสต์รวม
   const sorted = [...garages].sort((a, b) => {
@@ -63,31 +70,29 @@ export default async function BenzGaragesThailand({
         </p>
       </header>
 
-      <DemoBanner />
+      {/* CTA / province jump — เฉพาะจังหวัดที่มีอู่จริง */}
+      {provincesWithData.length > 0 && (
+        <section className="mb-7">
+          <h2 className="text-lg font-bold mb-3">รวมอู่เบนซ์ตามจังหวัด</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+            {provincesWithData.map((p) => (
+              <Link
+                key={p.slug}
+                href={`/benz-garages/${p.slug}`}
+                className="rounded-xl border bg-white px-3 py-3 hover:border-[#C9A961] hover:shadow-sm transition"
+              >
+                <div className="font-semibold text-sm">{p.th}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{p.count} อู่</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* CTA / province jump */}
-      <section className="mb-7">
-        <h2 className="text-lg font-bold mb-3">รวมอู่เบนซ์ตามจังหวัด</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
-          {PROVINCES.map((p) => (
-            <Link
-              key={p.slug}
-              href={`/benz-garages/${p.slug}`}
-              className="rounded-xl border bg-white px-3 py-3 hover:border-[#C9A961] hover:shadow-sm transition"
-            >
-              <div className="font-semibold text-sm">{p.th}</div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                {countByProvince[p.th] ? `${countByProvince[p.th]} อู่` : 'ยังไม่มีข้อมูล'}
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Sort + list */}
+      {/* Sort + ค้นหา + list */}
       <section>
         <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
-          <h2 className="text-lg font-bold">ดูอู่เบนซ์ทั้งหมด ({garages.length})</h2>
+          <h2 className="text-lg font-bold">อู่เบนซ์ทั้งหมด ({garages.length})</h2>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">เรียงตาม:</span>
             {sortTab('rating', 'คะแนน')}
@@ -96,17 +101,7 @@ export default async function BenzGaragesThailand({
           </div>
         </div>
 
-        {sorted.length === 0 ? (
-          <div className="rounded-xl border bg-white p-10 text-center text-gray-500">
-            ยังไม่พบอู่ในพื้นที่นี้ ลองเลือกจังหวัดอื่นหรือกลับมาดูใหม่อีกครั้ง
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {sorted.map((g) => (
-              <GarageCard key={g.id} g={g} />
-            ))}
-          </div>
-        )}
+        <GarageSearch garages={sorted} />
       </section>
 
       <p className="text-xs text-gray-500 mt-8 text-center">
