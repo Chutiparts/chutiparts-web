@@ -50,8 +50,8 @@ const lbl: React.CSSProperties = { fontSize: 12, color: '#666', fontWeight: 600,
 const inp: React.CSSProperties = { width: '100%', padding: '7px 9px', border: '1px solid #ddd', borderRadius: 7, fontSize: 13, marginTop: 4, boxSizing: 'border-box' }
 function dl(name: string, text: string, type: string) { const u = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u) }
 const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`
-export default function LedgerClient({ sales, stock, addSale, updateSale, addStock, updateStock, entries = [], addEntry, deleteEntry }:
-  { sales: Row[]; stock: Row[]; addSale: (fd: FormData) => Promise<void>; updateSale: (fd: FormData) => Promise<void>; addStock: (fd: FormData) => Promise<void>; updateStock: (fd: FormData) => Promise<void>; entries?: Row[]; addEntry?: (fd: FormData) => Promise<void>; deleteEntry?: (fd: FormData) => Promise<void> }) {
+export default function LedgerClient({ sales, stock, addSale, updateSale, addStock, updateStock, deleteStock, entries = [], addEntry, deleteEntry }:
+  { sales: Row[]; stock: Row[]; addSale: (fd: FormData) => Promise<void>; updateSale: (fd: FormData) => Promise<void>; addStock: (fd: FormData) => Promise<void>; updateStock: (fd: FormData) => Promise<void>; deleteStock?: (fd: FormData) => Promise<void>; entries?: Row[]; addEntry?: (fd: FormData) => Promise<void>; deleteEntry?: (fd: FormData) => Promise<void> }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [tab, setTab] = useState<'sales' | 'stock' | 'finance'>('sales')
@@ -79,7 +79,7 @@ export default function LedgerClient({ sales, stock, addSale, updateSale, addSto
         {tab === 'sales'
           ? <><Collapsible key="sales-link" title="🔗 ผูก SKU รายการขายที่ยังไม่ตัดสต็อก (Path B)"><StockLinkDraft sales={sales} stock={stock} /></Collapsible><SalesTab rows={sales} skus={saleSkus} saleStock={saleStock} onAdd={(fd, d) => submit(addSale, fd, 'บันทึกการขายแล้ว', d)} onSave={(fd) => submit(updateSale, fd, 'อัปเดตแล้ว')} flash={flash} /></>
           : tab === 'stock'
-          ? <><Collapsible key="stock-suggest" title="🛒 คำแนะนำ: ของขายดีใกล้หมด ควรสั่งเพิ่ม"><StockSuggestion sales={sales} stock={stock} /></Collapsible><StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} flash={flash} /></>
+          ? <><Collapsible key="stock-suggest" title="🛒 คำแนะนำ: ของขายดีใกล้หมด ควรสั่งเพิ่ม"><StockSuggestion sales={sales} stock={stock} /></Collapsible><StockTab rows={stock} onAdd={(fd, d) => submit(addStock, fd, 'บันทึกสต็อกแล้ว', d)} onSave={(fd) => submit(updateStock, fd, 'อัปเดตแล้ว')} onDelete={deleteStock ? (fd) => submit(deleteStock, fd, 'ลบสต็อกแล้ว') : undefined} flash={flash} /></>
           : (addEntry && deleteEntry ? <FinanceClient entries={entries} addEntry={addEntry} deleteEntry={deleteEntry} /> : <div style={{ ...card, padding: 16, color: '#999' }}>Finance Lite ไม่พร้อมใช้</div>)}
       </div>
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: GREEN, color: '#fff', padding: '8px 16px', borderRadius: 999, fontSize: 13, zIndex: 20 }}>{toast}</div>}
@@ -211,7 +211,7 @@ function SaleEdit({ r, skus, onSave }: { r: Row; skus: string[]; onSave: (fd: Fo
   )
 }
 /* ===================== STOCK ===================== */
-function StockTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: FormData, done: () => void) => void; onSave: (fd: FormData) => void; flash: (m: string) => void }) {
+function StockTab({ rows, onAdd, onSave, onDelete, flash }: { rows: Row[]; onAdd: (fd: FormData, done: () => void) => void; onSave: (fd: FormData) => void; onDelete?: (fd: FormData) => void; flash: (m: string) => void }) {
   const [showAdd, setShowAdd] = useState(true)
   const [q, setQ] = useState(''); const [stF, setStF] = useState(''); const [openId, setOpenId] = useState<string | null>(null)
   const inStock = rows.filter((r) => (r.status || 'in_stock') === 'in_stock')
@@ -281,16 +281,17 @@ function StockTab({ rows, onAdd, onSave, flash }: { rows: Row[]; onAdd: (fd: For
               <div style={{ fontSize: 13, color: '#444', marginTop: 3 }}>ทุน {baht(r.cost)} · ตั้งขาย {baht(r.set_price)}{r.location ? ` · 📍${r.location}` : ''}{r.source ? ` · 🏬 ${r.source}` : ''}</div>
               <div style={{ fontSize: 11.5, color: '#999', marginTop: 3 }}>เข้า {fmtDate(r.date_in)}{age !== null && <span style={{ color: age >= 365 ? '#A32D2D' : '#999' }}> · อายุ {age} วัน{age >= 365 ? ' (ค้างนาน)' : ''}</span>}{r.sku ? ` · ${r.sku}` : ''}</div>
             </div>
-            {open && <StockEdit r={r} onSave={onSave} />}
+            {open && <StockEdit r={r} onSave={onSave} onDelete={onDelete} />}
           </div>
         )
       })}
     </>
   )
 }
-function StockEdit({ r, onSave }: { r: Row; onSave: (fd: FormData) => void }) {
+function StockEdit({ r, onSave, onDelete }: { r: Row; onSave: (fd: FormData) => void; onDelete?: (fd: FormData) => void }) {
   return (
-    <form action={onSave} style={{ borderTop: '1px solid #eee', padding: 12, background: '#fbfaf6' }}>
+    <div style={{ borderTop: '1px solid #eee', background: '#fbfaf6' }}>
+    <form action={onSave} style={{ padding: 12 }}>
       <input type="hidden" name="id" value={r.id} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         {STK_ORDER.map((s2) => <button key={s2} type="submit" name="status" value={s2} style={{ ...qbtn, ...((r.status || 'in_stock') === s2 ? { background: STK[s2].bg, color: STK[s2].fg, borderColor: STK[s2].fg } : {}) }}>{STK[s2].th}</button>)}
@@ -305,5 +306,13 @@ function StockEdit({ r, onSave }: { r: Row; onSave: (fd: FormData) => void }) {
       <label style={{ ...lbl, marginTop: 8 }}>หมายเหตุ<input name="note" defaultValue={r.note || ''} style={inp} /></label>
       <button type="submit" style={{ marginTop: 10, background: GREEN, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>บันทึกการแก้ไข</button>
     </form>
+    {onDelete && (
+      <form action={onDelete} style={{ padding: '0 12px 12px', borderTop: '1px dashed #e7d5d5', marginTop: 2 }}
+        onSubmit={(e) => { if (!confirm(`ลบสต็อก “${r.part_name || r.sku || 'รายการนี้'}” ถาวร?\n(เคลียร์ลิงก์เอกสารรับเข้าให้อัตโนมัติ · ลบแล้วกู้คืนไม่ได้)`)) e.preventDefault() }}>
+        <input type="hidden" name="id" value={r.id} />
+        <button type="submit" style={{ marginTop: 10, background: '#fff', color: '#A32D2D', border: '1px solid #A32D2D', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>🗑 ลบรายการนี้ถาวร (owner)</button>
+      </form>
+    )}
+    </div>
   )
 }

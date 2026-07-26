@@ -92,6 +92,16 @@ async function updateStock(formData: FormData) {
   await svc().from('stock_records').update(patch).eq('id', id)
   revalidatePath(PATH)
 }
+// ลบสต็อก (owner) — เคลียร์ลิงก์เอกสารรับเข้าก่อน กัน reference ค้าง · ใช้ตอน dogfood/ลบของทดลอง
+async function deleteStock(formData: FormData) {
+  'use server'
+  if (!(await authed())) return
+  const id = String(formData.get('id') || ''); if (!id) return
+  const db = svc()
+  await db.from('doc_line_items').update({ stock_record_id: null }).eq('stock_record_id', id)
+  await db.from('stock_records').delete().eq('id', id)
+  revalidatePath(PATH)
+}
 
 // Level B: Finance Lite (finance_entries)
 async function addEntry(formData: FormData) {
@@ -141,6 +151,6 @@ export default async function LedgerPage() {
 
   return <LedgerClient
     sales={salesRes.data || []} stock={stockRes.data || []} entries={financeRes.data || []}
-    addSale={addSale} updateSale={updateSale} addStock={addStock} updateStock={updateStock}
+    addSale={addSale} updateSale={updateSale} addStock={addStock} updateStock={updateStock} deleteStock={deleteStock}
     addEntry={addEntry} deleteEntry={deleteEntry} />
 }
