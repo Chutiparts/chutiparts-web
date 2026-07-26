@@ -28,6 +28,19 @@ export default async function BusinessesPage({ searchParams }: { searchParams: {
         <h1 className="text-3xl font-bold mb-2">🔨 อู่ / 🛒 ร้านอะไหล่</h1>
         <p className="text-gray-600">รายชื่ออู่และร้านที่ ChutiBenz แนะนำ</p>
       </header>
+
+      {/* ทางเข้า directory "อู่เบนซ์ทั่วไทย" */}
+      <Link href="/benz-garages-thailand"
+        className="block mb-5 rounded-xl border border-[#C9A961] bg-[#faf7ef] p-4 hover:shadow-sm transition">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-bold text-[#1C1D2C]">🔎 รวมอู่เบนซ์ทั่วไทย — ค้นหาตามจังหวัด</div>
+            <div className="text-sm text-gray-600 mt-0.5">ไดเรกทอรีอู่ซ่อมเบนซ์ทั่วประเทศ พร้อมเบอร์โทร พิกัด แผนที่ และคะแนนรีวิว</div>
+          </div>
+          <span className="shrink-0 text-[#C9A961] font-bold">ดูทั้งหมด →</span>
+        </div>
+      </Link>
+
       <div className="flex justify-end mb-4">
         <a href="/businesses/submit"
           className="inline-block bg-[#C9A961] hover:bg-[#D8B872] text-[#1C1D2C] font-medium rounded-lg px-4 py-2 text-sm">
