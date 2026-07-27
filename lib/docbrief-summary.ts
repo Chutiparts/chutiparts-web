@@ -3,28 +3,32 @@
 //
 // อ่านอย่างเดียว · ไม่เขียนอะไรทั้งสิ้น · ถ้าตาราง doc_* ยังไม่มีก็คืนค่าว่างแทนที่จะพัง
 // (Daily Brief ต้องไม่ล่มเพราะ docbrief)
+// 27ก.ค.: + นับใบจาก LINE ที่ยังไม่เลือกประเภท (line_pending) + อายุค้าง (line_oldest_days) — กันตกหล่น
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface DocSummary {
   enabled: boolean
-  queued: number // รออ่าน
+  queued: number // รออ่าน (ไม่รวมใบ LINE ที่ยังไม่เลือกประเภท)
   pending_review: number // รอตรวจ (สิ่งที่ owner ต้องทำ)
   confirmed: number // ยืนยันแล้ว รอส่งออก
   failed: number // ต้องแก้
   exported_today: number
-  oldest_pending_days: number | null // ค้างนานสุดกี่วัน
+  oldest_pending_days: number | null // ค้างนานสุดกี่วัน (รอตรวจ)
+  line_pending: number // ใบจาก LINE รอเลือกประเภท (source=line · profile ว่าง · state=queued)
+  line_oldest_days: number | null // ใบ LINE ค้างเลือกประเภทนานสุดกี่วัน
 }
 
 export const EMPTY_SUMMARY: DocSummary = {
   enabled: false, queued: 0, pending_review: 0, confirmed: 0,
   failed: 0, exported_today: 0, oldest_pending_days: null,
+  line_pending: 0, line_oldest_days: null,
 }
 
 export async function getDocSummary(db: SupabaseClient): Promise<DocSummary> {
   try {
     const { data, error } = await db
       .from('doc_documents')
-      .select('state, created_at, updated_at')
+      .select('state, source, profile, created_at, updated_at')
       .is('deleted_at', null)
       .in('state', ['queued', 'pending_review', 'confirmed', 'failed', 'exported'])
 
@@ -35,10 +39,22 @@ export async function getDocSummary(db: SupabaseClient): Promise<DocSummary> {
 
     let queued = 0, pending = 0, confirmed = 0, failed = 0, exportedToday = 0
     let oldestPending: number | null = null
+    let linePending = 0
+    let lineOldest: number | null = null
 
     for (const d of data ?? []) {
       switch (d.state) {
-        case 'queued': queued++; break
+        case 'queued': {
+          // ใบจาก LINE ที่ยังไม่เลือกประเภท (profile ว่าง) = "รอเลือกประเภท" แยกออกจาก "รออ่าน" ปกติ
+          if (d.source === 'line' && (d.profile === null || d.profile === undefined)) {
+            linePending++
+            const ld = Math.floor((Date.now() - new Date(d.created_at).getTime()) / 86_400_000)
+            if (lineOldest === null || ld > lineOldest) lineOldest = ld
+          } else {
+            queued++
+          }
+          break
+        }
         case 'confirmed': confirmed++; break
         case 'failed': failed++; break
         case 'exported':
@@ -58,6 +74,8 @@ export async function getDocSummary(db: SupabaseClient): Promise<DocSummary> {
       queued, pending_review: pending, confirmed, failed,
       exported_today: exportedToday,
       oldest_pending_days: oldestPending,
+      line_pending: linePending,
+      line_oldest_days: lineOldest,
     }
   } catch {
     return EMPTY_SUMMARY
@@ -68,6 +86,7 @@ export async function getDocSummary(db: SupabaseClient): Promise<DocSummary> {
 export function summaryHeadline(s: DocSummary): string | null {
   if (!s.enabled) return null
   const parts: string[] = []
+  if (s.line_pending) parts.push(`จาก LINE รอเลือกประเภท ${s.line_pending} ใบ`)
   if (s.pending_review) parts.push(`รอตรวจ ${s.pending_review} ใบ`)
   if (s.queued) parts.push(`รออ่าน ${s.queued} ใบ`)
   if (s.confirmed) parts.push(`รอส่งเข้า Sheet ${s.confirmed} ใบ`)
