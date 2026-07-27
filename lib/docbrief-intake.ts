@@ -1,6 +1,7 @@
 // lib/docbrief-intake.ts — docbrief intake flow (แยกจาก page เพื่อทดสอบได้)
 // upload → validate → dedup(sha256) → เก็บ original → queued + audit ทุก transition
 // สเปก: phase-0-decision-doc.md §2 (state machine) · §4.6 (dedup) · §9 (audit) · §11 (limits)
+// 26ก.ค.: + รองรับ profile=null (LINE intake — เลือกประเภทตอนตรวจ) + opts.source/opts.metadata (backward-compatible)
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sha256, extFor, validateFile } from './docbrief'
 
@@ -25,19 +26,24 @@ export async function intakeFile(
   db: SupabaseClient,
   file: { name: string; type: string; buffer: Buffer },
   actor = 'owner',
-  profile: 'accounting' | 'stock' = 'accounting',
+  profile: 'accounting' | 'stock' | null = 'accounting',
+  opts?: { source?: string; metadata?: Record<string, unknown> },
 ): Promise<IntakeOutcome> {
   const buf = file.buffer
   const size = buf.byteLength
   const mime = file.type
   const hash = sha256(buf)
+  // ฟิลด์เสริม (LINE intake) — ใส่เฉพาะเมื่อส่งมา (คงพฤติกรรมเดิมของ web upload)
+  const extra: Record<string, unknown> = {}
+  if (opts?.source) extra.source = opts.source
+  if (opts?.metadata) extra.review_metadata = opts.metadata
 
   // 1) validate (§11) — สร้าง record ทุกครั้งแม้ไม่ผ่าน
   const v = validateFile(mime, size, buf)
   if (!v.ok) {
     const { data } = await db.from('doc_documents').insert({
       state: 'failed', file_hash: hash, original_filename: file.name, mime_type: mime,
-      file_size: size, error_category: 'intake_error', error_message: v.message,
+      file_size: size, error_category: 'intake_error', error_message: v.message, ...extra,
     }).select('id').single()
     await audit(db, data?.id ?? null, actor, 'document.rejected', null, 'failed', { reason: v.message })
     return { status: 'rejected', id: data?.id ?? null, message: v.message }
@@ -50,7 +56,7 @@ export async function intakeFile(
   if (dup) {
     const { data } = await db.from('doc_documents').insert({
       state: 'duplicate', file_hash: hash, original_filename: file.name, mime_type: mime,
-      file_size: size, page_count: v.pageCount, storage_path: dup.storage_path, duplicate_of: dup.id,
+      file_size: size, page_count: v.pageCount, storage_path: dup.storage_path, duplicate_of: dup.id, ...extra,
     }).select('id').single()
     await audit(db, data?.id ?? null, actor, 'duplicate.detected', null, 'duplicate', { duplicate_of: dup.id })
     return { status: 'duplicate', id: data!.id, duplicateOf: dup.id }
@@ -63,7 +69,7 @@ export async function intakeFile(
     const msg = `อัปโหลดไฟล์ไม่สำเร็จ: ${up.error.message}`
     const { data } = await db.from('doc_documents').insert({
       state: 'failed', file_hash: hash, original_filename: file.name, mime_type: mime,
-      file_size: size, error_category: 'intake_error', error_message: msg,
+      file_size: size, error_category: 'intake_error', error_message: msg, ...extra,
     }).select('id').single()
     await audit(db, data?.id ?? null, actor, 'document.rejected', null, 'failed', { storage_error: up.error.message })
     return { status: 'rejected', id: data?.id ?? null, message: msg }
@@ -71,7 +77,7 @@ export async function intakeFile(
 
   const { data: doc } = await db.from('doc_documents').insert({
     state: 'received', file_hash: hash, original_filename: file.name, mime_type: mime,
-    file_size: size, page_count: v.pageCount, storage_path: storagePath, profile,
+    file_size: size, page_count: v.pageCount, storage_path: storagePath, profile, ...extra,
   }).select('id').single()
   await audit(db, doc!.id, actor, 'document.received', null, 'received', { storage_path: storagePath, page_count: v.pageCount })
 
