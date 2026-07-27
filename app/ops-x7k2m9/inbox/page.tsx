@@ -2,6 +2,7 @@
 // blueprint §5/§16.1 — รวม "ใบที่ต้องทำตอนนี้" ทั้ง Profile A+B ในที่เดียว
 // เรียงตามความเร่ง · ลิงก์ไปหน้าที่ทำงานได้ · ใช้ข้อมูลเดิม ไม่สร้างตารางใหม่
 // 26ก.ค.: + กลุ่ม "จาก LINE — รอเลือกประเภท" (LINE intake: source=line, profile=null → เลือกสต็อก/บัญชีที่นี่)
+// 27ก.ค.: + เตือนใบ LINE ค้างนาน (≥2 วัน) เด่นขึ้น กันตกหล่น (จุดที่ 3 จาก consultant review)
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { opsAuthed } from '@/lib/ops-auth'
@@ -52,6 +53,9 @@ const AGO = (iso: string) => {
   if (h < 24) return `ค้าง ${h} ชม.`
   return `ค้าง ${Math.floor(h / 24)} วัน`
 }
+// อายุค้างเป็น "วัน" (ใช้เตือนใบ LINE ที่ยังไม่เลือกประเภทนาน ๆ)
+const daysOld = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+const LINE_STALE_DAYS = 2 // ค้างเกินนี้ = เตือนเด่น (กันตกหล่น)
 const profileBadge = (p: string) => (p === 'stock' ? { icon: '📦', th: 'สต็อก', href: '/ops-x7k2m9/stock-intake' } : { icon: '📄', th: 'บัญชี', href: '/ops-x7k2m9/documents' })
 
 function Section({ title, hint, items, color }: { title: string; hint: string; items: Doc[]; color: string }) {
@@ -101,35 +105,45 @@ function Section({ title, hint, items, color }: { title: string; hint: string; i
 function LineClassifySection({ items }: { items: LineDoc[] }) {
   if (!items.length) return null
   const btn: React.CSSProperties = { fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer' }
+  const staleCount = items.filter((d) => daysOld(d.created_at) >= LINE_STALE_DAYS).length
   return (
     <div style={{ marginBottom: 22 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>📥 จาก LINE — รอเลือกประเภท</h2>
         <span style={{ fontSize: 12, padding: '2px 9px', borderRadius: 999, background: '#06c75522', color: '#06864a' }}>{items.length}</span>
+        {staleCount > 0 && (
+          <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: '#fee2e2', color: '#991b1b', fontWeight: 700 }}>⚠️ ค้างนาน {staleCount}</span>
+        )}
         <span style={{ fontSize: 12, color: '#9ca3af' }}>เลือกว่าเป็นสต็อกหรือบัญชี แล้วไปตรวจต่อ</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map((d) => (
-          <div key={d.id} style={{ border: '1px solid #e5e7eb', borderLeft: '3px solid #06c755', borderRadius: 10, padding: '10px 14px', background: '#fff' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, background: '#eafaf0', color: '#06864a', whiteSpace: 'nowrap' }}>LINE</span>
-              <div style={{ flex: 1, minWidth: 120 }}>
-                <div style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>รูปเอกสารจาก LINE</div>
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>{AGO(d.created_at)}</div>
+        {items.map((d) => {
+          const days = daysOld(d.created_at)
+          const stale = days >= LINE_STALE_DAYS
+          return (
+            <div key={d.id} style={{ border: '1px solid #e5e7eb', borderLeft: `3px solid ${stale ? '#b91c1c' : '#06c755'}`, borderRadius: 10, padding: '10px 14px', background: stale ? '#fef2f2' : '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, background: '#eafaf0', color: '#06864a', whiteSpace: 'nowrap' }}>LINE</span>
+                <div style={{ flex: 1, minWidth: 120 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>รูปเอกสารจาก LINE</div>
+                  <div style={{ fontSize: 11, color: stale ? '#b91c1c' : '#9ca3af', fontWeight: stale ? 700 : 400 }}>
+                    {AGO(d.created_at)}{stale ? ' · ⚠️ รีบเลือกประเภท' : ''}
+                  </div>
+                </div>
+                <form action={classifyDoc} style={{ display: 'inline' }}>
+                  <input type="hidden" name="id" value={d.id} />
+                  <input type="hidden" name="profile" value="stock" />
+                  <button type="submit" style={btn}>📦 สต็อก</button>
+                </form>
+                <form action={classifyDoc} style={{ display: 'inline' }}>
+                  <input type="hidden" name="id" value={d.id} />
+                  <input type="hidden" name="profile" value="accounting" />
+                  <button type="submit" style={btn}>📄 บัญชี</button>
+                </form>
               </div>
-              <form action={classifyDoc} style={{ display: 'inline' }}>
-                <input type="hidden" name="id" value={d.id} />
-                <input type="hidden" name="profile" value="stock" />
-                <button type="submit" style={btn}>📦 สต็อก</button>
-              </form>
-              <form action={classifyDoc} style={{ display: 'inline' }}>
-                <input type="hidden" name="id" value={d.id} />
-                <input type="hidden" name="profile" value="accounting" />
-                <button type="submit" style={btn}>📄 บัญชี</button>
-              </form>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
