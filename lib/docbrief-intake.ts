@@ -66,8 +66,9 @@ export async function intakeFile(
   const storagePath = `originals/${hash}${extFor(mime)}`
   const up = await db.storage.from(DOC_BUCKET).upload(storagePath, buf, { contentType: mime, upsert: false })
   if (up.error && !/exists/i.test(up.error.message)) {
-    const msg = `อัปโหลดไฟล์ไม่สำเร็จ: ${up.error.message}`
-    const { data } = await db.from('doc_documents').insert({
+  const e = up.error as unknown as { message?: string; statusCode?: string | number; status?: number; error?: string; name?: string }
+  const msg = `อัปโหลดไฟล์ไม่สำเร็จ: ${e?.message || ''} · code=${e?.statusCode ?? e?.status ?? '?'} · ${e?.error ?? e?.name ?? ''} · ${(size / 1048576).toFixed(2)}MB`    
+  const { data } = await db.from('doc_documents').insert({
       state: 'failed', file_hash: hash, original_filename: file.name, mime_type: mime,
       file_size: size, error_category: 'intake_error', error_message: msg, ...extra,
     }).select('id').single()
