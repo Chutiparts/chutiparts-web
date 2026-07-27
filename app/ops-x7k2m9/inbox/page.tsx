@@ -1,7 +1,9 @@
 // app/ops-x7k2m9/inbox/page.tsx — docbrief: กล่องงาน (Workflow Inbox)
 // blueprint §5/§16.1 — รวม "ใบที่ต้องทำตอนนี้" ทั้ง Profile A+B ในที่เดียว
 // เรียงตามความเร่ง · ลิงก์ไปหน้าที่ทำงานได้ · ใช้ข้อมูลเดิม ไม่สร้างตารางใหม่
+// 26ก.ค.: + กลุ่ม "จาก LINE — รอเลือกประเภท" (LINE intake: source=line, profile=null → เลือกสต็อก/บัญชีที่นี่)
 import { createClient } from '@supabase/supabase-js'
+import { revalidatePath } from 'next/cache'
 import { opsAuthed } from '@/lib/ops-auth'
 import OpsGate from '@/components/OpsGate'
 
@@ -13,12 +15,26 @@ function svc() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+// เลือกประเภทให้เอกสารจาก LINE (สต็อก/บัญชี) → set profile → ใบไปโผล่ในหน้า flow ที่ถูก
+async function classifyDoc(formData: FormData) {
+  'use server'
+  if (!(await opsAuthed())) return
+  const id = String(formData.get('id') || '')
+  const profile = String(formData.get('profile') || '')
+  if (!id || (profile !== 'stock' && profile !== 'accounting')) return
+  const db = svc()
+  await db.from('doc_documents').update({ profile, updated_at: new Date().toISOString() }).eq('id', id).eq('source', 'line')
+  await db.from('doc_audit').insert({ document_id: id, actor: 'owner', action: 'line.classify', metadata: { profile } })
+  revalidatePath('/ops-x7k2m9/inbox')
+}
+
 type Doc = {
   id: string; profile: string; state: string
   vendor_name: string | null; original_filename: string; doc_no: string | null; grand_total: number | null
   review_flags: string[]; error_category: string | null; error_message: string | null
   retry_count: number | null; created_at: string; updated_at: string
 }
+type LineDoc = { id: string; original_filename: string; created_at: string }
 
 // ป้ายธง → ข้อความไทย (รวมทั้ง Profile A และ B)
 const FLAG_TH: Record<string, string> = {
@@ -81,6 +97,44 @@ function Section({ title, hint, items, color }: { title: string; hint: string; i
   )
 }
 
+// กลุ่มเอกสารจาก LINE ที่ยังไม่เลือกประเภท — มีปุ่ม [สต็อก]/[บัญชี]
+function LineClassifySection({ items }: { items: LineDoc[] }) {
+  if (!items.length) return null
+  const btn: React.CSSProperties = { fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer' }
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>📥 จาก LINE — รอเลือกประเภท</h2>
+        <span style={{ fontSize: 12, padding: '2px 9px', borderRadius: 999, background: '#06c75522', color: '#06864a' }}>{items.length}</span>
+        <span style={{ fontSize: 12, color: '#9ca3af' }}>เลือกว่าเป็นสต็อกหรือบัญชี แล้วไปตรวจต่อ</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map((d) => (
+          <div key={d.id} style={{ border: '1px solid #e5e7eb', borderLeft: '3px solid #06c755', borderRadius: 10, padding: '10px 14px', background: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, background: '#eafaf0', color: '#06864a', whiteSpace: 'nowrap' }}>LINE</span>
+              <div style={{ flex: 1, minWidth: 120 }}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>รูปเอกสารจาก LINE</div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>{AGO(d.created_at)}</div>
+              </div>
+              <form action={classifyDoc} style={{ display: 'inline' }}>
+                <input type="hidden" name="id" value={d.id} />
+                <input type="hidden" name="profile" value="stock" />
+                <button type="submit" style={btn}>📦 สต็อก</button>
+              </form>
+              <form action={classifyDoc} style={{ display: 'inline' }}>
+                <input type="hidden" name="id" value={d.id} />
+                <input type="hidden" name="profile" value="accounting" />
+                <button type="submit" style={btn}>📄 บัญชี</button>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default async function InboxPage() {
   if (!(await opsAuthed())) return <OpsGate title="📥 กล่องงาน" />
 
@@ -93,13 +147,21 @@ export default async function InboxPage() {
     .limit(500)
   const docs = (data ?? []) as Doc[]
 
+  // เอกสารจาก LINE ที่ยังไม่เลือกประเภท (source=line · profile ว่าง · ยังไม่อ่าน)
+  const { data: lineData } = await db.from('doc_documents')
+    .select('id, original_filename, created_at')
+    .eq('source', 'line').is('profile', null).eq('state', 'queued').is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(200)
+  const lineDocs = (lineData ?? []) as LineDoc[]
+
   // แยกไฟล์เสียตั้งแต่อัปโหลด (แก้ไม่ได้ ต้องอัปใหม่) ออกจากงานที่ทำได้
   const groups = {
     review: docs.filter((d) => d.state === 'pending_review'),
     send: docs.filter((d) => d.state === 'confirmed'), // Profile B รอส่ง Sheet
     failed: docs.filter((d) => d.state === 'failed'),
   }
-  const total = groups.review.length + groups.send.length + groups.failed.length
+  const total = lineDocs.length + groups.review.length + groups.send.length + groups.failed.length
 
   return (
     <section style={{ maxWidth: 760, margin: '0 auto', padding: '24px 16px' }}>
@@ -114,6 +176,7 @@ export default async function InboxPage() {
         </div>
       ) : (
         <>
+          <LineClassifySection items={lineDocs} />
           <Section title="รอตรวจ" hint="AI อ่านเสร็จ รอคุณตรวจ/แก้" items={groups.review} color="#854d0e" />
           <Section title="รอส่งเข้า Sheet" hint="ยืนยันแล้ว รอกดส่งออก" items={groups.send} color="#1e40af" />
           <Section title="ไม่ผ่าน — ต้องแก้" hint="มีปัญหา · ลองใหม่หรือแก้ข้อมูล" items={groups.failed} color="#b91c1c" />
