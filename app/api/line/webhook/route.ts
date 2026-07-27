@@ -17,12 +17,14 @@ function svc() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+// ⚠️ ใช้ env ชุดแยก LINE_DOC_* เฉพาะ DocBrief intake (OA @802qxngz "Mr.Chuti")
+//    ไม่ชนกับ LINE_CHANNEL_* (แจ้งเตือน Lead ของ @440ifncj) และ LINE_OPS_* (Reception Desk บอทค้นอะไหล่ @311vbzok)
 const allowedUsers = (): string[] =>
-  (process.env.LINE_ALLOWED_USER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean)
+  (process.env.LINE_DOC_ALLOWED_USER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean)
 
 export async function POST(req: Request) {
-  const secret = process.env.LINE_CHANNEL_SECRET || ''
-  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
+  const secret = process.env.LINE_DOC_CHANNEL_SECRET || ''
+  const token = process.env.LINE_DOC_CHANNEL_ACCESS_TOKEN || ''
 
   // ต้องอ่าน raw body ตรง ๆ เพื่อ verify signature (ห้าม parse ก่อน)
   const raw = await req.text()
@@ -38,7 +40,7 @@ export async function POST(req: Request) {
 
   const db = svc()
   const whitelist = allowedUsers()
-  const echoUnknown = process.env.LINE_ECHO_UNKNOWN_ID === 'true' // เปิดชั่วคราวตอนตั้งค่าเพื่อดู userId
+  const echoUnknown = process.env.LINE_DOC_ECHO_UNKNOWN_ID === 'true' // เปิดชั่วคราวตอนตั้งค่าเพื่อดู userId
 
   for (const ev of events) {
     try {
