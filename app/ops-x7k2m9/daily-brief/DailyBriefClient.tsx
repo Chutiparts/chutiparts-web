@@ -161,7 +161,7 @@ const CRISIS_BRIEFS: Record<string, CrisisBrief> = {
   },
 }
 
-type DocSummary = { enabled: boolean; queued: number; pending_review: number; confirmed: number; failed: number; exported_today: number; oldest_pending_days: number | null }
+type DocSummary = { enabled: boolean; queued: number; pending_review: number; confirmed: number; failed: number; exported_today: number; oldest_pending_days: number | null; line_pending: number; line_oldest_days: number | null }
 
 export default function DailyBriefClient({ leads, tasks, sales = [], stock = [], products = [], searches = [], feedback = [], docs }: { leads: Row[]; tasks: Row[]; sales?: Row[]; stock?: Row[]; products?: Row[]; searches?: Row[]; feedback?: Row[]; docs?: DocSummary }) {
   const [toast, setToast] = useState('')
@@ -437,10 +437,10 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
 
       <div style={{ padding: 12, maxWidth: 960, margin: '0 auto' }}>
         {/* ===== เอกสาร (docbrief) — §4.2 read-only summary ===== */}
-        {docs?.enabled && (docs.pending_review + docs.queued + docs.confirmed + docs.failed > 0 || docs.exported_today > 0) && (
+        {docs?.enabled && (docs.pending_review + docs.queued + docs.confirmed + docs.failed + docs.line_pending > 0 || docs.exported_today > 0) && (
           <a href="/ops-x7k2m9/documents" style={{ textDecoration: 'none', display: 'block', marginBottom: 10 }}>
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderLeft: '4px solid #C9A961', borderRadius: 10, padding: '11px 13px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: docs.pending_review + docs.queued + docs.confirmed + docs.failed > 0 ? 7 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: docs.pending_review + docs.queued + docs.confirmed + docs.failed + docs.line_pending > 0 ? 7 : 0 }}>
                 <span style={{ fontSize: 15 }}>📄</span>
                 <span style={{ fontSize: 13.5, fontWeight: 700, color: '#17301F' }}>เอกสาร</span>
                 {docs.oldest_pending_days !== null && docs.oldest_pending_days >= 3 && (
