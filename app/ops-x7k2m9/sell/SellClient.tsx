@@ -13,11 +13,12 @@ const lbl: React.CSSProperties = { fontSize: 12, color: '#666', fontWeight: 600,
 const inp: React.CSSProperties = { width: '100%', padding: '9px 10px', border: '1px solid #ddd', borderRadius: 8, fontSize: 14, marginTop: 4, boxSizing: 'border-box' }
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e7e3d8', borderRadius: 10, marginBottom: 8, padding: 12 }
 
-export default function SellClient({ stockOpts, todaySales, addTeamSale }: { stockOpts: Opt[]; todaySales: Sale[]; addTeamSale: (fd: FormData) => Promise<{ ok: boolean; msg: string }> }) {
+export default function SellClient({ stockOpts, todaySales, addTeamSale }: { stockOpts: Opt[]; todaySales: Sale[]; addTeamSale: (fd: FormData) => Promise<{ ok: boolean; msg: string; needConfirm?: boolean }> }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [f, setF] = useState({ sku: '', qty: '1', customer: '', sold_by: '', payment_status: 'paid' })
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [confirmFd, setConfirmFd] = useState<{ fd: FormData; msg: string } | null>(null)
   const bySku = useMemo(() => { const m: Record<string, Opt> = {}; stockOpts.forEach((o) => { m[o.sku.toUpperCase()] = o }); return m }, [stockOpts])
   const sel = bySku[f.sku.trim().toUpperCase()]
   const unit = sel?.set_price ?? null
@@ -30,6 +31,20 @@ export default function SellClient({ stockOpts, todaySales, addTeamSale }: { sto
     if (f.payment_status === 'unpaid' && !f.sold_by.trim()) { setToast({ ok: false, msg: 'ค้างชำระต้องระบุผู้ขาย' }); return }
     const fd = new FormData()
     fd.set('sku', sel.sku); fd.set('qty', String(qtyN)); fd.set('customer', f.customer); fd.set('sold_by', f.sold_by); fd.set('payment_status', f.payment_status)
+    start(async () => {
+      const r = await addTeamSale(fd)
+      if ((r as any).needConfirm) { setConfirmFd({ fd, msg: r.msg }); return }
+      setToast(r)
+      if (r.ok) { setF({ sku: '', qty: '1', customer: '', sold_by: '', payment_status: 'paid' }); router.refresh() }
+      setTimeout(() => setToast(null), 2800)
+    })
+  }
+
+  function doConfirm() {
+    if (!confirmFd) return
+    const fd = confirmFd.fd
+    fd.set('confirm_oversell', '1')
+    setConfirmFd(null)
     start(async () => {
       const r = await addTeamSale(fd)
       setToast(r)
@@ -112,6 +127,18 @@ export default function SellClient({ stockOpts, todaySales, addTeamSale }: { sto
         ))}
       </div>
 
+      {confirmFd && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setConfirmFd(null)}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 20, maxWidth: 380, width: '100%', boxShadow: '0 10px 40px rgba(0,0,0,.3)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: 16, color: '#A32D2D', marginBottom: 8 }}>⚠️ ขายเกินสต็อก</div>
+            <div style={{ fontSize: 13.5, color: '#333', lineHeight: 1.5, marginBottom: 16 }}>{confirmFd.msg}</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setConfirmFd(null)} style={{ flex: 1, background: '#eee', color: '#333', border: 'none', borderRadius: 8, padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>ยกเลิก</button>
+              <button onClick={doConfirm} disabled={pending} style={{ flex: 1, background: '#A32D2D', color: '#fff', border: 'none', borderRadius: 8, padding: '11px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>{pending ? 'กำลังบันทึก…' : 'ยืนยันขายต่อ'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {toast && <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: toast.ok ? GREEN : '#A32D2D', color: '#fff', padding: '10px 18px', borderRadius: 999, fontSize: 14, fontWeight: 600, zIndex: 20, maxWidth: '90%' }}>{toast.msg}</div>}
     </div>
   )

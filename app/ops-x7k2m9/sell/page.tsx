@@ -35,7 +35,7 @@ async function loginOps(formData: FormData) {
 }
 
 // team-safe: ราคา+ต้นทุน server ดึงจาก stock (ไม่รับจาก client) · คืนแค่ ok/msg (ไม่มีทุน/กำไร)
-async function addTeamSale(formData: FormData): Promise<{ ok: boolean; msg: string }> {
+async function addTeamSale(formData: FormData): Promise<{ ok: boolean; msg: string; needConfirm?: boolean }> {
   'use server'
   if (!(await authed())) return { ok: false, msg: 'unauthorized' }
   const sku = String(formData.get('sku') || '').trim()
@@ -43,31 +43,79 @@ async function addTeamSale(formData: FormData): Promise<{ ok: boolean; msg: stri
   const customer = String(formData.get('customer') || '').trim() || null
   const sold_by = String(formData.get('sold_by') || '').trim() || null
   const payment = String(formData.get('payment_status') || 'paid') === 'unpaid' ? 'unpaid' : 'paid'
+  const confirmOversell = String(formData.get('confirm_oversell') || '') === '1'
   if (!sku) return { ok: false, msg: 'กรุณาเลือก SKU' }
   if (!Number.isFinite(qty) || qty < 1) return { ok: false, msg: 'จำนวนไม่ถูกต้อง' }
   if (payment === 'unpaid' && !sold_by) return { ok: false, msg: 'ค้างชำระต้องระบุผู้ขาย' }
   const db = svc()
-  // ราคา/ต้นทุน/ชื่อ ดึงจาก stock ตาม sku (server-side · ทีมแก้ไม่ได้)
-  const { data: st } = await db.from('stock_records').select('sku,part_name,car_model,cost,set_price').ilike('sku', sku).limit(1)
-  const s: any = st && st[0]
-  if (!s) return { ok: false, msg: 'ไม่พบ SKU นี้ในสต็อก' }
+
+  const { data: st } = await db.from('stock_records')
+    .select('id,sku,part_name,car_model,cost,set_price,qty,deleted_at')
+    .ilike('sku', sku).is('deleted_at', null)
+  const rows = st || []
+
+  if (rows.length === 0) {
+    const { data: del } = await db.from('stock_records')
+      .select('id').ilike('sku', sku).not('deleted_at', 'is', null).limit(1)
+    return {
+      ok: false,
+      msg: (del && del.length)
+        ? 'SKU นี้ถูกลบจากสต็อกแล้ว — ถ้ายังมีของจริง กู้คืนที่ Ledger ก่อนแล้วค่อยขาย'
+        : 'ไม่พบ SKU นี้ในสต็อก',
+    }
+  }
+  if (rows.length > 1) {
+    return { ok: false, msg: `พบ SKU "${sku}" ซ้ำ ${rows.length} แถว — ยืนยันแถวที่ Ledger ก่อนขาย (กันตัดผิดแถว)` }
+  }
+
+  const s: any = rows[0]
   const unit = s.set_price != null ? Number(s.set_price) : 0
   if (!(unit > 0)) return { ok: false, msg: 'สินค้านี้ยังไม่ตั้งราคา — แจ้งเจ้าของ' }
   const unitCost = s.cost != null ? Number(s.cost) : null
-  const { error } = await db.from('sales_records').insert({
+  const onHand = Number(s.qty ?? 0)
+
+  if (qty > onHand && !confirmOversell) {
+    return {
+      ok: false,
+      needConfirm: true,
+      msg: `สต็อกมี ${onHand} ชิ้น แต่กำลังขาย ${qty} — จะทำให้ยอดติดลบ ${onHand - qty}. ถ้าของมีจริงหน้าร้าน กดยืนยันเพื่อขายต่อ (ระบบบันทึกว่าขายเกินสต็อก)`,
+    }
+  }
+  const isOversell = qty > onHand
+
+  const { data: sale, error } = await db.from('sales_records').insert({
     sku: String(s.sku), part_sold: s.part_name || null, car_model: s.car_model || null,
     sale_date: new Date().toISOString().slice(0, 10),
-    sale_price: unit * qty,                         // ยอดรวม (ราคา/ชิ้น × จำนวน)
-    cost: unitCost != null ? unitCost * qty : null, // ต้นทุนรวม (server · ทีมไม่เห็น)
+    sale_price: unit * qty,
+    cost: unitCost != null ? unitCost * qty : null,
     qty, sold_by, customer,
     payment_status: payment, delivery_status: 'delivered',
+  }).select('id').single()
+  if (error || !sale) return { ok: false, msg: 'บันทึกไม่สำเร็จ: ' + (error?.message || '') }
+
+  const { error: mvErr } = await db.rpc('record_stock_issue', {
+    p_stock_record_id: s.id, p_qty: qty, p_sale_id: sale.id,
+    p_actor: sold_by, p_unit_cost: unitCost,
   })
-  if (error) return { ok: false, msg: 'บันทึกไม่สำเร็จ: ' + error.message }
+  if (mvErr) {
+    return { ok: true, msg: 'บันทึกขายแล้ว ✓ แต่ตัดสต็อกไม่สำเร็จ — แจ้งเจ้าของตรวจ ledger (' + mvErr.message + ')' }
+  }
+
+  if (isOversell) {
+    await db.from('stock_movements')
+      .update({ note: `oversell: ขาย ${qty} จากคงเหลือ ${onHand}` })
+      .eq('sale_id', sale.id).eq('movement_type', 'issued')
+  }
+
   revalidatePath(PATH)
   revalidatePath('/ops-x7k2m9/ledger')
-  return { ok: true, msg: 'บันทึกการขายแล้ว ✓' }
+  return {
+    ok: true,
+    msg: isOversell
+      ? `บันทึกการขายแล้ว ✓ (ขายเกินสต็อก — ยอดติดลบ ${onHand - qty} · owner ควรตรวจ)`
+      : 'บันทึกการขายแล้ว ✓',
+  }
 }
-
 export default async function SellPage() {
   if (!(await authed())) {
     return (
