@@ -21,10 +21,13 @@ function svc() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+// auth: owner(ops_admin) หรือ team(ops_team)
 async function authed(): Promise<boolean> {
+  const c = await cookies()
   const secret = process.env.ADMIN_OPS_SECRET
-  if (!secret) return false
-  return (await cookies()).get(COOKIE)?.value === secret
+  if (secret && c.get(COOKIE)?.value === secret) return true
+  const team = process.env.TEAM_OPS_SECRET
+  return !!team && c.get('ops_team')?.value === team
 }
 
 type ProductRow = Record<string, unknown> & { id: string; part_number: string | null }
