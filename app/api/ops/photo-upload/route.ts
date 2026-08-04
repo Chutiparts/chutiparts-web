@@ -1,5 +1,5 @@
 // app/api/ops/photo-upload/route.ts — Phase 1 photo upload API (ChutiBenz)
-// 2026-08-04
+// 2026-08-04 · v2: ใช้ select('*') อ่าน field แบบปลอดภัย (ตาราง products ไม่มีคอลัมน์ car_model — ใช้ compatible_models)
 // GET  ?sku=  → lookup product (โชว์ชื่อ+รูปเดิมก่อนอัพ)
 // POST multipart (sku + file) → อัพเข้า R2 → UPDATE products.image_url by part_number
 // auth: cookie ops_admin == ADMIN_OPS_SECRET (เหมือน ops หน้าอื่น) · key R2 อยู่ server เท่านั้น
@@ -27,31 +27,34 @@ async function authed(): Promise<boolean> {
   return (await cookies()).get(COOKIE)?.value === secret
 }
 
-type ProductRow = {
-  id: string
-  part_number: string | null
-  name: string | null
-  car_model: string | null
-  image_url: string | null
+type ProductRow = Record<string, unknown> & { id: string; part_number: string | null }
+
+// แปลง compatible_models (array/string) → ข้อความโชว์ผล
+function modelText(p: ProductRow): string | null {
+  const cm = p.compatible_models
+  if (Array.isArray(cm)) return cm.length ? cm.join(', ') : null
+  if (typeof cm === 'string' && cm.trim()) return cm.trim()
+  if (typeof p.car_model === 'string' && p.car_model.trim()) return p.car_model.trim()
+  return null
 }
 
-// หา product จาก SKU (norm ก่อน · fallback exact) — คืน record แรกที่เจอ
+// หา product จาก SKU: exact part_number ก่อน · แล้ว norm · คืน record แรกที่เจอ (select('*') กัน column error)
 async function findProduct(skuRaw: string): Promise<ProductRow | null> {
-  const norm = strip(skuRaw)
+  const sku = skuRaw.trim()
+  const norm = strip(sku)
   if (!norm) return null
   const db = svc()
-  const byNorm = await db
-    .from('products')
-    .select('id, part_number, name, car_model, image_url')
-    .eq('part_number_norm', norm)
-    .limit(1)
-  if (byNorm.data && byNorm.data.length) return byNorm.data[0] as ProductRow
-  const byExact = await db
-    .from('products')
-    .select('id, part_number, name, car_model, image_url')
-    .eq('part_number', skuRaw.trim())
-    .limit(1)
+
+  const byExact = await db.from('products').select('*').eq('part_number', sku).limit(1)
   if (byExact.data && byExact.data.length) return byExact.data[0] as ProductRow
+
+  const byNorm = await db.from('products').select('*').eq('part_number_norm', norm).limit(1)
+  if (byNorm.data && byNorm.data.length) return byNorm.data[0] as ProductRow
+
+  // fallback สุดท้าย: ilike กันเว้นวรรค/ตัวพิมพ์ (เช่นพิมพ์ 140-026 แต่เก็บ 140-026 )
+  const byLike = await db.from('products').select('*').ilike('part_number', sku).limit(1)
+  if (byLike.data && byLike.data.length) return byLike.data[0] as ProductRow
+
   return null
 }
 
@@ -64,9 +67,9 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     found: true,
     part_number: p.part_number,
-    name: p.name,
-    car_model: p.car_model,
-    image_url: p.image_url,
+    name: (p.name as string) ?? null,
+    car_model: modelText(p),
+    image_url: (p.image_url as string) ?? null,
   })
 }
 
