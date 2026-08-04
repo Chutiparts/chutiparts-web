@@ -93,7 +93,7 @@ export default function PhotoUploadClient() {
       fd.append('file', blob, `${lookup.part_number}.jpg`)
       const r = await fetch('/api/ops/photo-upload', { method: 'POST', body: fd })
       const j = await r.json()
-      if (!r.ok || !j.ok) throw new Error(j.error || 'อัพไม่สำเร็จ')
+      if (!r.ok || !j.ok) throw new Error([j.error, j.message, j.details].filter(Boolean).join(' — ') || 'อัพไม่สำเร็จ')
       setMsg({ type: 'ok', text: '✅ อัพรูปขึ้นเว็บแล้ว' })
       setLookup({ ...lookup, image_url: j.url })
       setBlob(null)
