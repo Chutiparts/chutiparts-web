@@ -42,11 +42,15 @@ export async function uploadToR2(
   const publicUrl = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '')
   const url = `${endpoint()}/${bucket}/${encodeURIComponent(key)}`
 
+  // R2 ต้องการ Content-Length ที่ชัดเจน → ส่ง body เป็น Uint8Array + set header เอง
+  const bytes = body instanceof Uint8Array ? body : new Uint8Array(body)
+
   const res = await client().fetch(url, {
     method: 'PUT',
-    body: body as BodyInit,
+    body: bytes as unknown as BodyInit,
     headers: {
       'Content-Type': contentType,
+      'Content-Length': String(bytes.byteLength),
       'Cache-Control': 'public, max-age=31536000, immutable',
     },
   })
