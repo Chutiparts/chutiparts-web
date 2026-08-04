@@ -8,21 +8,23 @@ export const dynamic = 'force-dynamic'
 const COOKIE = 'ops_admin'
 const PATH = '/ops-x7k2m9/photo'
 
+// auth: owner(ops_admin) หรือ team(ops_team) — เหมือนหน้า sell · หน้านี้อยู่ใน TEAM_ALLOWED (middleware)
 async function authed(): Promise<boolean> {
+  const c = await cookies()
   const secret = process.env.ADMIN_OPS_SECRET
-  if (!secret) return false
-  return (await cookies()).get(COOKIE)?.value === secret
+  if (secret && c.get(COOKIE)?.value === secret) return true
+  const team = process.env.TEAM_OPS_SECRET
+  return !!team && c.get('ops_team')?.value === team
 }
 
 async function loginOps(formData: FormData) {
   'use server'
   const pw = String(formData.get('pw') || '')
   const secret = process.env.ADMIN_OPS_SECRET
-  if (secret && pw === secret) {
-    ;(await cookies()).set(COOKIE, secret, {
-      httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30,
-    })
-  }
+  const team = process.env.TEAM_OPS_SECRET
+  const opts = { httpOnly: true, secure: true, sameSite: 'lax' as const, path: '/', maxAge: 60 * 60 * 24 * 30 }
+  if (secret && pw === secret) { (await cookies()).set(COOKIE, secret, opts); (await cookies()).delete('ops_team') }
+  else if (team && pw === team) { (await cookies()).set('ops_team', team, opts); (await cookies()).delete(COOKIE) }
   revalidatePath(PATH)
 }
 
