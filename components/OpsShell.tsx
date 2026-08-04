@@ -26,6 +26,7 @@ const HUBS: Hub[] = [
   { key: 'stock', label: 'สต็อก', icon: '📦', items: [
     { href: `${BASE}/stock-source`, label: 'Stock', icon: '📦', ownerOnly: true },
     { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
+    { href: `${BASE}/add-part`, label: 'เพิ่มสินค้า', icon: '➕' },
     { href: `${BASE}/photo`, label: 'อัพรูป', icon: '📷' },
     { href: `${BASE}/sync-stock`, label: 'Sync สต็อก', icon: '🔄', ownerOnly: true, hidden: true }, // แทนด้วย "รับเข้าสต็อก" แล้ว
   ]},
