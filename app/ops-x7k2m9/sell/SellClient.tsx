@@ -2,7 +2,7 @@
 // app/ops-x7k2m9/sell/SellClient.tsx — ฟอร์มขายฝั่งทีม (team-safe: ไม่มีทุน/กำไรทุกที่)
 // เลือก SKU (ค้นด้วยชื่อ) → จำนวน → ราคา/ชิ้น (read-only จาก stock) → รวมโชว์อัตโนมัติ → ลูกค้า → ผู้ขาย → บันทึก
 // ค้างชำระ = บังคับระบุผู้ขาย · ราคาแก้ไม่ได้ (กันลดราคาเอง) · server เป็นคนคำนวณ/ตัดสต็อกจริง
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 
 type Opt = { sku: string; part_name: string; car_model: string; set_price: number | null; left: number }
@@ -16,6 +16,7 @@ const card: React.CSSProperties = { background: '#fff', border: '1px solid #e7e3
 export default function SellClient({ stockOpts, todaySales, addTeamSale }: { stockOpts: Opt[]; todaySales: Sale[]; addTeamSale: (fd: FormData) => Promise<{ ok: boolean; msg: string; needConfirm?: boolean }> }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  const submittingRef = useRef(false) // 🔒 P1-3: lock แบบ synchronous กัน double-tap ที่เร็วกว่า re-render (เสริม disabled={pending})
   const [f, setF] = useState({ sku: '', qty: '1', customer: '', sold_by: '', payment_status: 'paid' })
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null)
   const [confirmFd, setConfirmFd] = useState<{ fd: FormData; msg: string } | null>(null)
@@ -26,30 +27,42 @@ export default function SellClient({ stockOpts, todaySales, addTeamSale }: { sto
   const total = unit != null ? unit * qtyN : null
 
   function submit() {
+    if (submittingRef.current) return // 🔒 กันยิงซ้ำทันที (double-tap) — ไม่รอ re-render ปุ่ม
     if (!sel) { setToast({ ok: false, msg: 'กรุณาเลือก SKU จากรายการ' }); return }
     if (unit == null || unit <= 0) { setToast({ ok: false, msg: 'สินค้านี้ยังไม่ตั้งราคา — แจ้งเจ้าของ' }); return }
     if (f.payment_status === 'unpaid' && !f.sold_by.trim()) { setToast({ ok: false, msg: 'ค้างชำระต้องระบุผู้ขาย' }); return }
     const fd = new FormData()
     fd.set('sku', sel.sku); fd.set('qty', String(qtyN)); fd.set('customer', f.customer); fd.set('sold_by', f.sold_by); fd.set('payment_status', f.payment_status)
+    submittingRef.current = true
     start(async () => {
-      const r = await addTeamSale(fd)
-      if ((r as any).needConfirm) { setConfirmFd({ fd, msg: r.msg }); return }
-      setToast(r)
-      if (r.ok) { setF({ sku: '', qty: '1', customer: '', sold_by: '', payment_status: 'paid' }); router.refresh() }
-      setTimeout(() => setToast(null), 2800)
+      try {
+        const r = await addTeamSale(fd)
+        if (r.needConfirm) { setConfirmFd({ fd, msg: r.msg }); return }
+        setToast(r)
+        if (r.ok) { setF({ sku: '', qty: '1', customer: '', sold_by: '', payment_status: 'paid' }); router.refresh() }
+        setTimeout(() => setToast(null), 2800)
+      } finally {
+        submittingRef.current = false
+      }
     })
   }
 
   function doConfirm() {
     if (!confirmFd) return
+    if (submittingRef.current) return // 🔒 กันยิงยืนยันซ้ำ
     const fd = confirmFd.fd
     fd.set('confirm_oversell', '1')
     setConfirmFd(null)
+    submittingRef.current = true
     start(async () => {
-      const r = await addTeamSale(fd)
-      setToast(r)
-      if (r.ok) { setF({ sku: '', qty: '1', customer: '', sold_by: '', payment_status: 'paid' }); router.refresh() }
-      setTimeout(() => setToast(null), 2800)
+      try {
+        const r = await addTeamSale(fd)
+        setToast(r)
+        if (r.ok) { setF({ sku: '', qty: '1', customer: '', sold_by: '', payment_status: 'paid' }); router.refresh() }
+        setTimeout(() => setToast(null), 2800)
+      } finally {
+        submittingRef.current = false
+      }
     })
   }
 
