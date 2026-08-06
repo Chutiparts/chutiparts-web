@@ -54,8 +54,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 2) human-review decision (NO orders/sales/stock write)
-    // NOTE: assumes ops_decisions has a `status` column accepting pending_review|need_human_followup.
-    // The migration slice (ค) adds only `source` + `voice_call_log_id` — see README.voice.md "Open schema question".
+    // ops_decisions.status is added by the migration slice (nullable text, no CHECK) alongside
+    // source + voice_call_log_id — voice always sets pending_review | need_human_followup.
     const topic = `เสียง: ${b.intent}${b.order_id ? ` · ออเดอร์ ${String(b.order_id).slice(0, 8)}` : ''}`
     const reason = `outcome=${b.outcome} · confidence=${b.stt_confidence} → ${decisionStatus}`
     const { data: dec, error: decErr } = await supa.from('ops_decisions').insert({

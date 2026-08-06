@@ -87,10 +87,11 @@ app/api/voice/
 - **Zod not used** — adding it edits `package.json` (outside this slice's file scope) and
   breaks "zero new dependency". `_shared/schema.ts` is a self-contained validator with a
   Zod-like contract; swap-in later is one file. (brief §1.2)
-- **🔴 `ops_decisions.status` gap** — `/call-result` writes `status='pending_review'|'need_human_followup'`
-  per brief §3.3, but the migration slice adds only `source` + `voice_call_log_id`. If
-  `ops_decisions` has no `status` column, the insert fails in real mode. **Owner: confirm the
-  column exists or extend the migration.** (`ops_decisions.topic` may also be NOT NULL — we set it.)
+- **✅ `ops_decisions.status` gap — CLOSED** — Builder verified `ops_decisions` had no `status`
+  column, so the migration slice now adds `alter table public.ops_decisions add column if not
+  exists status text;` (nullable, no default/CHECK — legacy manual rows stay NULL, future
+  statuses not blocked). `/call-result` writes `pending_review`|`need_human_followup`. (`ops_decisions.topic`
+  may be NOT NULL — we set it.)
 - **Testability & imports** — cross-module imports among `_shared` are `import type` only, so
   Node's test runner erases them and loads `guardrails.ts`/`schema.ts` standalone. Production
   imports are extensionless (tsc `moduleResolution: bundler`); tests use `.ts` (tsconfig excludes `*.test.ts`).
@@ -99,6 +100,6 @@ app/api/voice/
 
 ## TODO markers left in code
 - `context/route.ts` — normalize `phone_e164` to strict E.164 before dialing (orchestrator).
-- `call-result/route.ts` — `ops_decisions.status` column assumption (see above).
+- `call-result/route.ts` — `ops_decisions.status` now provided by the migration (gap closed).
 - Retention: every new table has `created_at`; **90-day purge job not implemented** (brief §4).
 - Real orchestrator/telephony wiring is out of scope until Case 0 closes (brief Gate).
