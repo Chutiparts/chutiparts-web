@@ -48,6 +48,12 @@ async function applyStockSync(rows: StockRow[]): Promise<{ ok: boolean; added: n
   const at = new Date().toISOString()
   const batchId = 'stocksync-' + at.replace(/[^0-9]/g, '').slice(0, 14)
   if (!(await authed())) return { ok: false, added: 0, updated: 0, errors: [{ sku: '-', msg: 'unauthorized' }], batchId, at }
+  // 🔒 หลัง cutover ledger: stock_records.qty = live on-hand (trigger คุม) · sync นี้เขียน qty = "รับเข้ารวม" (gross)
+  // ถ้าปล่อยเขียนทับ = ล้าง qty live กลับเป็น gross → ledger เพี้ยนเงียบ (double-count กลับมา)
+  // ล็อกไว้ default · เปิดได้เฉพาะตั้งใจ (ก่อน cutover / กู้คืน) ด้วย ENV ALLOW_STOCK_SYNC_OVERWRITE=1
+  if (process.env.ALLOW_STOCK_SYNC_OVERWRITE !== '1') {
+    return { ok: false, added: 0, updated: 0, errors: [{ sku: '-', msg: 'ปิดใช้งานหลัง cutover ledger — การ sync จะเขียนทับคงเหลือจริง (on-hand) ด้วยยอดรับเข้ารวม ทำให้สต็อกเพี้ยน · ถ้าจำเป็นต้องตั้ง ENV ALLOW_STOCK_SYNC_OVERWRITE=1 ก่อน' }], batchId, at }
+  }
   const db = svc()
   let added = 0, updated = 0
   const errors: { sku: string; msg: string }[] = []
@@ -91,5 +97,6 @@ export default async function SyncStockPage() {
     )
   }
   const res = await svc().from('stock_records').select('*').limit(5000)
-  return <StockSyncClient stock={res.data || []} applyStockSync={applyStockSync} />
+  const syncEnabled = process.env.ALLOW_STOCK_SYNC_OVERWRITE === '1'
+  return <StockSyncClient stock={res.data || []} applyStockSync={applyStockSync} syncEnabled={syncEnabled} />
 }

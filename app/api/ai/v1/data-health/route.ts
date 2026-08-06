@@ -14,30 +14,20 @@ export async function GET(req: NextRequest) {
     tool: 'data-health',
     keyParams: [],
     fetch: async (supa) => {
-      const [leadsRes, tasksRes, stockRes, salesRes] = await Promise.all([
+      const [leadsRes, tasksRes, stockRes] = await Promise.all([
         supa.from('contact_leads').select('*').limit(2000),
         supa.from('ops_tasks').select('*').limit(1000),
         supa.from('stock_records').select('*').limit(5000),
-        supa.from('sales_records').select('*').limit(20000),
       ])
 
       const leads = (leadsRes.data || []).filter(leadOpen)
       const tasks = (tasksRes.data || []).filter(taskOpen)
       const stock = stockRes.data || []
-      const sales = salesRes.data || []
 
-      const soldBySku: Record<string, number> = {}
-      sales.forEach((r: any) => {
-        const k = String(r.sku || '').trim().toUpperCase()
-        if (k) soldBySku[k] = (soldBySku[k] || 0) + Number(r.qty || 1)
-      })
+      // หลัง cutover: stock_records.qty = live on-hand (trigger คุม) → อ่าน qty ตรง (เลิก Path B)
       const sheetStock = stock
         .filter((s: any) => s.qty != null && !isNaN(Number(s.qty)))
-        .map((s: any) => {
-          const received = Number(s.qty)
-          const sold = soldBySku[String(s.sku || '').trim().toUpperCase()] || 0
-          return { qty: received - sold, cost: s.cost }
-        })
+        .map((s: any) => ({ qty: Number(s.qty), cost: s.cost }))
 
       const health = {
         leads_open: leads.length,

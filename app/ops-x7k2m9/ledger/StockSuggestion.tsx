@@ -15,8 +15,7 @@ export default function StockSuggestion({ sales = [], stock = [] }: { sales?: Ro
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2000) }
 
-  // Path B: คงเหลือ = รับเข้า(stock.qty) − ขาย(นับ sales ตาม sku) · + ขาย 90 วัน (ดีมานด์)
-  const soldBySku = useMemo(() => { const m: Record<string, number> = {}; sales.forEach((s) => { const k = U(s.sku); if (k) m[k] = (m[k] || 0) + Number(s.qty || 1) }); return m }, [sales])
+  // หลัง cutover: คงเหลือ = stock.qty (live on-hand · trigger คุม) · ยังใช้ sales เพื่อดีมานด์ 90 วัน
   const sold90BySku = useMemo(() => { const m: Record<string, number> = {}; sales.forEach((s) => { const k = U(s.sku); if (k && s.sale_date && daysSince(s.sale_date) <= 90) m[k] = (m[k] || 0) + 1 }); return m }, [sales])
 
   const suggestions = useMemo(() => {
@@ -24,15 +23,14 @@ export default function StockSuggestion({ sales = [], stock = [] }: { sales?: Ro
       .filter((s) => String(s.sku || '').trim() && s.qty != null && !isNaN(Number(s.qty)))
       .map((s) => {
         const sku = String(s.sku).trim()
-        const received = Number(s.qty) || 0
-        const sold = soldBySku[U(sku)] || 0
-        const left = received - sold
+        // หลัง cutover: qty = live on-hand (trigger คุม) → คงเหลือ = qty ตรง
+        const left = Number(s.qty) || 0
         const sold90 = sold90BySku[U(sku)] || 0
         return { sku, part_name: s.part_name || '(ไม่ระบุ)', car_model: s.car_model || '', left, sold90 }
       })
       .filter((x) => x.left <= 1 && x.sold90 >= 1)
       .sort((a, b) => b.sold90 - a.sold90 || a.left - b.left)
-  }, [stock, soldBySku, sold90BySku])
+  }, [stock, sold90BySku])
 
   const visible = suggestions.filter((x) => !done[x.sku])
 
@@ -65,7 +63,7 @@ export default function StockSuggestion({ sales = [], stock = [] }: { sales?: Ro
     <div style={box}>
       <div style={head}>🛒 ควรสั่งเพิ่ม / หาของ (Draft) · {visible.length}</div>
       <div style={{ fontSize: 11.5, color: '#777', marginBottom: 8 }}>
-        ของ <b>ขายดีแต่ใกล้หมด</b> (คงเหลือ = รับเข้า − ขาย · Path B) · ยืนยันเพื่อ <b>สร้าง Task หาของ</b> ให้ทีม · <b>ไม่สั่งอัตโนมัติ · owner กดยืนยันเอง</b>
+        ของ <b>ขายดีแต่ใกล้หมด</b> (คงเหลือ = on-hand จริง) · ยืนยันเพื่อ <b>สร้าง Task หาของ</b> ให้ทีม · <b>ไม่สั่งอัตโนมัติ · owner กดยืนยันเอง</b>
       </div>
       {visible.length === 0 ? (
         <div style={{ fontSize: 12.5, color: '#0F6E56' }}>✅ จัดการครบทุกรายการในรอบนี้แล้ว</div>

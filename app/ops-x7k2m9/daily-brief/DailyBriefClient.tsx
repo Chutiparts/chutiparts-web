@@ -222,10 +222,8 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
 
   const unassignedCount = B.unassignedLeads.length + B.unassignedTasks.length
   const reorder = useMemo(() => reorderSignals(sales, stock), [sales, stock])
-  // 📦 คงเหลือจากชีต (stock_records.qty ที่ sync จากแท็บ Stock) — อ่านตรงตาม SKU ไม่พึ่งชื่อยอดขาย
-  // Path B: คงเหลือจริง = รับเข้า (stock.qty จากชีต) − ขาย (นับ sales_records ตาม sku · 1 แถว=1 ชิ้น)
-  const soldBySku = useMemo(() => { const m: Record<string, number> = {}; (sales || []).forEach((r) => { const k = String(r.sku || '').trim().toUpperCase(); if (k) m[k] = (m[k] || 0) + 1 }); return m }, [sales])
-  const sheetStock = useMemo(() => stock.filter((s) => s.qty != null && !isNaN(Number(s.qty))).map((s) => { const received = Number(s.qty); const sold = soldBySku[String(s.sku || '').trim().toUpperCase()] || 0; return { sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', received, sold, qty: received - sold, location: s.location || '' } }), [stock, soldBySku])
+  // 📦 คงเหลือจากชีต — หลัง cutover: stock_records.qty = live on-hand (trigger คุม) → อ่าน qty ตรง (เลิก Path B หักซ้ำ)
+  const sheetStock = useMemo(() => stock.filter((s) => s.qty != null && !isNaN(Number(s.qty))).map((s) => { const qty = Number(s.qty); return { sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', qty, location: s.location || '' } }), [stock])
   const lowStock = useMemo(() => sheetStock.filter((x) => x.qty <= 1).sort((a, b) => a.qty - b.qty), [sheetStock])
   const totalUnits = useMemo(() => sheetStock.reduce((s, x) => s + x.qty, 0), [sheetStock])
   const reorderUrgent = reorder.filter((x) => x.urgent).length
@@ -701,14 +699,14 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
         {/* 📦 คงเหลือจากชีต (SKU) — คงเหลือน้อย/หมด · อ่านจาก stock_records.qty ที่ sync จากแท็บ Stock */}
         {sheetStock.length > 0 && (
           <Section id="sec-sheet-stock" title="📦 คงเหลือน้อย/หมด (จากชีต · ตาม SKU)" count={lowStock.length}>
-            <div style={{ fontSize: 11.5, color: '#888', marginBottom: 6 }}>คงเหลือจริงรวม {totalUnits} ชิ้น · คงเหลือ = รับเข้า − ขาย (เว็บคิดให้ · Path B) · แสดงเฉพาะคงเหลือ ≤ 1</div>
+            <div style={{ fontSize: 11.5, color: '#888', marginBottom: 6 }}>คงเหลือจริงรวม {totalUnits} ชิ้น · คงเหลือ = on-hand จริง (ระบบตัดสต็อกให้อัตโนมัติ) · แสดงเฉพาะคงเหลือ ≤ 1</div>
             {lowStock.length === 0 ? <div style={{ ...card, color: '#0F6E56', fontSize: 12.5 }}>✅ ไม่มีรายการคงเหลือน้อย/หมด</div> : lowStock.map((x) => (
               <div key={x.sku} style={{ ...card, borderLeft: `4px solid ${x.qty === 0 ? '#A32D2D' : '#854F0B'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                   <b style={{ fontSize: 13.5 }}>{x.name}{x.model ? ` · ${x.model}` : ''}</b>
                   <Badge label={x.qty === 0 ? '🔴 หมด' : `🟡 เหลือ ${x.qty}`} bg={x.qty === 0 ? '#FCEBEB' : '#FAEEDA'} fg={x.qty === 0 ? '#A32D2D' : '#854F0B'} />
                 </div>
-                <div style={{ fontSize: 11.5, color: '#888', marginTop: 2 }}>SKU {x.sku}{x.location ? ` · ที่เก็บ ${x.location}` : ''} · รับเข้า {x.received} − ขาย {x.sold}</div>
+                <div style={{ fontSize: 11.5, color: '#888', marginTop: 2 }}>SKU {x.sku}{x.location ? ` · ที่เก็บ ${x.location}` : ''} · คงเหลือ {x.qty}</div>
               </div>
             ))}
           </Section>
