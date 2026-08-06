@@ -57,9 +57,23 @@ curl -s "$BASE/consent?contact_lead_id=<lead-uuid>"
 `trigger-call` without a granted consent → `409 CONSENT_REQUIRED`. `call-result` with
 `intent=confirmed & stt_confidence≥0.85` → `routed_to:"review"`; otherwise `"inbox"`.
 
+## STT/TTS provider abstraction (`_shared/providers/`)
+Swap STT/TTS vendor with one config value; business logic never knows which (spec §3.4/§196).
+```
+SABAI_STT_PROVIDER = iapp | selfhost   (default iapp)
+SABAI_TTS_PROVIDER = iapp | selfhost   (default iapp)
+```
+- `types.ts` — `SttProvider` / `TtsProvider` interfaces; methods return a discriminated result (never throw).
+- `iapp.ts` — cloud pilot adapter, **skeleton**. Env-gated on `IAPP_API_KEY`: no key → `NOT_CONFIGURED`,
+  key present → `NOT_IMPLEMENTED`. **Never networks** — real endpoint/auth are TODO until iApp API docs arrive (no guessing).
+- `selfhost.ts` — Typhoon/NECTEC placeholder (`NOT_IMPLEMENTED`), selectable now to prove the config path.
+- `index.ts` — `getSttProvider()` / `getTtsProvider()` factory (`select.ts` picks the name).
+- Not wired into the routes: in F1 the orchestrator does STT/TTS; this is the shared seam for when it's needed.
+
 ## Tests
 ```bash
-node --test app/api/voice/_shared/*.test.ts
+node --test app/api/voice/_shared/*.test.ts            # 26 — contract/guardrails
+node --test app/api/voice/_shared/providers/*.test.ts  # 8  — provider select + adapter contract (no network)
 ```
 Covers: consent-gate incl. **fail-closed**, intent-routing thresholds, latest-by-captured_at,
 idempotency decision, schema validation (incl. Catch #1/#2 forbidden fields), and a static
@@ -76,7 +90,9 @@ app/api/voice/
 │   ├── db.ts                 # service client + getLatestConsent (fail-closed) + stub mocks
 │   ├── guardrails.test.ts
 │   ├── schema.test.ts
-│   └── no-auto-commit.test.ts
+│   ├── no-auto-commit.test.ts
+│   └── providers/            # STT/TTS abstraction: types · select · iapp · selfhost · index · providers.test
+
 ├── context/route.ts          # GET
 ├── trigger-call/route.ts     # POST
 ├── call-result/route.ts      # POST
