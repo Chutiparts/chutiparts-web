@@ -1,5 +1,5 @@
 // TARGET PATH: app/api/ai/v1/parts/search/route.ts
-// search_parts — Path B (คงเหลือ = stock.qty − นับ sales ตาม sku) · READ-ONLY · ไม่คืน PII · ไม่เดารหัส
+// search_parts — คงเหลือ = stock_records.qty (live on-hand หลัง cutover · trigger คุม) · READ-ONLY · ไม่คืน PII · ไม่เดารหัส
 // Phase 2: ผ่าน handleAiRead = rate-limit(weight 2) + cache/snapshot + fallback (ไม่ล้ม/ไม่หมุน)
 import { type NextRequest } from 'next/server'
 import { handleAiRead } from '@/lib/ai-tools'
@@ -15,17 +15,10 @@ export async function GET(req: NextRequest) {
       const q = (sp.get('q') || '').trim().slice(0, 80)
       const model = (sp.get('model') || '').trim().slice(0, 40).toUpperCase()
 
-      const [stockRes, salesRes] = await Promise.all([
+      const [stockRes] = await Promise.all([
         supa.from('stock_records').select('*').limit(5000),
-        supa.from('sales_records').select('sku').limit(20000),
       ])
       if (stockRes.error) throw new Error('query_failed')
-
-      const soldBySku: Record<string, number> = {}
-      ;(salesRes.data || []).forEach((r: any) => {
-        const k = String(r.sku || '').trim().toUpperCase()
-        if (k) soldBySku[k] = (soldBySku[k] || 0) + Number(r.qty || 1)
-      })
 
       const qLower = q.toLowerCase()
       let rows = (stockRes.data || []).filter((s: any) => s.qty != null && !isNaN(Number(s.qty)))
@@ -40,9 +33,8 @@ export async function GET(req: NextRequest) {
       }
 
       const results = rows.slice(0, 50).map((s: any) => {
-        const received = Number(s.qty)
-        const sold = soldBySku[String(s.sku || '').trim().toUpperCase()] || 0
-        const available = received - sold
+        // หลัง cutover: qty = live on-hand (trigger คุม) → อ่าน qty ตรง
+        const available = Number(s.qty)
         return {
           sku: s.sku || null,
           name: s.part_name || null,

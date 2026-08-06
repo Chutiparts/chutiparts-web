@@ -29,18 +29,10 @@ export async function GET(req: NextRequest) {
       const stock = stockRes.data || []
       const sales = salesRes.data || []
 
-      const soldBySku: Record<string, number> = {}
-      sales.forEach((r: any) => {
-        const k = String(r.sku || '').trim().toUpperCase()
-        if (k) soldBySku[k] = (soldBySku[k] || 0) + Number(r.qty || 1)
-      })
+      // หลัง cutover: stock_records.qty = live on-hand (trigger ตัดยอดขายให้แล้ว) → อ่าน qty ตรง (เลิก Path B หักซ้ำ)
       const sheetStock = stock
         .filter((s: any) => s.qty != null && !isNaN(Number(s.qty)))
-        .map((s: any) => {
-          const received = Number(s.qty)
-          const sold = soldBySku[String(s.sku || '').trim().toUpperCase()] || 0
-          return { sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', qty: received - sold }
-        })
+        .map((s: any) => ({ sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', qty: Number(s.qty) }))
 
       const items: any[] = []
       leads.filter(leadOpen).forEach((l: any) => {
