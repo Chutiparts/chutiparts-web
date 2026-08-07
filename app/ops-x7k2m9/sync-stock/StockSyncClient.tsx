@@ -37,7 +37,7 @@ function findCol(header: string[], keys: string[]) {
 
 type PreviewRow = { status: 'new' | 'update' | 'nochange' | 'error'; sku: string; part_name: string; car_model: string; qty: number; cost: number | null; set_price: number | null; location: string; note: string; id?: string | null; write: boolean }
 
-export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[]; applyStockSync: (rows: StockRow[]) => Promise<{ ok: boolean; added: number; updated: number; errors: { sku: string; msg: string }[]; batchId: string; at: string }> }) {
+export default function StockSyncClient({ stock, applyStockSync, syncEnabled = false }: { stock: Row[]; syncEnabled?: boolean; applyStockSync: (rows: StockRow[]) => Promise<{ ok: boolean; added: number; updated: number; errors: { sku: string; msg: string }[]; batchId: string; at: string }> }) {
   const [raw, setRaw] = useState('')
   const [fileName, setFileName] = useState('')
   const [busy, setBusy] = useState(false)
@@ -110,7 +110,8 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
   const backup = () => dl(`stock-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(stock, null, 2), 'application/json')
   async function confirmWrite() {
     if (!toWrite.length || busy) return
-    if (!window.confirm(`ยืนยันเขียนคลังตั้งต้น (รับเข้า) ${toWrite.length} รายการลง stock_records?\n(เพิ่ม ${analysis?.counts.new} · แก้ ${analysis?.counts.update})\nเว็บจะหักยอดขายเอง = คงเหลือจริง · ระบบดาวน์โหลด backup ให้ก่อน`)) return
+    if (!syncEnabled) { window.alert('🔒 การ sync ถูกล็อกหลัง cutover ledger — จะเขียนทับคงเหลือจริง (on-hand) ด้วยยอดรับเข้ารวม ทำให้สต็อกเพี้ยน\n\nถ้าจำเป็นจริง (ก่อน cutover / กู้คืน) ต้องตั้ง ENV ALLOW_STOCK_SYNC_OVERWRITE=1 ก่อน'); return }
+    if (!window.confirm(`ยืนยันเขียนคลังตั้งต้น (รับเข้า) ${toWrite.length} รายการลง stock_records?\n(เพิ่ม ${analysis?.counts.new} · แก้ ${analysis?.counts.update})\n⚠️ เขียน qty = ยอดรับเข้ารวม (ทับ on-hand) · ระบบดาวน์โหลด backup ให้ก่อน`)) return
     setBusy(true)
     backup()
     try {
@@ -143,6 +144,15 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
       </div>
 
       <div style={{ padding: 12, maxWidth: 1000, margin: '0 auto' }}>
+        {!syncEnabled && (
+          <div style={{ ...card, background: '#FCEBEB', border: '1px solid #E7B4B4' }}>
+            <div style={{ fontWeight: 700, color: '#A32D2D', marginBottom: 4 }}>🔒 การเขียน (sync) ถูกล็อกหลัง cutover ledger</div>
+            <div style={{ fontSize: 12.5, color: '#7A2020', lineHeight: 1.5 }}>
+              ตอนนี้ระบบตัดสต็อกอัตโนมัติแล้ว — <b>คงเหลือ (on-hand) ถูกคุมโดย ledger</b> · ถ้า sync จากชีตทับ จะเขียน qty กลับเป็น "ยอดรับเข้ารวม" ทำให้สต็อกเพี้ยน (double-count กลับมา)
+              <br />ยัง <b>ดู preview/diff ได้ตามปกติ</b> (ไม่เขียนอะไร) · ถ้าจำเป็นต้องเขียนจริง (ก่อน cutover / กู้คืน) ให้ตั้ง ENV <code>ALLOW_STOCK_SYNC_OVERWRITE=1</code> ก่อน
+            </div>
+          </div>
+        )}
         <div style={card}>
           <div style={{ fontWeight: 700, color: GREEN, marginBottom: 8 }}>1) วาง CSV หรือเลือกไฟล์ (export จากแท็บ <b>"รับเข้า"</b> — มีคอลัมน์ SKU + จำนวน)</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
@@ -195,9 +205,9 @@ export default function StockSyncClient({ stock, applyStockSync }: { stock: Row[
               <div style={{ fontWeight: 700, color: GREEN, marginBottom: 8 }}>3) ยืนยัน (เขียนเฉพาะ "ใหม่ + อัปเดต" = {toWrite.length} รายการ)</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button style={btn} onClick={backup}>⬇ ดาวน์โหลด backup ปัจจุบัน</button>
-                <button onClick={confirmWrite} disabled={busy || toWrite.length === 0}
-                  style={{ ...btn, background: toWrite.length ? GREEN : '#ccc', color: '#fff', borderColor: GREEN, cursor: toWrite.length ? 'pointer' : 'default' }}>
-                  {busy ? 'กำลังเขียน…' : `✅ ยืนยันเขียนคลังตั้งต้น ${toWrite.length} รายการ`}
+                <button onClick={confirmWrite} disabled={busy || toWrite.length === 0 || !syncEnabled}
+                  style={{ ...btn, background: (toWrite.length && syncEnabled) ? GREEN : '#ccc', color: '#fff', borderColor: (toWrite.length && syncEnabled) ? GREEN : '#ccc', cursor: (toWrite.length && syncEnabled) ? 'pointer' : 'default' }}>
+                  {busy ? 'กำลังเขียน…' : !syncEnabled ? '🔒 ล็อกหลัง cutover (ตั้ง ENV เพื่อปลดล็อก)' : `✅ ยืนยันเขียนคลังตั้งต้น ${toWrite.length} รายการ`}
                 </button>
               </div>
               <div style={{ fontSize: 11.5, color: '#999', marginTop: 6 }}>กดยืนยัน = ดาวน์โหลด backup ให้อัตโนมัติ แล้วเขียน · re-sync = ทับรับเข้ารวมตัวใหม่ (ปลอดภัย ไม่สร้างซ้ำ)</div>

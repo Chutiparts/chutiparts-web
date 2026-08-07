@@ -134,13 +134,11 @@ export default async function SellPage() {
     svc().from('stock_records').select('sku,part_name,car_model,set_price,qty').limit(5000),
     svc().from('sales_records').select('sku,part_sold,car_model,customer,qty,sale_price,sold_by,payment_status,sale_date').order('sale_date', { ascending: false }).limit(400),
   ])
-  // คงเหลือ Path B (sum qty) เพื่อโชว์ให้ทีมเห็นของเหลือ
-  const soldBySku: Record<string, number> = {}
-  ;(salesRes.data || []).forEach((r: any) => { const k = String(r.sku || '').trim().toUpperCase(); if (k) soldBySku[k] = (soldBySku[k] || 0) + Number(r.qty || 1) })
+  // หลัง cutover: stock_records.qty = live on-hand (trigger คุม) → คงเหลือ = qty ตรง (เลิก Path B)
   const stockOpts = (stockRes.data || []).filter((s: any) => s.sku).map((s: any) => ({
     sku: String(s.sku).trim(), part_name: s.part_name || '', car_model: s.car_model || '',
     set_price: s.set_price != null ? Number(s.set_price) : null,
-    left: (Number(s.qty) || 0) - (soldBySku[String(s.sku).trim().toUpperCase()] || 0),
+    left: Number(s.qty) || 0,
   }))
   const today = new Date().toISOString().slice(0, 10)
   // team-safe: ไม่ส่ง cost/profit ไป client เลย
