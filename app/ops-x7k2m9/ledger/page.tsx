@@ -92,6 +92,23 @@ async function updateStock(formData: FormData) {
   await svc().from('stock_records').update(patch).eq('id', id)
   revalidatePath(PATH)
 }
+// รับเข้าเพิ่มแบบไม่มีบิล (owner) — insert received movement → trigger บวก qty (ห้ามเขียน qty ตรง)
+// idempotent ไม่จำเป็น (แต่ละครั้ง = เจตนารับเข้าใหม่) · ตรวจ qty>0 + แถวยัง active ก่อนโพสต์
+async function receiveStock(formData: FormData) {
+  'use server'
+  if (!(await authed())) return
+  const id = String(formData.get('id') || ''); if (!id) return
+  const qty = Number(formData.get('qty'))
+  if (!Number.isInteger(qty) || qty <= 0) return // ต้องเป็นจำนวนเต็ม > 0 (กัน 0/ลบ/ทศนิยม/NaN)
+  const db = svc()
+  const { data: rec } = await db.from('stock_records').select('id, deleted_at').eq('id', id).single()
+  if (!rec || rec.deleted_at) return // แถวถูกลบ/soft-delete → ไม่รับเข้า
+  await db.from('stock_movements').insert({
+    stock_record_id: id, qty_change: qty, movement_type: 'received',
+    actor: 'owner', note: 'รับเข้าเพิ่ม (ไม่มีบิล)',
+  })
+  revalidatePath(PATH)
+}
 // ลบสต็อก (owner) — เคลียร์ลิงก์เอกสารรับเข้าก่อน กัน reference ค้าง · ใช้ตอน dogfood/ลบของทดลอง
 async function deleteStock(formData: FormData) {
   'use server'
@@ -151,6 +168,6 @@ export default async function LedgerPage() {
 
   return <LedgerClient
     sales={salesRes.data || []} stock={stockRes.data || []} entries={financeRes.data || []}
-    addSale={addSale} updateSale={updateSale} addStock={addStock} updateStock={updateStock} deleteStock={deleteStock}
+    addSale={addSale} updateSale={updateSale} addStock={addStock} updateStock={updateStock} deleteStock={deleteStock} receiveStock={receiveStock}
     addEntry={addEntry} deleteEntry={deleteEntry} />
 }

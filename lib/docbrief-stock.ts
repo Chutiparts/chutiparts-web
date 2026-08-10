@@ -229,10 +229,18 @@ export async function saveStockLine(
   return { ok: true }
 }
 
-// ── A3: ยืนยัน → เข้าสต็อกจริง (stock_records) ──────────────────────────
-// ต้องครบทุกช่องจำเป็นก่อน: sku · part_name · qty · ต้นทุน · ราคาขาย · ที่เก็บ
-// insert เพิ่มอย่างเดียว · ถ้า SKU ซ้ำของเดิม = บล็อก (กันเขียนทับ) ให้ owner จัดการ restock เอง
-// idempotent: บรรทัดที่มี stock_record_id แล้วจะข้าม (กดซ้ำไม่เพิ่มซ้ำ)
+// ── A3: ยืนยัน → เข้าสต็อกจริง (post-ledger cutover 2026-08-09) ──────────
+// ต้องครบทุกช่องจำเป็นก่อน: sku · part_name · qty(int>0) · ต้นทุน · ราคาขาย · ที่เก็บ
+// ทุกบรรทัดเข้าสต็อก "ผ่าน received movement เท่านั้น" (ห้ามเขียน qty ตรง) → trigger บวก qty:
+//   • SKU ใหม่ → insert stock_records (qty=0) ก่อน แล้วค่อย received movement บวกขึ้น
+//   • SKU เดิม → received movement เข้า row เดิมเลย
+// idempotent (กันนับเบิ้ล 3 ชั้น):
+//   1) บรรทัดที่มี stock_record_id แล้ว → ข้าม
+//   2) received movement ผูก line_item_id + unique index ux_stock_movements_line
+//      → retry/concurrent จะ 23505 = ถือว่า posted แล้ว (qty ไม่บวกซ้ำ · ลบ row เปล่าที่เพิ่งสร้างทิ้ง)
+//   3) new-SKU สร้าง row qty=0 ก่อน movement → ถ้า crash ก่อน mark, retry จะเจอ row เดิมแล้ววิ่งเข้า
+//      restock path → movement 23505 → ไม่บวกซ้ำ (นี่คือเหตุผลที่ new-SKU ต้องมี movement ด้วย)
+// ambiguous: SKU เดิมที่มี active row ซ้ำหลายแถว → ไม่เดา · block เฉพาะเคสนั้น (ไม่แตะอะไรเลย)
 
 const REQUIRED = ['sku', 'part_name', 'qty', 'unit_price', 'set_price', 'location'] as const
 
@@ -266,47 +274,117 @@ export async function confirmStockDocument(
   }
   if (problems.length) return { ok: false, message: 'กรอกไม่ครบบางบรรทัด', problems }
 
-  // 2) เช็ก SKU ซ้ำของเดิมใน stock_records (กันเขียนทับ)
+  // 1b) qty ต้องเป็นจำนวนเต็ม > 0 (REQUIRED เช็กแค่ "มีค่า" → กัน "0"/"-5"/"abc" ที่ทำ movement เพี้ยน)
+  const badQty = lines.filter((l) => !l.stock_record_id).filter((l) => {
+    const n = Number(l.qty)
+    return !Number.isFinite(n) || !Number.isInteger(n) || n <= 0
+  })
+  if (badQty.length) {
+    return { ok: false, message: `จำนวนต้องเป็นเลขจำนวนเต็มมากกว่า 0 — บรรทัด ${badQty.map((l) => l.line_no).join(', ')}` }
+  }
+
+  // 2) หา active stock_records ที่มี SKU ตรง (deleted_at is null) → map: sku → [id,...]
+  //    ใช้ตัดสินว่าแต่ละบรรทัดเป็น "ของใหม่" (0 แถว) หรือ "เติมของเดิม" (1 แถว) หรือ ambiguous (>1)
   const skus = lines.map((l) => String(l.sku).trim())
-  const { data: existing } = await db.from('stock_records').select('sku').in('sku', skus)
-  const dup = new Set((existing ?? []).map((r) => r.sku))
-  const dupLines = lines.filter((l) => dup.has(String(l.sku).trim()) && !l.stock_record_id)
-  if (dupLines.length) {
+  const { data: existing } = await db.from('stock_records')
+    .select('id, sku').in('sku', skus).is('deleted_at', null)
+  const bySku = new Map<string, string[]>()
+  for (const r of existing ?? []) {
+    const k = String(r.sku).trim()
+    const arr = bySku.get(k) ?? []
+    arr.push(r.id as string)
+    bySku.set(k, arr)
+  }
+
+  // 2a) preflight ambiguous — บรรทัดที่ยังไม่ post แต่ SKU มี active หลายแถว → block ทั้งใบ (ยังไม่แตะอะไรเลย)
+  const ambiguous = [...new Set(
+    lines.filter((l) => !l.stock_record_id && (bySku.get(String(l.sku).trim())?.length ?? 0) > 1)
+      .map((l) => String(l.sku).trim()),
+  )]
+  if (ambiguous.length) {
     return {
       ok: false,
-      message: `SKU ซ้ำของเดิม: ${dupLines.map((l) => l.sku).join(', ')} — ถ้าเป็นการเติมของเดิม ให้แก้จำนวนในสต็อกเอง หรือเปลี่ยน SKU เป็นเลขใหม่`,
+      message: `SKU มีหลายรายการ active เลือกไม่ได้ (แก้ให้เหลือรายการเดียว หรือเปลี่ยน SKU): ${ambiguous.join(', ')}`,
     }
   }
 
-  // 3) insert เข้า stock_records (ข้ามบรรทัดที่ทำไปแล้ว)
-  let inserted = 0
+  // 3) โพสต์ทีละบรรทัด (ข้ามบรรทัดที่ทำไปแล้ว — idempotent) · ทุกบรรทัดเข้าสต็อกผ่าน received movement
+  const nowIso = () => new Date().toISOString()
+  const markPosted = (lineId: string, recId: string) =>
+    db.from('doc_line_items').update({ stock_record_id: recId, updated_at: nowIso() }).eq('id', lineId)
+  let inserted = 0   // นับรวมทุกบรรทัดที่ posted สำเร็จ (ใหม่ + เติมของเดิม)
+  let restocked = 0  // เฉพาะเติมของเดิม (SKU เดิม)
   for (const l of lines) {
     if (l.stock_record_id) continue // ทำไปแล้ว — idempotent
-    const { data: rec, error } = await db.from('stock_records').insert({
-      sku: String(l.sku).trim(),
-      part_name: l.part_name,
-      car_model: l.car_model,
-      qty: l.qty,
-      cost: l.unit_price,
-      set_price: l.set_price,
-      location: l.location,
-      status: 'in_stock',
-      has_image: false,
-      source: doc.vendor_name,
-      date_in: doc.doc_date,
-      note: [l.category, l.oem, l.condition, l.note].filter(Boolean).join(' · ') || null,
-    }).select('id').single()
-    if (error) {
-      await audit(db, documentId, actor, 'stock.insert_failed', null, null, { line_no: l.line_no, error: error.message })
-      return { ok: false, message: `บรรทัด ${l.line_no} เข้าสต็อกไม่สำเร็จ: ${error.message}`, inserted }
+    const sku = String(l.sku).trim()
+    const qtyN = Number(l.qty) // ผ่าน preflight 1b แล้ว = จำนวนเต็ม > 0
+    const existingId = (bySku.get(sku) ?? [])[0] ?? null
+
+    // หาเป้าหมาย stock_records: ของเดิมใช้ id เดิม · ของใหม่สร้าง row qty=0 ก่อน (on-hand มาจาก movement)
+    let targetId = existingId
+    let createdNew = false
+    if (!targetId) {
+      const { data: rec, error } = await db.from('stock_records').insert({
+        sku,
+        part_name: l.part_name,
+        car_model: l.car_model,
+        qty: 0, // ← on-hand จะถูก trigger บวกจาก received movement ด้านล่าง (ไม่เขียน qty ตรง)
+        cost: l.unit_price,
+        set_price: l.set_price,
+        location: l.location,
+        status: 'in_stock',
+        has_image: false,
+        source: doc.vendor_name,
+        date_in: doc.doc_date,
+        note: [l.category, l.oem, l.condition, l.note].filter(Boolean).join(' · ') || null,
+      }).select('id').single()
+      if (error || !rec) {
+        await audit(db, documentId, actor, 'stock.insert_failed', null, null, { line_no: l.line_no, sku, error: error?.message })
+        return { ok: false, message: `บรรทัด ${l.line_no} เข้าสต็อกไม่สำเร็จ: ${error?.message ?? 'unknown'}`, inserted }
+      }
+      targetId = rec.id as string
+      createdNew = true
     }
-    await db.from('doc_line_items').update({ stock_record_id: rec!.id, updated_at: new Date().toISOString() }).eq('id', l.id)
+
+    // received movement → trigger บวก qty · ผูก line_item_id (unique) = กันนับเบิ้ล
+    const { error: mvErr } = await db.from('stock_movements').insert({
+      stock_record_id: targetId,
+      qty_change: qtyN,
+      movement_type: 'received',
+      unit_cost: l.unit_price,
+      document_id: documentId,
+      line_item_id: l.id,
+      actor,
+      note: `รับเข้าจากบิล ${doc.vendor_name ?? doc.doc_date ?? documentId.slice(0, 8)}`,
+    })
+    if (mvErr) {
+      // ux_stock_movements_line กัน post ซ้ำ → 23505 = บรรทัดนี้ถูกโพสต์ไปแล้ว (retry/concurrent)
+      if ((mvErr as { code?: string }).code === '23505') {
+        if (createdNew) {
+          // row qty=0 ที่เพิ่งสร้างเป็น orphan (บรรทัดถูกโพสต์ที่อื่นแล้ว) → ลบทิ้ง กัน dup SKU
+          await db.from('stock_records').delete().eq('id', targetId)
+        } else {
+          await markPosted(l.id, targetId)
+        }
+        continue
+      }
+      // movement fail อื่น ๆ: ลบ row เปล่าที่เพิ่งสร้าง (ถ้ามี) กันค้าง orphan qty=0 · retry ได้สะอาด
+      if (createdNew) await db.from('stock_records').delete().eq('id', targetId)
+      await audit(db, documentId, actor, 'stock.movement_failed', null, null, { line_no: l.line_no, sku, error: mvErr.message })
+      return { ok: false, message: `บรรทัด ${l.line_no} รับเข้าไม่สำเร็จ: ${mvErr.message}`, inserted }
+    }
+
+    await markPosted(l.id, targetId)
     inserted++
+    if (!createdNew) restocked++
+    // ลงทะเบียน row ใหม่เข้า map ทันที → บรรทัดถัดไปในบิลเดียวกันที่ SKU เดียวกัน
+    // จะวิ่งเข้า restock path (บวกเข้าแถวเดิม) แทนสร้าง dup row (กัน ambiguous ในอนาคต)
+    else bySku.set(sku, [targetId])
   }
 
   // 4) เอกสาร → exported
-  await db.from('doc_documents').update({ state: 'exported', updated_at: new Date().toISOString() }).eq('id', documentId)
-  await audit(db, documentId, actor, 'document.exported', 'pending_review', 'exported', { inserted, skus })
+  await db.from('doc_documents').update({ state: 'exported', updated_at: nowIso() }).eq('id', documentId)
+  await audit(db, documentId, actor, 'document.exported', 'pending_review', 'exported', { inserted, restocked, created: inserted - restocked, skus })
 
   return { ok: true, inserted }
 }
