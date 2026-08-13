@@ -1,49 +1,64 @@
 'use client'
 // components/OpsShell.tsx — Mini ERP shell (เมนู navigation)
-// โครงใหม่: หลัก · ปฏิบัติการ (3 hub แบบ accordion: การเงิน/สต็อก/เอกสาร) · ระบบ
-// RBAC: พนักงาน docbrief (reviewer/operator/viewer) เห็นเฉพาะเมนูเอกสารที่จำเป็น
-//   owner เห็นครบ · team (parts-desk) เห็นเมนูทั่วไป · ซ่อน (hidden) = ไม่โชว์ แต่โค้ด+URL ยังอยู่
-import { usePathname, useSearchParams } from 'next/navigation'
+// โครง (reorg): 5 section headers · Daily Brief บนสุด · hub accordion เดิม (สต็อก&Sourcing/สินค้า/เอกสาร)
+//   Section = { header?, entries: (Item|Hub)[] } · entry = link เดี่ยว หรือ hub พับได้
+// RBAC: พนักงาน docbrief (reviewer/operator/viewer) เห็นเฉพาะเมนูเอกสาร · owner เห็นครบ · team เห็นทั่วไป
+//   role flag (doc/docOwner/ownerOnly) ติดกับ item เดิมแม้ย้ายกลุ่ม · canSee logic ไม่แตะพฤติกรรม
+// badges: prop count-only จาก layout (tasks/lowstock) → pill ท้าย label · read-only
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
 const BASE = '/ops-x7k2m9'
-// doc = เมนู docbrief (พนักงาน+owner เห็น) · docOwner = docbrief แต่ owner เท่านั้น
-// ownerOnly = การเงิน/ระบบ (owner) · hidden = ไม่โชว์ (เก็บโค้ดไว้) · plain = ทั่วไป (team เห็น)
-type Item = { href: string; label: string; icon: string; match?: string; doc?: boolean; docOwner?: boolean; ownerOnly?: boolean; hidden?: boolean; badgeKey?: string; badgeTone?: 'red' | 'amber' }
+// href? = ไม่มี = soon placeholder (กดไม่ได้) · doc/docOwner/ownerOnly/hidden = RBAC เดิม · badgeKey → pill
+type Item = { href?: string; label: string; icon: string; match?: string; badgeKey?: string; soon?: boolean; doc?: boolean; docOwner?: boolean; ownerOnly?: boolean; hidden?: boolean }
 type Hub = { key: string; label: string; icon: string; items: Item[] }
+type Section = { header?: string; entries: (Item | Hub)[] }
 
-const MAIN: Item[] = [
-  { href: `${BASE}/daily-brief`, label: 'Daily Brief', icon: '☀️', ownerOnly: true },
-  { href: `${BASE}/parts-desk`, label: 'Leads', icon: '📇' },
-  { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk`, badgeKey: 'tasks', badgeTone: 'amber' },
-]
-const HUBS: Hub[] = [
-  { key: 'finance', label: 'การเงิน', icon: '💰', items: [
-    { href: `${BASE}/ledger`, label: 'Ledger', icon: '📒', ownerOnly: true },
+const isHub = (e: Item | Hub): e is Hub => 'items' in e
+const BADGE_TONE: Record<string, 'red' | 'amber'> = { tasks: 'amber', lowstock: 'red' }
+
+const SECTIONS: Section[] = [
+  // บนสุด (ไม่มี header)
+  { entries: [
+    { href: `${BASE}/daily-brief`, label: 'Daily Brief', icon: '☀️', ownerOnly: true },
+  ] },
+  { header: 'ลูกค้า & งาน', entries: [
+    { href: `${BASE}/parts-desk`, label: 'Leads & Follow-up', icon: '📇', badgeKey: 'tasks' }, // รวม Leads+Tasks (Tasks = แท็บในหน้า)
+    { label: 'Voice / AI Conversations', icon: '🎙️', soon: true }, // plain · เร็วๆ นี้
+  ] },
+  { header: 'การเงิน', entries: [
     { href: `${BASE}/sell`, label: 'ขายออก', icon: '🧾' },
+    { href: `${BASE}/ledger`, label: 'Ledger', icon: '📒', ownerOnly: true },
+    { label: 'รายเดือน', icon: '📅', ownerOnly: true, soon: true }, // เร็วๆ นี้
     { href: `${BASE}/landed-cost`, label: 'Landed Cost', icon: '🧮', ownerOnly: true },
-  ]},
-  { key: 'stock', label: 'สต็อก', icon: '📦', items: [
-    { href: `${BASE}/stock-source`, label: 'Stock', icon: '📦', ownerOnly: true, badgeKey: 'lowstock', badgeTone: 'red' },
-    { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
-    { href: `${BASE}/add-part`, label: 'เพิ่มสินค้า', icon: '➕' },
-    { href: `${BASE}/photo`, label: 'อัพรูป', icon: '📷' },
-    { href: `${BASE}/sync-stock`, label: 'Sync สต็อก', icon: '🔄', ownerOnly: true, hidden: true }, // แทนด้วย "รับเข้าสต็อก" แล้ว
-  ]},
-  { key: 'docs', label: 'เอกสาร', icon: '📄', items: [
-    { href: `${BASE}/inbox`, label: 'กล่องงาน', icon: '📥', doc: true },
-    { href: `${BASE}/documents`, label: 'บัญชี', icon: '📄', doc: true },
-    { href: `${BASE}/stock-intake`, label: 'รับเข้าสต็อก', icon: '📦', doc: true },
-    { href: `${BASE}/repository`, label: 'คลังเอกสาร', icon: '🗂️', doc: true },
-    { href: `${BASE}/doc-metrics`, label: 'ต้นทุน AI', icon: '📊', docOwner: true },
-    { href: `${BASE}/trash`, label: 'ถังทิ้ง', icon: '🗑', docOwner: true },
-  ]},
+  ] },
+  { header: 'สต็อก & สินค้า', entries: [
+    { key: 'stock', label: 'สต็อก & Sourcing', icon: '📦', items: [
+      { href: `${BASE}/stock-source`, label: 'สต็อก', icon: '📦', ownerOnly: true, badgeKey: 'lowstock' },
+      { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
+      { href: `${BASE}/stock-intake`, label: 'รับเข้าสต็อก', icon: '🚚', doc: true }, // ย้ายมาจากกลุ่มเอกสาร
+      { href: `${BASE}/sync-stock`, label: 'Sync สต็อก', icon: '🔄', ownerOnly: true, hidden: true }, // เก็บ URL · ไม่ render
+    ] },
+    { key: 'goods', label: 'สินค้า', icon: '🏷️', items: [
+      { href: `${BASE}/add-part`, label: 'เพิ่มสินค้า', icon: '➕' },
+      { href: `${BASE}/photo`, label: 'อัพรูป', icon: '📷' },
+    ] },
+  ] },
+  { header: 'เอกสาร', entries: [
+    { key: 'docs', label: 'เอกสาร', icon: '📄', items: [
+      { href: `${BASE}/inbox`, label: 'กล่องงาน', icon: '📥', doc: true },
+      { href: `${BASE}/documents`, label: 'บัญชี', icon: '📄', doc: true },
+      { href: `${BASE}/repository`, label: 'คลังเอกสาร', icon: '🗂️', doc: true },
+    ] },
+  ] },
+  { header: 'ระบบ', entries: [
+    { href: `${BASE}/doc-metrics`, label: 'ต้นทุน AI', icon: '📊', docOwner: true }, // ย้ายมาจากเอกสาร
+    { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺', ownerOnly: true },
+    { href: `${BASE}/garages`, label: 'Directory / อู่เบนซ์', icon: '🔧', ownerOnly: true },
+    { href: `${BASE}/trash`, label: 'ถังขยะ', icon: '🗑', docOwner: true }, // ท้ายสุด
+  ] },
 ]
-const SYSTEM: Item[] = [
-  { href: `${BASE}/garages`, label: 'อู่เบนซ์ (directory)', icon: '🔧', ownerOnly: true },
-  { href: `${BASE}/web-checker`, label: 'Monitor', icon: '🩺', ownerOnly: true },
-]
-const ALL_ITEMS: Item[] = [...MAIN, ...HUBS.flatMap((h) => h.items), ...SYSTEM]
+const ALL_ITEMS: Item[] = SECTIONS.flatMap((s) => s.entries.flatMap((e) => (isHub(e) ? e.items : [e])))
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Owner', reviewer: 'ผู้ตรวจ', operator: 'ผู้ปฏิบัติงาน', viewer: 'ผู้ดู', team: 'ทีม' }
 
@@ -62,9 +77,12 @@ const CSS = `
 .opsx-hub.has-active{color:#C9A961}
 .opsx-caret{margin-left:auto;font-size:10px;opacity:.7;transition:transform .15s}
 .opsx-caret.open{transform:rotate(90deg)}
-.opsx-main{margin-left:var(--w);min-height:100vh}
+.opsx-soon{opacity:.5;cursor:default}
+.opsx-soon:hover{background:none}
+.opsx-soon-tag{margin-left:auto;font-size:9px;font-weight:700;background:#eee;color:#999;border-radius:6px;padding:1px 6px;white-space:nowrap}
 .opsx-pill{border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px;line-height:1.6;white-space:nowrap}
 .opsx-bdot{position:absolute;top:-5px;right:-9px;min-width:15px;height:15px;line-height:15px;border-radius:999px;font-size:9px;font-weight:700;color:#fff;padding:0 3px;text-align:center;box-sizing:border-box}
+.opsx-main{margin-left:var(--w);min-height:100vh}
 .opsx-bottom{display:none}
 @media (max-width:768px){
 .opsx-side{display:none}
@@ -79,13 +97,13 @@ const CSS = `
 export default function OpsShell({ children, role = 'owner', badges = {} }: { children: React.ReactNode; role?: string; badges?: Record<string, number> }) {
   const path = usePathname() || ''
   const TONE: Record<'red' | 'amber', { bg: string; fg: string }> = { red: { bg: '#FCEBEB', fg: '#A32D2D' }, amber: { bg: '#FAEEDA', fg: '#854F0B' } }
-  // badge จาก prop (count-only จาก layout) → เลข + tone · 0/undefined = ไม่โชว์
+  // badge จาก prop (count-only จาก layout) · tone มาจาก badgeKey · 0/undefined = ไม่โชว์
   const badgeOf = (it: Item): { n: number; tone: 'red' | 'amber' } | null => {
     if (!it.badgeKey) return null
     const n = badges[it.badgeKey] || 0
-    return n > 0 ? { n, tone: it.badgeTone || 'amber' } : null
+    return n > 0 ? { n, tone: BADGE_TONE[it.badgeKey] || 'amber' } : null
   }
-  // ผลรวม badge ของ hub (โชว์ที่หัวเมื่อ hub ปิด) · tone แดงชนะ (เร่งกว่า)
+  // ผลรวม badge ของ hub (โชว์ที่หัวเมื่อ hub ปิด) · tone แดงชนะ
   const hubBadge = (h: Hub): { n: number; tone: 'red' | 'amber' } | null => {
     let n = 0; let tone: 'red' | 'amber' = 'amber'
     for (const it of h.items) { const b = badgeOf(it); if (b) { n += b.n; if (b.tone === 'red') tone = 'red' } }
@@ -94,11 +112,13 @@ export default function OpsShell({ children, role = 'owner', badges = {} }: { ch
   const Pill = ({ n, tone }: { n: number; tone: 'red' | 'amber' }) => (
     <span className="opsx-pill" style={{ background: TONE[tone].bg, color: TONE[tone].fg }}>{n}</span>
   )
+
+  // RBAC — คงเดิมทุกบรรทัด (ไม่แตะ behavior)
   const DOC_ROLES = new Set(['owner', 'reviewer', 'operator', 'viewer'])
   const isDocStaff = role === 'reviewer' || role === 'operator' || role === 'viewer'
   const canSee = (it: Item) => {
     if (it.hidden) return false
-    if (it.docOwner) return role === 'owner'          // เมนู docbrief เฉพาะ owner (ต้นทุน AI / ถังทิ้ง)
+    if (it.docOwner) return role === 'owner'          // เมนู docbrief เฉพาะ owner (ต้นทุน AI / ถังขยะ)
     if (it.doc) return DOC_ROLES.has(role)            // เมนู docbrief พนักงานเห็น
     if (isDocStaff) return false                       // พนักงาน docbrief → เห็นเฉพาะเมนูเอกสาร
     if (it.ownerOnly) return role === 'owner'          // การเงิน/ระบบ
@@ -106,29 +126,38 @@ export default function OpsShell({ children, role = 'owner', badges = {} }: { ch
   }
 
   const linkTarget = (h: string) => (h.endsWith('.html') ? { target: '_blank', rel: 'noopener' } : {})
-  const sp = useSearchParams()
   const activeHref = (() => {
     const pd = `${BASE}/parts-desk`
-    if (path === pd || path.startsWith(pd + '/')) return sp?.get('tab') === 'tasks' ? `${pd}?tab=tasks` : pd
-    const hit = ALL_ITEMS.find((it) => { const b = it.href.split('?')[0]; return path === b || path.startsWith(b + '/') })
+    if (path === pd || path.startsWith(pd + '/')) return pd // Leads & Follow-up ครอบทุก tab
+    const hit = ALL_ITEMS.find((it) => { if (!it.href) return false; const b = it.href.split('?')[0]; return path === b || path.startsWith(b + '/') })
     return hit ? hit.href : ''
   })()
-  const isActive = (it: Item) => it.href === activeHref
-  const activeHubKey = HUBS.find((h) => h.items.some((it) => it.href === activeHref))?.key ?? ''
+  const isActive = (it: Item) => !!it.href && it.href === activeHref
+
+  // hide-empty: กรอง item ตาม canSee → hub/section ที่ไม่เหลือ item = ไม่ render (header หายด้วย)
+  const visSections = SECTIONS.map((sec) => {
+    const entries = sec.entries.reduce<(Item | Hub)[]>((acc, e) => {
+      if (isHub(e)) { const items = e.items.filter(canSee); if (items.length) acc.push({ ...e, items }) }
+      else if (canSee(e)) acc.push(e)
+      return acc
+    }, [])
+    return { header: sec.header, entries }
+  }).filter((sec) => sec.entries.length > 0)
+  // mobile: ทุก item ที่ role เห็น (แบน hub) · ตัด soon (กดไม่ได้)
+  const visMobile = visSections.flatMap((s) => s.entries.flatMap((e) => (isHub(e) ? e.items : [e]))).filter((it) => !it.soon && it.href)
 
   // accordion: ค่าเริ่มต้น = เปิด hub ที่มีหน้าปัจจุบัน · ผู้ใช้กดเปิด/ปิดเองได้
+  const activeHubKey = SECTIONS.flatMap((s) => s.entries).filter(isHub).find((h) => h.items.some((it) => it.href === activeHref))?.key ?? ''
   const [toggled, setToggled] = useState<Record<string, boolean>>({})
   const isHubOpen = (key: string) => toggled[key] ?? (key === activeHubKey)
 
-  const visMain = MAIN.filter(canSee)
-  const visHubs = HUBS.map((h) => ({ ...h, items: h.items.filter(canSee) })).filter((h) => h.items.length > 0)
-  const visSystem = SYSTEM.filter(canSee)
-  const visMobile = [...visMain, ...visHubs.flatMap((h) => h.items), ...visSystem]
-
   const Link = ({ it, sub }: { it: Item; sub?: boolean }) => {
+    if (it.soon) return (
+      <div className={`opsx-link opsx-soon${sub ? ' opsx-sub' : ''}`}><span>{it.icon}</span><span>{it.label}</span><span className="opsx-soon-tag">เร็วๆ นี้</span></div>
+    )
     const b = badgeOf(it)
     return (
-      <a href={it.href} {...linkTarget(it.href)} className={`opsx-link${sub ? ' opsx-sub' : ''}${isActive(it) ? ' active' : ''}`}>
+      <a href={it.href} {...linkTarget(it.href || '')} className={`opsx-link${sub ? ' opsx-sub' : ''}${isActive(it) ? ' active' : ''}`}>
         <span>{it.icon}</span><span>{it.label}</span>
         {b && <Pill n={b.n} tone={b.tone} />}
       </a>
@@ -141,37 +170,33 @@ export default function OpsShell({ children, role = 'owner', badges = {} }: { ch
 
       <aside className="opsx-side">
         <div className="opsx-brand">ChutiBenz<small>Mini ERP · {ROLE_LABEL[role] || 'Command Center'}</small></div>
-
-        {visMain.length > 0 && <><div className="opsx-ghead">หลัก</div>{visMain.map((it) => <Link key={it.label} it={it} />)}</>}
-
-        {visHubs.length > 0 && (
-          <>
-            <div className="opsx-ghead">ปฏิบัติการ</div>
-            {visHubs.map((h) => {
-              const open = isHubOpen(h.key)
-              const hasActive = h.key === activeHubKey
+        {visSections.map((sec, i) => (
+          <div key={sec.header || `sec-${i}`}>
+            {sec.header && <div className="opsx-ghead">{sec.header}</div>}
+            {sec.entries.map((e) => {
+              if (!isHub(e)) return <Link key={e.label} it={e} />
+              const open = isHubOpen(e.key)
+              const hasActive = e.key === activeHubKey
               return (
-                <div key={h.key}>
-                  <button type="button" className={`opsx-hub${hasActive ? ' has-active' : ''}`} onClick={() => setToggled((t) => ({ ...t, [h.key]: !open }))}>
-                    <span>{h.icon}</span><span>{h.label}</span>
-                    {!open && (() => { const hb = hubBadge(h); return hb ? <Pill n={hb.n} tone={hb.tone} /> : null })()}
+                <div key={e.key}>
+                  <button type="button" className={`opsx-hub${hasActive ? ' has-active' : ''}`} onClick={() => setToggled((t) => ({ ...t, [e.key]: !open }))}>
+                    <span>{e.icon}</span><span>{e.label}</span>
+                    {!open && (() => { const hb = hubBadge(e); return hb ? <Pill n={hb.n} tone={hb.tone} /> : null })()}
                     <span className={`opsx-caret${open ? ' open' : ''}`}>▶</span>
                   </button>
-                  {open && h.items.map((it) => <Link key={it.label} it={it} sub />)}
+                  {open && e.items.map((it) => <Link key={it.label} it={it} sub />)}
                 </div>
               )
             })}
-          </>
-        )}
-
-        {visSystem.length > 0 && <><div className="opsx-ghead">ระบบ</div>{visSystem.map((it) => <Link key={it.label} it={it} />)}</>}
+          </div>
+        ))}
       </aside>
 
       <nav className="opsx-bottom">
         {visMobile.map((it) => {
           const b = badgeOf(it)
           return (
-            <a key={it.label} href={it.href} {...linkTarget(it.href)} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
+            <a key={it.label} href={it.href} {...linkTarget(it.href || '')} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
               <span className="opsx-bicon" style={{ position: 'relative' }}>{it.icon}{b && <span className="opsx-bdot" style={{ background: TONE[b.tone].fg }}>{b.n > 99 ? '99+' : b.n}</span>}</span><span>{it.label}</span>
             </a>
           )
