@@ -167,6 +167,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   const [toast, setToast] = useState('')
   const [openBrief, setOpenBrief] = useState('')
   const [showDetail, setShowDetail] = useState(false)
+  const [openAging, setOpenAging] = useState(false)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
   const copy = (text: string, m = 'คัดลอกแล้ว') => navigator.clipboard?.writeText(text).then(() => flash(m))
   const [fb, setFb] = useState<Record<string, string>>({})
@@ -226,6 +227,27 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   const sheetStock = useMemo(() => stock.filter((s) => s.qty != null && !isNaN(Number(s.qty))).map((s) => { const qty = Number(s.qty); return { sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', qty, location: s.location || '' } }), [stock])
   const lowStock = useMemo(() => sheetStock.filter((x) => x.qty <= 1).sort((a, b) => a.qty - b.qty), [sheetStock])
   const totalUnits = useMemo(() => sheetStock.reduce((s, x) => s + x.qty, 0), [sheetStock])
+  // 🧊 Aging Stock / ทุนจม (Phase 1 บล็อก A · read-only จาก stock prop · ไม่ fetch เพิ่ม)
+  //   active (deleted_at null) + มีของ (qty>0) + มีทุนจริง (cost×qty>0) · bucket >90/>180 วัน (cumulative)
+  //   date_in ว่าง → แยกกลุ่ม "ไม่ทราบอายุ" (กัน NaN) · Top เรียง tied×aging (ทุนจมหนักสุดก่อน)
+  const aging = useMemo(() => {
+    const DAY = 86400000, now = Date.now()
+    const rows = (stock || [])
+      .filter((s) => s.deleted_at == null && Number(s.qty) > 0)
+      .map((s) => {
+        const qty = Number(s.qty) || 0, cost = Number(s.cost) || 0
+        const t = s.date_in ? new Date(s.date_in).getTime() : NaN
+        const days = isNaN(t) ? null : Math.floor((now - t) / DAY)
+        return { sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', qty, tied: cost * qty, days }
+      })
+      .filter((r) => r.tied > 0)
+    const sum = (arr: { tied: number }[]) => arr.reduce((a, r) => a + r.tied, 0)
+    const over90 = rows.filter((r) => r.days != null && r.days > 90)
+    const over180 = rows.filter((r) => r.days != null && r.days > 180)
+    const unknown = rows.filter((r) => r.days == null)
+    const top = [...over90].sort((a, b) => (b.tied * (b.days || 0)) - (a.tied * (a.days || 0))).slice(0, 10)
+    return { cap90: sum(over90), n90: over90.length, cap180: sum(over180), n180: over180.length, capUnknown: sum(unknown), nUnknown: unknown.length, top }
+  }, [stock])
   const reorderUrgent = reorder.filter((x) => x.urgent).length
 
   // ===== Product risk buckets (Level B: merge จาก Risk Guard) =====
@@ -499,6 +521,37 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
                   <button onClick={() => unmute(it)} style={{ ...fbbtn, whiteSpace: 'nowrap' }}>↩️ เตือนอีก</button>
                 </div>
               ))}
+            </div>
+          )}
+          {/* 🧊 Aging Stock / ทุนจม (Phase 1 บล็อก A) — 1 บรรทัดสรุป + กดขยาย · read-only · nav ไป Stock */}
+          {(aging.n90 > 0 || aging.nUnknown > 0) && (
+            <div style={{ marginBottom: 14 }}>
+              <div onClick={() => setOpenAging((o) => !o)} title="กดเพื่อดูรายการทุนจม"
+                style={{ ...card, borderLeft: `4px solid ${aging.cap180 >= 20000 ? '#854F0B' : BRASS}`, padding: '11px 12px', marginBottom: openAging ? 4 : 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: '#412402' }}>
+                  {aging.n90 > 0
+                    ? <>🧊 ทุนจม &gt;180 วัน: {bahtN(aging.cap180)} ({aging.n180} รายการ) · &gt;90 วัน: {bahtN(aging.cap90)}
+                        {aging.cap180 >= 20000 && <span style={{ marginLeft: 6, background: '#FAEEDA', color: '#854F0B', fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 999 }}>🟡 สูง</span>}</>
+                    : <>🧊 ไม่มีของค้างเกิน 90 วัน · ❔ ไม่ทราบอายุ {aging.nUnknown} รายการ ({bahtN(aging.capUnknown)}) — เช็ก date_in</>}
+                </div>
+                <span style={{ fontSize: 12, color: '#999' }}>{openAging ? '▲ ซ่อน' : '▼ ดู'}</span>
+              </div>
+              {openAging && (
+                <div style={{ ...card }}>
+                  <div style={{ fontSize: 11.5, color: '#888', marginBottom: 6 }}>เรียงตามทุน × อายุ (ทุนจมหนักสุดก่อน) · ทุน = ต้นทุน × จำนวน</div>
+                  {aging.top.length === 0 ? <div style={{ fontSize: 12.5, color: '#999' }}>— ไม่มีรายการเกิน 90 วัน —</div> : aging.top.map((r, i) => (
+                    <div key={r.sku || `aging-${i}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', padding: '5px 0', borderBottom: '1px dashed #eee' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}{r.model ? ` · ${r.model}` : ''}</div>
+                        <div style={{ fontSize: 11, color: '#999' }}>SKU {r.sku || '-'} · ค้าง {r.days} วัน · จำนวน {r.qty}</div>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#854F0B', whiteSpace: 'nowrap' }}>{bahtN(r.tied)}</div>
+                    </div>
+                  ))}
+                  {aging.nUnknown > 0 && <div style={{ fontSize: 11.5, color: '#999', marginTop: 6 }}>❔ ไม่ทราบอายุ (date_in ว่าง): {aging.nUnknown} รายการ · ทุน {bahtN(aging.capUnknown)}</div>}
+                  <a href="/ops-x7k2m9/stock-source" style={{ ...qbtn, display: 'inline-block', textDecoration: 'none', marginTop: 8 }}>→ ไปที่ Stock</a>
+                </div>
+              )}
             </div>
           )}
           <div style={{ ...card, background: '#fbfaf6', fontSize: 12, color: '#7c4a13', marginTop: 4 }}>
