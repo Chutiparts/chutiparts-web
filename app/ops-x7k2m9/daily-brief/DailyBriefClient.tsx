@@ -168,6 +168,7 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
   const [openBrief, setOpenBrief] = useState('')
   const [showDetail, setShowDetail] = useState(false)
   const [openAging, setOpenAging] = useState(false)
+  const [openListing, setOpenListing] = useState(false)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 1600) }
   const copy = (text: string, m = 'คัดลอกแล้ว') => navigator.clipboard?.writeText(text).then(() => flash(m))
   const [fb, setFb] = useState<Record<string, string>>({})
@@ -248,6 +249,38 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
     const top = [...over90].sort((a, b) => (b.tied * (b.days || 0)) - (a.tied * (a.days || 0))).slice(0, 10)
     return { cap90: sum(over90), n90: over90.length, cap180: sum(over180), n180: over180.length, capUnknown: sum(unknown), nUnknown: unknown.length, top }
   }, [stock])
+  // 📸 Listing Readiness (Phase 2 บล็อก C · read-only จาก stock prop · ไม่ fetch เพิ่ม)
+  //   ของมีจริง (deleted_at null · qty>0) แต่ลงขายไม่ครบ: ไม่มีรูป / ราคาว่าง / รุ่นว่าง
+  const listing = useMemo(() => {
+    const rows = (stock || []).filter((s) => s.deleted_at == null && Number(s.qty) > 0)
+    let noImage = 0, noPrice = 0, noModel = 0
+    const need: { sku: string; name: string; model: string; miss: string[] }[] = []
+    for (const s of rows) {
+      const miss: string[] = []
+      if (!s.has_image) { miss.push('ไม่มีรูป'); noImage++ }
+      if (s.set_price == null || Number(s.set_price) <= 0) { miss.push('ราคาว่าง'); noPrice++ }
+      if (!s.car_model || !String(s.car_model).trim()) { miss.push('รุ่นว่าง'); noModel++ }
+      if (miss.length) need.push({ sku: s.sku || '', name: s.part_name || '(ไม่ระบุ)', model: s.car_model || '', miss })
+    }
+    return { noImage, noPrice, noModel, count: need.length, top: need.slice(0, 10) }
+  }, [stock])
+  // 📈 Trend deltas (Phase 2 บล็อก D · read-only) — วันนี้ vs ค่าเฉลี่ย 7 วันก่อนหน้า (ไม่รวมวันนี้)
+  const trend = useMemo(() => {
+    const DAY = 86400000, now = Date.now()
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const dayKey = (d: any) => String(d || '').slice(0, 10)
+    const past7 = new Set<string>()
+    for (let i = 1; i <= 7; i++) past7.add(new Date(now - i * DAY).toISOString().slice(0, 10))
+    const todaySales = (sales || []).filter((r) => dayKey(r.sale_date) === todayKey)
+    const past7Sales = (sales || []).filter((r) => past7.has(dayKey(r.sale_date)))
+    const past7Leads = (leads || []).filter((l) => past7.has(dayKey(l.created_at)))
+    const sumRev = (arr: Row[]) => arr.reduce((a, r) => a + (Number(r.sale_price) || 0), 0)
+    return {
+      billsToday: todaySales.length, revToday: sumRev(todaySales),
+      leadsToday: (leads || []).filter((l) => dayKey(l.created_at) === todayKey).length,
+      avgBills: past7Sales.length / 7, avgRev: sumRev(past7Sales) / 7, avgLeads: past7Leads.length / 7,
+    }
+  }, [sales, leads])
   const reorderUrgent = reorder.filter((x) => x.urgent).length
 
   // ===== Product risk buckets (Level B: merge จาก Risk Guard) =====
@@ -554,6 +587,44 @@ export default function DailyBriefClient({ leads, tasks, sales = [], stock = [],
               )}
             </div>
           )}
+          {/* 📸 Listing Readiness (Phase 2 บล็อก C) — 1 บรรทัดสรุป + กดขยาย · nav ไป อัพรูป */}
+          {listing.count > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div onClick={() => setOpenListing((o) => !o)} title="กดเพื่อดูรายการที่ยังไม่พร้อมขาย"
+                style={{ ...card, borderLeft: '4px solid #854F0B', padding: '11px 12px', marginBottom: openListing ? 4 : 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: '#412402' }}>
+                  📸 ยังไม่พร้อมขาย: {[
+                    listing.noImage > 0 && `ไม่มีรูป ${listing.noImage}`,
+                    listing.noPrice > 0 && `ราคาว่าง ${listing.noPrice}`,
+                    listing.noModel > 0 && `รุ่นว่าง ${listing.noModel}`,
+                  ].filter(Boolean).join(' · ')}
+                </div>
+                <span style={{ fontSize: 12, color: '#999' }}>{openListing ? '▲ ซ่อน' : '▼ ดู'}</span>
+              </div>
+              {openListing && (
+                <div style={{ ...card }}>
+                  <div style={{ fontSize: 11.5, color: '#888', marginBottom: 6 }}>ของมีจริง (qty&gt;0) แต่ลงขายไม่ครบข้อมูล · แสดง {listing.top.length} รายการแรก</div>
+                  {listing.top.map((r, i) => (
+                    <div key={r.sku || `list-${i}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', padding: '5px 0', borderBottom: '1px dashed #eee' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}{r.model ? ` · ${r.model}` : ''}</div>
+                        <div style={{ fontSize: 11, color: '#999' }}>SKU {r.sku || '-'}</div>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#854F0B', fontWeight: 600, whiteSpace: 'nowrap' }}>{r.miss.join(' · ')}</div>
+                    </div>
+                  ))}
+                  <a href="/ops-x7k2m9/photo" style={{ ...qbtn, display: 'inline-block', textDecoration: 'none', marginTop: 8 }}>→ ไปที่ อัพรูป</a>
+                </div>
+              )}
+            </div>
+          )}
+          {/* 📈 Trend (Phase 2 บล็อก D) — ชีพจรวันนี้ vs ค่าเฉลี่ย 7 วัน */}
+          <div style={{ ...card, marginBottom: 8, padding: '9px 12px', fontSize: 12.5, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, color: GREEN }}>📈 วันนี้:</span>
+            <span>บิล <TrendNum v={trend.billsToday} avg={trend.avgBills} /></span>
+            <span>· ยอด <TrendNum v={trend.revToday} avg={trend.avgRev} baht /></span>
+            <span>· lead ใหม่ <TrendNum v={trend.leadsToday} avg={trend.avgLeads} /></span>
+          </div>
           <div style={{ ...card, background: '#fbfaf6', fontSize: 12, color: '#7c4a13', marginTop: 4 }}>
             🩺 <b>Data Health:</b> lead ไม่มีนัดตาม {dhLeadNoNext} · task ไม่อัปเดต ≥3 วัน {dhTaskStale} · ต้นทุนว่าง {dhCostMissing}{(dhLeadNoNext + dhTaskStale + dhCostMissing) === 0 ? ' · ✅ ข้อมูลครบดี' : ''}
           </div>
@@ -797,6 +868,14 @@ function Section({ title, count, children, id }: { title: string; count: number;
   )
 }
 function Empty() { return <div style={{ ...card, color: '#aaa', fontSize: 12.5 }}>— ไม่มีรายการ —</div> }
+// Trend cell — ค่าวันนี้ + ลูกศร↑↓→ เทียบ avg7 (deadband ±5% กันสั่นเล็กน้อย · avg=0 ไม่ NaN)
+function TrendNum({ v, avg, baht }: { v: number; avg: number; baht?: boolean }) {
+  const fmt = (n: number) => baht ? '฿' + Math.round(n).toLocaleString() : String(Math.round(n * 10) / 10)
+  const band = Math.abs(avg) * 0.05
+  const up = v > avg + band, down = v < avg - band
+  const color = up ? '#0F6E56' : down ? '#A32D2D' : '#777'
+  return <b style={{ color }}>{fmt(v)} <span style={{ fontSize: 11, fontWeight: 600 }}>{up ? '↑' : down ? '↓' : '→'} avg7 {fmt(avg)}</span></b>
+}
 
 // Level B: มินิรายการสัญญาณเสี่ยงสต็อก (โชว์ 3 อันแรก + ลิงก์ไป Risk Guard)
 function RiskMini({ title, items, kind }: { title: string; items: Row[]; kind: 'aged' | 'stale' | 'incomplete' }) {
