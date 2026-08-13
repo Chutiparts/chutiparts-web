@@ -9,13 +9,13 @@ import { useState } from 'react'
 const BASE = '/ops-x7k2m9'
 // doc = เมนู docbrief (พนักงาน+owner เห็น) · docOwner = docbrief แต่ owner เท่านั้น
 // ownerOnly = การเงิน/ระบบ (owner) · hidden = ไม่โชว์ (เก็บโค้ดไว้) · plain = ทั่วไป (team เห็น)
-type Item = { href: string; label: string; icon: string; match?: string; doc?: boolean; docOwner?: boolean; ownerOnly?: boolean; hidden?: boolean }
+type Item = { href: string; label: string; icon: string; match?: string; doc?: boolean; docOwner?: boolean; ownerOnly?: boolean; hidden?: boolean; badgeKey?: string; badgeTone?: 'red' | 'amber' }
 type Hub = { key: string; label: string; icon: string; items: Item[] }
 
 const MAIN: Item[] = [
   { href: `${BASE}/daily-brief`, label: 'Daily Brief', icon: '☀️', ownerOnly: true },
   { href: `${BASE}/parts-desk`, label: 'Leads', icon: '📇' },
-  { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk` },
+  { href: `${BASE}/parts-desk?tab=tasks`, label: 'Tasks', icon: '🗂️', match: `${BASE}/parts-desk`, badgeKey: 'tasks', badgeTone: 'amber' },
 ]
 const HUBS: Hub[] = [
   { key: 'finance', label: 'การเงิน', icon: '💰', items: [
@@ -24,7 +24,7 @@ const HUBS: Hub[] = [
     { href: `${BASE}/landed-cost`, label: 'Landed Cost', icon: '🧮', ownerOnly: true },
   ]},
   { key: 'stock', label: 'สต็อก', icon: '📦', items: [
-    { href: `${BASE}/stock-source`, label: 'Stock', icon: '📦', ownerOnly: true },
+    { href: `${BASE}/stock-source`, label: 'Stock', icon: '📦', ownerOnly: true, badgeKey: 'lowstock', badgeTone: 'red' },
     { href: `${BASE}/sourcing`, label: 'หาของ', icon: '🔧' },
     { href: `${BASE}/add-part`, label: 'เพิ่มสินค้า', icon: '➕' },
     { href: `${BASE}/photo`, label: 'อัพรูป', icon: '📷' },
@@ -63,6 +63,8 @@ const CSS = `
 .opsx-caret{margin-left:auto;font-size:10px;opacity:.7;transition:transform .15s}
 .opsx-caret.open{transform:rotate(90deg)}
 .opsx-main{margin-left:var(--w);min-height:100vh}
+.opsx-pill{border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px;line-height:1.6;white-space:nowrap}
+.opsx-bdot{position:absolute;top:-5px;right:-9px;min-width:15px;height:15px;line-height:15px;border-radius:999px;font-size:9px;font-weight:700;color:#fff;padding:0 3px;text-align:center;box-sizing:border-box}
 .opsx-bottom{display:none}
 @media (max-width:768px){
 .opsx-side{display:none}
@@ -74,8 +76,24 @@ const CSS = `
 }
 `
 
-export default function OpsShell({ children, role = 'owner' }: { children: React.ReactNode; role?: string }) {
+export default function OpsShell({ children, role = 'owner', badges = {} }: { children: React.ReactNode; role?: string; badges?: Record<string, number> }) {
   const path = usePathname() || ''
+  const TONE: Record<'red' | 'amber', { bg: string; fg: string }> = { red: { bg: '#FCEBEB', fg: '#A32D2D' }, amber: { bg: '#FAEEDA', fg: '#854F0B' } }
+  // badge จาก prop (count-only จาก layout) → เลข + tone · 0/undefined = ไม่โชว์
+  const badgeOf = (it: Item): { n: number; tone: 'red' | 'amber' } | null => {
+    if (!it.badgeKey) return null
+    const n = badges[it.badgeKey] || 0
+    return n > 0 ? { n, tone: it.badgeTone || 'amber' } : null
+  }
+  // ผลรวม badge ของ hub (โชว์ที่หัวเมื่อ hub ปิด) · tone แดงชนะ (เร่งกว่า)
+  const hubBadge = (h: Hub): { n: number; tone: 'red' | 'amber' } | null => {
+    let n = 0; let tone: 'red' | 'amber' = 'amber'
+    for (const it of h.items) { const b = badgeOf(it); if (b) { n += b.n; if (b.tone === 'red') tone = 'red' } }
+    return n > 0 ? { n, tone } : null
+  }
+  const Pill = ({ n, tone }: { n: number; tone: 'red' | 'amber' }) => (
+    <span className="opsx-pill" style={{ background: TONE[tone].bg, color: TONE[tone].fg }}>{n}</span>
+  )
   const DOC_ROLES = new Set(['owner', 'reviewer', 'operator', 'viewer'])
   const isDocStaff = role === 'reviewer' || role === 'operator' || role === 'viewer'
   const canSee = (it: Item) => {
@@ -107,11 +125,15 @@ export default function OpsShell({ children, role = 'owner' }: { children: React
   const visSystem = SYSTEM.filter(canSee)
   const visMobile = [...visMain, ...visHubs.flatMap((h) => h.items), ...visSystem]
 
-  const Link = ({ it, sub }: { it: Item; sub?: boolean }) => (
-    <a href={it.href} {...linkTarget(it.href)} className={`opsx-link${sub ? ' opsx-sub' : ''}${isActive(it) ? ' active' : ''}`}>
-      <span>{it.icon}</span><span>{it.label}</span>
-    </a>
-  )
+  const Link = ({ it, sub }: { it: Item; sub?: boolean }) => {
+    const b = badgeOf(it)
+    return (
+      <a href={it.href} {...linkTarget(it.href)} className={`opsx-link${sub ? ' opsx-sub' : ''}${isActive(it) ? ' active' : ''}`}>
+        <span>{it.icon}</span><span>{it.label}</span>
+        {b && <Pill n={b.n} tone={b.tone} />}
+      </a>
+    )
+  }
 
   return (
     <div className="opsx-shell">
@@ -131,7 +153,9 @@ export default function OpsShell({ children, role = 'owner' }: { children: React
               return (
                 <div key={h.key}>
                   <button type="button" className={`opsx-hub${hasActive ? ' has-active' : ''}`} onClick={() => setToggled((t) => ({ ...t, [h.key]: !open }))}>
-                    <span>{h.icon}</span><span>{h.label}</span><span className={`opsx-caret${open ? ' open' : ''}`}>▶</span>
+                    <span>{h.icon}</span><span>{h.label}</span>
+                    {!open && (() => { const hb = hubBadge(h); return hb ? <Pill n={hb.n} tone={hb.tone} /> : null })()}
+                    <span className={`opsx-caret${open ? ' open' : ''}`}>▶</span>
                   </button>
                   {open && h.items.map((it) => <Link key={it.label} it={it} sub />)}
                 </div>
@@ -144,11 +168,14 @@ export default function OpsShell({ children, role = 'owner' }: { children: React
       </aside>
 
       <nav className="opsx-bottom">
-        {visMobile.map((it) => (
-          <a key={it.label} href={it.href} {...linkTarget(it.href)} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
-            <span className="opsx-bicon">{it.icon}</span><span>{it.label}</span>
-          </a>
-        ))}
+        {visMobile.map((it) => {
+          const b = badgeOf(it)
+          return (
+            <a key={it.label} href={it.href} {...linkTarget(it.href)} className={`opsx-blink${isActive(it) ? ' active' : ''}`}>
+              <span className="opsx-bicon" style={{ position: 'relative' }}>{it.icon}{b && <span className="opsx-bdot" style={{ background: TONE[b.tone].fg }}>{b.n > 99 ? '99+' : b.n}</span>}</span><span>{it.label}</span>
+            </a>
+          )
+        })}
       </nav>
 
       <main className="opsx-main">{children}</main>
