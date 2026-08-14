@@ -1,5 +1,7 @@
 'use client'
-import { useRef, useState, useTransition, useActionState } from 'react'
+import { useRef, useState, useTransition, useActionState, useMemo } from 'react'
+import { nameSimilarity } from '@/lib/docbrief-name-match'
+import { PARTS_CATEGORIES } from '@/lib/constants'
 
 type Line = {
   id: string; document_id: string; line_no: number
@@ -29,20 +31,29 @@ const FLAG_TH: Record<string, string> = {
   possible_duplicate: 'อาจซ้ำ',
 }
 
-const inp: React.CSSProperties = { width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13 }
+const inp: React.CSSProperties = { width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }
 const lbl: React.CSSProperties = { fontSize: 11, color: '#6b7280', display: 'block', marginBottom: 2 }
 const GREEN = '#17301F'
+
+// ช่องจำเป็นก่อน confirm (ตรงกับ REQ ใน confirmStockDocument) — ใช้ทั้ง per-line + counter + sort
+const REQ_FIELDS = ['sku', 'part_name', 'qty', 'unit_price', 'set_price', 'location'] as const
+const REQ_TH: Record<string, string> = { sku: 'SKU', part_name: 'ชื่อ', qty: 'จำนวน', unit_price: 'ต้นทุน', set_price: 'ราคาขาย', location: 'ที่เก็บ' }
+const lineMissing = (l: Line) => REQ_FIELDS.filter((f) => l[f] == null || String(l[f]).trim() === '')
+const ATTN_FLAGS = ['name_missing', 'name_uncertain', 'arithmetic_mismatch']
+const needsAttn = (l: Line) => lineMissing(l).length > 0 || (l.review_flags ?? []).some((f) => ATTN_FLAGS.includes(f))
 
 type ConfirmState = { ok: boolean; message?: string } | null
 
 type NameWarn = { part_name: string; sku: string | null; similarity: number }
 
 export default function StockIntakeClient({
-  docs, linesByDoc, warnByLine = {}, uploadBills, extractBills, saveLine, autoSku, confirmStock, rejectBill, trashBill, getPreviewUrl,
+  docs, linesByDoc, warnByLine = {}, nameOptions = [], locationOptions = [], uploadBills, extractBills, saveLine, autoSku, confirmStock, rejectBill, trashBill, getPreviewUrl,
 }: {
   docs: Doc[]
   linesByDoc: Record<string, Line[]>
   warnByLine?: Record<string, NameWarn[]>
+  nameOptions?: string[]
+  locationOptions?: string[]
   uploadBills: (fd: FormData) => Promise<void>
   extractBills: (fd: FormData) => Promise<void>
   saveLine: (fd: FormData) => Promise<void>
@@ -157,24 +168,31 @@ export default function StockIntakeClient({
               </div>
             )}
 
-            {/* ตารางรายการ (ตรวจ/แก้) */}
-            {isOpen && lines.length > 0 && (
+            {/* ตารางรายการ (ตรวจ/แก้) — เรียงบรรทัดที่ยังไม่ครบ/ติดธง ขึ้นบน */}
+            {isOpen && lines.length > 0 && (() => {
+              const remaining = lines.filter((l) => lineMissing(l).length > 0).length
+              const sorted = [...lines].sort((a, b) => (needsAttn(b) ? 1 : 0) - (needsAttn(a) ? 1 : 0) || a.line_no - b.line_no)
+              return (
               <div style={{ borderTop: '1px solid #e5e7eb', background: '#fafafa', padding: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 12, color: '#6b7280', flex: 1 }}>
-                    💡 จาก AI: <b>จำนวน · ชื่อ · ต้นทุน</b> · เติมอัตโนมัติ: <b>SKU · หมวดหมู่ · สภาพ</b> · เติมเอง: <b>ราคาขาย · ที่เก็บ</b>
+                    💡 AI เติมโครงให้แล้ว — คุณ<b>แตะเลือกชื่อ + ราคาขาย + ที่เก็บ</b>
                   </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: remaining ? '#fef3c7' : '#dcfce7', color: remaining ? '#92400e' : '#166534' }}>
+                    {remaining ? `เหลือ ${remaining} แถวยังไม่ครบ (ชื่อ/ราคาขาย/ที่เก็บ)` : '✓ ครบทุกแถว พร้อมยืนยัน'}
+                  </span>
                   <form action={autoSku}>
                     <input type="hidden" name="id" value={d.id} />
                     <button type="submit" disabled={pending}
                       style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #C9A961', background: '#fffbea', color: '#8a6d2f', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                      🔢 เติมอัตโนมัติ
+                      🔢 เติม SKU ใหม่
                     </button>
                   </form>
                 </div>
-                {lines.map((l) => <LineForm key={l.id} line={l} warn={warnByLine[l.id]} saveLine={saveLine} pending={pending} start={start} />)}
+                {sorted.map((l) => <LineForm key={l.id} line={l} warn={warnByLine[l.id]} saveLine={saveLine} pending={pending} start={start} nameOptions={nameOptions} locationOptions={locationOptions} />)}
               </div>
-            )}
+              )
+            })()}
 
             {/* ยืนยัน / ปฏิเสธ */}
             {d.state === 'pending_review' && (
@@ -193,9 +211,8 @@ function ConfirmFooter({ docId, lines, confirmStock, rejectBill }: {
   rejectBill: (fd: FormData) => Promise<void>
 }) {
   const [state, action, busy] = useActionState(confirmStock, null)
-  // เช็กครบทุกช่องจำเป็นก่อน (กันกดทั้งที่ยังไม่พร้อม)
-  const REQ: (keyof Line)[] = ['sku', 'part_name', 'qty', 'unit_price', 'set_price', 'location']
-  const incomplete = lines.filter((l) => REQ.some((f) => l[f] == null || String(l[f]).trim() === ''))
+  // เช็กครบทุกช่องจำเป็นก่อน (กันกดทั้งที่ยังไม่พร้อม) — REQ เดียวกับ confirmStockDocument
+  const incomplete = lines.filter((l) => lineMissing(l).length > 0)
   const ready = incomplete.length === 0
 
   return (
@@ -227,53 +244,142 @@ function ConfirmFooter({ docId, lines, confirmStock, rejectBill }: {
   )
 }
 
-function LineForm({ line, warn, saveLine, pending, start }: {
+function LineForm({ line, warn, saveLine, pending, start, nameOptions, locationOptions }: {
   line: Line; warn?: NameWarn[]; saveLine: (fd: FormData) => Promise<void>; pending: boolean; start: React.TransitionStartFunction
+  nameOptions: string[]; locationOptions: string[]
 }) {
   const [saved, setSaved] = useState(false)
+  // controlled เฉพาะช่องที่มีปุ่ม/แตะช่วยเติม (ค่ายัง submit ผ่าน form action = saveLine เดิม)
+  const [name, setName] = useState(line.part_name ?? '')
+  const [setPrice, setSetPrice] = useState(line.set_price != null ? String(line.set_price) : '')
+  const [location, setLocation] = useState(line.location ?? '')
+  const [condition, setCondition] = useState(line.condition ?? 'มือสอง-A') // default "มือสอง" (ใช้บ่อยสุด · brief ข้อ 5)
+  const [nameOpen, setNameOpen] = useState(false)
   const flags = line.review_flags ?? []
   const arithBad = flags.includes('arithmetic_mismatch')
+  const unit = Number(line.unit_price) || 0
+  const missing = lineMissing(line)
+
+  // ตัวเลือกชื่อจากคลังจริง (reuse nameSimilarity เดียวกับ warnByLine) — substring + fuzzy
+  const suggestions = useMemo(() => {
+    if (!nameOptions.length) return []
+    const q = name.trim()
+    if (!q) return nameOptions.slice(0, 12)
+    return nameOptions
+      .map((n) => ({ n, s: n.includes(q) ? 1 : nameSimilarity(q, n) }))
+      .filter((x) => x.s >= 0.34 && x.n !== q)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 12)
+      .map((x) => x.n)
+  }, [name, nameOptions])
+  const recentLoc = locationOptions.slice(0, 6)
+
   return (
     <form
       action={(fd) => start(async () => { await saveLine(fd); setSaved(true); setTimeout(() => setSaved(false), 1500) })}
-      style={{ background: '#fff', border: `1px solid ${arithBad ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 8, padding: 10, marginBottom: 8 }}>
+      style={{ background: '#fff', border: `1px solid ${arithBad ? '#fca5a5' : missing.length ? '#fde68a' : '#e5e7eb'}`, borderLeft: `4px solid ${missing.length ? '#f59e0b' : '#86efac'}`, borderRadius: 8, padding: 10, marginBottom: 8 }}>
       <input type="hidden" name="document_id" value={line.document_id} />
       <input type="hidden" name="id" value={line.id} />
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+
+      {/* header + สถานะครบ/ไม่ครบ */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af' }}>#{line.line_no}</span>
         {flags.map((f) => <span key={f} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: '#fef3c7', color: '#92400e' }}>{FLAG_TH[f] ?? f}</span>)}
-        {line.confidence != null && <span style={{ fontSize: 10, color: line.confidence < 0.6 ? '#b91c1c' : '#9ca3af' }}>ความมั่นใจ {(line.confidence * 100).toFixed(0)}%</span>}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: line.arithmetic_ok ? '#059669' : '#9ca3af' }}>
-          {line.arithmetic_ok ? '✓ ตัวเลขลงตัว' : ''}{line.amount != null ? ` · รวม ${line.amount.toLocaleString()} ฿` : ''}
+        {line.confidence != null && <span style={{ fontSize: 10, color: line.confidence < 0.6 ? '#b91c1c' : '#9ca3af' }}>มั่นใจ {(line.confidence * 100).toFixed(0)}%</span>}
+        <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: missing.length ? '#b45309' : '#059669' }}>
+          {missing.length ? `ยังไม่ครบ: ${missing.map((f) => REQ_TH[f] ?? f).join(' · ')}` : '✓ ครบ'}
         </span>
       </div>
-      {/* จาก AI */}
-      <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 110px', gap: 8, marginBottom: 8 }}>
-        <div><label style={lbl}>จำนวน</label><input name="qty" defaultValue={line.qty ?? ''} style={inp} inputMode="numeric" /></div>
+
+      {/* ★ ชื่ออะไหล่ = เด่นสุด (combobox แตะเลือก) */}
+      <div style={{ position: 'relative', marginBottom: 8 }}>
+        <label style={{ ...lbl, fontWeight: 700, color: '#374151' }}>ชื่ออะไหล่ — แตะเลือกจากของเดิม หรือพิมพ์ใหม่</label>
+        <input name="part_name" value={name} autoComplete="off"
+          onChange={(e) => setName(e.target.value)}
+          onFocus={() => setNameOpen(true)}
+          onBlur={() => setTimeout(() => setNameOpen(false), 150)}
+          style={{ ...inp, fontSize: 15, padding: '9px 10px', borderWidth: 1.5, borderColor: warn?.length ? '#fb923c' : flags.includes('name_uncertain') ? '#fbbf24' : '#9ca3af' }} />
+        {nameOpen && suggestions.length > 0 && (
+          <div style={{ position: 'absolute', zIndex: 20, top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, marginTop: 2, maxHeight: 220, overflowY: 'auto', boxShadow: '0 6px 20px rgba(0,0,0,.12)' }}>
+            {suggestions.map((s) => (
+              <div key={s} onMouseDown={(e) => { e.preventDefault(); setName(s); setNameOpen(false) }}
+                style={{ padding: '7px 10px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}>{s}</div>
+            ))}
+          </div>
+        )}
+        {warn?.length ? (
+          <div style={{ marginTop: 5, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: 10.5, color: '#c2410c' }}>⚠️ คล้ายของเดิม (แตะใช้):</span>
+            {warn.map((w) => (
+              <button key={w.part_name} type="button" onMouseDown={(e) => { e.preventDefault(); setName(w.part_name) }}
+                style={{ fontSize: 11, padding: '2px 9px', borderRadius: 999, border: '1px solid #fdba74', background: '#fff7ed', color: '#c2410c', cursor: 'pointer' }}>
+                {w.part_name}{w.sku ? ` (${w.sku})` : ''}
+              </button>
+            ))}
+            <span style={{ fontSize: 10, color: '#9ca3af' }}>— ถ้าตัวเดียวกัน เติมจำนวนในสต็อกเดิมแทน</span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* AI เติมให้ (มั่นใจสูง · compact/จาง) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '68px 96px 1fr', gap: 8, marginBottom: 8, background: '#f9fafb', borderRadius: 6, padding: '6px 8px' }}>
+        <div><label style={lbl}>จำนวน</label><input name="qty" defaultValue={line.qty ?? ''} style={{ ...inp, background: '#fff' }} inputMode="numeric" /></div>
+        <div><label style={lbl}>ต้นทุน/ชิ้น</label><input name="unit_price" defaultValue={line.unit_price ?? ''} style={{ ...inp, background: '#fff' }} inputMode="numeric" /></div>
+        <div><label style={lbl}>SKU <span style={{ color: '#059669', fontWeight: 600 }}>· auto</span></label><input name="sku" defaultValue={line.sku ?? ''} style={{ ...inp, background: '#fff' }} placeholder="140-010" /></div>
+      </div>
+
+      {/* เติมเอง: ราคาขาย (×N) + ที่เก็บ (quick-pick) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
         <div>
-          <label style={lbl}>ชื่ออะไหล่</label>
-          <input name="part_name" defaultValue={line.part_name ?? ''} style={{ ...inp, borderColor: warn?.length ? '#fb923c' : flags.includes('name_uncertain') ? '#fbbf24' : '#d1d5db' }} />
-          {warn?.length ? (
-            <div style={{ fontSize: 10.5, color: '#c2410c', marginTop: 3, lineHeight: 1.4 }}>
-              ⚠️ คล้ายของเดิม: {warn.map((w) => `${w.part_name}${w.sku ? ` (${w.sku})` : ''}`).join(' · ')} — ถ้าเป็นตัวเดียวกันให้เติมจำนวนในสต็อกเดิมแทน
-            </div>
-          ) : null}
+          <label style={lbl}>ราคาตั้งขาย *</label>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input name="set_price" value={setPrice} onChange={(e) => setSetPrice(e.target.value)} style={inp} inputMode="numeric" />
+            {unit > 0 && [2, 2.5, 3].map((f) => (
+              <button key={f} type="button" onClick={() => setSetPrice(String(Math.round(unit * f)))}
+                style={{ padding: '0 7px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>×{f}</button>
+            ))}
+          </div>
         </div>
-        <div><label style={lbl}>ต้นทุน/ชิ้น</label><input name="unit_price" defaultValue={line.unit_price ?? ''} style={inp} inputMode="numeric" /></div>
+        <div>
+          <label style={lbl}>ตำแหน่งเก็บ *</label>
+          <input name="location" value={location} onChange={(e) => setLocation(e.target.value)} list={`loc-${line.id}`} style={inp} placeholder="A-05" />
+          <datalist id={`loc-${line.id}`}>{locationOptions.map((l) => <option key={l} value={l} />)}</datalist>
+        </div>
       </div>
-      {/* เติมเอง */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
-        <div><label style={lbl}>SKU *</label><input name="sku" defaultValue={line.sku ?? ''} style={inp} placeholder="เช่น 140-010" /></div>
-        <div><label style={lbl}>ราคาตั้งขาย *</label><input name="set_price" defaultValue={line.set_price ?? ''} style={inp} inputMode="numeric" /></div>
-        <div><label style={lbl}>ตำแหน่งเก็บ *</label><input name="location" defaultValue={line.location ?? ''} style={inp} placeholder="เช่น A-05" /></div>
-        <div><label style={lbl}>หมวดหมู่</label><input name="category" defaultValue={line.category ?? ''} style={inp} placeholder="เช่น LGT-03 ไฟท้าย" /></div>
-        <div><label style={lbl}>OEM</label><input name="oem" defaultValue={line.oem ?? ''} style={inp} /></div>
-        <div><label style={lbl}>สภาพ</label><input name="condition" defaultValue={line.condition ?? ''} style={inp} placeholder="เช่น มือสอง-A" /></div>
+      {recentLoc.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, color: '#9ca3af' }}>ที่เก็บล่าสุด:</span>
+          {recentLoc.map((l) => (
+            <button key={l} type="button" onClick={() => setLocation(l)}
+              style={{ fontSize: 11, padding: '1px 8px', borderRadius: 999, border: '1px solid #e5e7eb', background: '#fff', color: '#374151', cursor: 'pointer' }}>{l}</button>
+          ))}
+        </div>
+      )}
+
+      {/* หมวด (datalist) · สภาพ (chips) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 6 }}>
+        <div>
+          <label style={lbl}>หมวดหมู่</label>
+          <input name="category" defaultValue={line.category ?? ''} list={`cats-${line.id}`} style={inp} placeholder="เลือก/พิมพ์หมวด" />
+          <datalist id={`cats-${line.id}`}>{PARTS_CATEGORIES.map((c) => <option key={c.value} value={c.label} />)}</datalist>
+        </div>
+        <div>
+          <label style={lbl}>สภาพ</label>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {['มือสอง-A', 'มือสอง-B', 'ใหม่'].map((c) => (
+              <button key={c} type="button" onClick={() => setCondition(c)}
+                style={{ flex: 1, padding: '5px 2px', borderRadius: 6, border: `1px solid ${condition === c ? '#166534' : '#d1d5db'}`, background: condition === c ? '#dcfce7' : '#fff', color: condition === c ? '#166534' : '#6b7280', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>{c}</button>
+            ))}
+          </div>
+          <input type="hidden" name="condition" value={condition} />
+        </div>
       </div>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input name="oem" defaultValue={line.oem ?? ''} style={{ ...inp, width: 120 }} placeholder="OEM" />
         <input name="note" defaultValue={line.note ?? ''} style={{ ...inp, flex: 1 }} placeholder="หมายเหตุ" />
         <button type="submit" disabled={pending}
-          style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: GREEN, color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          style={{ padding: '7px 16px', borderRadius: 7, border: 'none', background: saved ? '#059669' : GREEN, color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
           {saved ? '✓ บันทึกแล้ว' : 'บันทึกบรรทัด'}
         </button>
       </div>

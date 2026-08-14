@@ -170,18 +170,34 @@ export default async function StockIntakePage() {
     ;(byDoc[row.document_id as string] ??= []).push(row)
   }
 
-  // B2: เตือน "ชื่ออะไหล่คล้ายของเดิม" กันสร้างสต็อกซ้ำ — เฉพาะบรรทัดในใบที่รอตรวจ
+  // B2 + bulk-intake: ดึง stock ครั้งเดียว → (1) เตือนชื่อคล้ายของเดิม (pending) (2) คลังชื่อ/ที่เก็บ ให้แตะเลือก
+  // fail → คืนค่าว่าง (ห้ามทำหน้าล่ม) · nameOptions/locationOptions = active เท่านั้น (deleted_at null)
   const pendingIds = new Set((docs ?? []).filter((d) => d.state === 'pending_review').map((d) => d.id))
   const warnByLine: Record<string, { part_name: string; sku: string | null; similarity: number }[]> = {}
-  if ((lines ?? []).some((l) => pendingIds.has((l as Record<string, unknown>).document_id as string))) {
-    const { data: stock } = await db.from('stock_records').select('sku, part_name').limit(5000)
-    const existing = (stock ?? []) as { sku: string | null; part_name: string | null }[]
-    for (const l of lines ?? []) {
-      const row = l as Record<string, unknown>
-      if (!pendingIds.has(row.document_id as string)) continue
-      const matches = findSimilarNames(row.part_name as string | null, existing).slice(0, 2)
-      if (matches.length) warnByLine[row.id as string] = matches
-    }
+  let nameOptions: string[] = []
+  let locationOptions: string[] = []
+  if (ids.length) {
+    try {
+      const { data: stock } = await db.from('stock_records').select('sku, part_name, location, deleted_at').limit(5000)
+      const existing = (stock ?? []) as { sku: string | null; part_name: string | null; location: string | null; deleted_at: string | null }[]
+      const names = new Set<string>(); const locs = new Set<string>()
+      for (const r of existing) {
+        if (r.deleted_at) continue // แนะนำเฉพาะของ active
+        const p = (r.part_name || '').trim(); if (p) names.add(p)
+        const loc = (r.location || '').trim(); if (loc) locs.add(loc)
+      }
+      nameOptions = [...names].sort((a, b) => a.localeCompare(b, 'th')).slice(0, 800)
+      locationOptions = [...locs].sort((a, b) => a.localeCompare(b, 'th'))
+      // เตือนชื่อคล้าย เฉพาะบรรทัดในใบที่รอตรวจ (คงพฤติกรรมเดิม — เทียบกับทั้ง stock)
+      if ((lines ?? []).some((l) => pendingIds.has((l as Record<string, unknown>).document_id as string))) {
+        for (const l of lines ?? []) {
+          const row = l as Record<string, unknown>
+          if (!pendingIds.has(row.document_id as string)) continue
+          const matches = findSimilarNames(row.part_name as string | null, existing).slice(0, 2)
+          if (matches.length) warnByLine[row.id as string] = matches
+        }
+      }
+    } catch { nameOptions = []; locationOptions = [] }
   }
 
   return (
@@ -189,6 +205,8 @@ export default async function StockIntakePage() {
       docs={docs ?? []}
       linesByDoc={byDoc as never}
       warnByLine={warnByLine}
+      nameOptions={nameOptions}
+      locationOptions={locationOptions}
       uploadBills={uploadBills}
       extractBills={extractBills}
       saveLine={saveLine}
