@@ -5,6 +5,7 @@
 //   (C) Trust strip 4 ช่อง: ตรวจสภาพ · สอบถามสถานะ · จัดส่ง/นัดรับ · ติดต่อเร็ว
 // defensive ต่อ field ใหม่ (image_urls, engine_codes, oem_verified, warranty_days, fitment_note, side)
 import { createClient } from '@/utils/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
@@ -12,6 +13,31 @@ import AddToCartButton from '../../components/AddToCartButton'
 import L from '@/components/L'
 const SITE_URL = 'https://chutibenz.com'
 const LINE_OA = 'https://line.me/R/ti/p/%40440ifncj'
+
+// ── สต็อกสด: จำเป็นต้องใช้ service-role (server-side, read-only) ──────────────
+// เหตุผล: หน้า product ใช้ anon/publishable key + cutover ทำ anon lockdown (revoke all
+//   from anon บน stock_records · Gate F1) → anon อ่าน stock_records ไม่ได้
+// อ่านเฉพาะ qty (ไม่ดึง cost) = เปิดเผยเฉพาะจำนวนที่ตั้งใจโชว์ · ไม่แตะ RLS/trigger/write
+function stockSvc() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)!
+  return createServiceClient(url, key, { auth: { persistSession: false } })
+}
+
+/** liveQty = sum(qty) ของ active rows ที่ sku ตรง part_number (trim/ci)
+ *  ไม่เจอ row / query fail / ไม่มี sku → fallback (product.stock) · ห้ามหน้าล่ม */
+async function getLiveQty(partNumber: unknown, fallback: number | null): Promise<number | null> {
+  const sku = String(partNumber ?? '').trim()
+  if (!sku) return fallback
+  try {
+    const { data, error } = await stockSvc()
+      .from('stock_records').select('qty').ilike('sku', sku).is('deleted_at', null)
+    if (error || !data || data.length === 0) return fallback
+    return data.reduce((s, r) => s + (Number((r as { qty: number | null }).qty) || 0), 0)
+  } catch {
+    return fallback
+  }
+}
 
 // ดึงสินค้าจาก slug (รองรับ slug ไทย + fallback ด้วย code นำหน้าแบบ ASCII)
 async function getProductBySlug(slug: string) {
@@ -108,10 +134,21 @@ export default async function ProductDetail({
   const mainImage = images[0] || null
   const hasPrice = typeof product.price === 'number' && product.price > 0
   const engineCodes: string[] = Array.isArray(product.engine_codes) ? product.engine_codes : []
+  const compatibleModels: string[] = Array.isArray(product.compatible_models) ? product.compatible_models : []
   const altParts: string[] = Array.isArray(product.alt_part_numbers) ? product.alt_part_numbers : []
   const sideLabel = product.side === 'L' ? 'ซ้าย' : product.side === 'R' ? 'ขวา' : null
 
-  // --- JSON-LD Product schema ---
+  // --- สต็อกสด (stock_records) แทน product.stock ที่ค้าง · คน + AI เห็นเลขเดียวกัน ---
+  const fallbackStock = typeof product.stock === 'number' ? product.stock : null
+  const liveQty = await getLiveQty(product.part_number, fallbackStock)
+
+  // --- JSON-LD Product schema (enriched สำหรับ AI shopping) ---
+  // fitment = structured data ที่สำคัญสุดของอะไหล่รถ · ใส่เฉพาะที่มีค่า (undefined ตัดออก)
+  const additionalProperty = [
+    compatibleModels.length ? { '@type': 'PropertyValue', name: 'รุ่นที่ใส่ได้', value: compatibleModels.join(', ') } : null,
+    engineCodes.length ? { '@type': 'PropertyValue', name: 'รหัสเครื่อง', value: engineCodes.join(', ') } : null,
+    sideLabel ? { '@type': 'PropertyValue', name: 'ข้าง', value: sideLabel } : null,
+  ].filter(Boolean)
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -121,13 +158,34 @@ export default async function ProductDetail({
     sku: product.part_number || undefined,
     mpn: product.oem_number || undefined,
     brand: { '@type': 'Brand', name: 'Mercedes-Benz' },
+    additionalProperty: additionalProperty.length ? additionalProperty : undefined,
     offers: hasPrice ? {
       '@type': 'Offer',
       price: product.price,
       priceCurrency: 'THB',
-      availability: 'https://schema.org/InStock',
+      // availability สะท้อนสต็อกสด: 0 = OutOfStock · >0 หรือไม่ทราบ = InStock (คง Offer ไว้เสมอ)
+      availability: liveQty === 0 ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+      itemCondition: product.condition === 'new' ? 'https://schema.org/NewCondition' : 'https://schema.org/UsedCondition',
       url: `${SITE_URL}/products/${product.slug}`,
       seller: { '@type': 'Organization', name: 'ChutiBenz' },
+      // คืน/เปลี่ยนกรณีของมีปัญหา ภายใน 15 วัน (ตามจริง · ไม่ overclaim)
+      hasMerchantReturnPolicy: {
+        '@type': 'MerchantReturnPolicy',
+        applicableCountry: 'TH',
+        returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+        merchantReturnDays: typeof product.warranty_days === 'number' && product.warranty_days > 0 ? product.warranty_days : 15,
+        returnMethod: 'https://schema.org/ReturnByMail',
+        refundType: 'https://schema.org/FullRefund',
+      },
+      shippingDetails: {
+        '@type': 'OfferShippingDetails',
+        shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'TH' },
+        deliveryTime: {
+          '@type': 'ShippingDeliveryTime',
+          handlingTime: { '@type': 'QuantitativeValue', minValue: 0, maxValue: 1, unitCode: 'DAY' },
+          transitTime: { '@type': 'QuantitativeValue', minValue: 1, maxValue: 4, unitCode: 'DAY' },
+        },
+      },
     } : undefined,
   }
 
@@ -168,7 +226,7 @@ export default async function ProductDetail({
                     <span className="text-xs mt-2">รูปสินค้ากำลังจัดเตรียม · สอบถามรูปจริงทาง LINE</span>
                   </div>
                 )}
-                {typeof product.stock === 'number' && product.stock <= 1 && product.stock > 0 && (
+                {liveQty != null && liveQty > 0 && liveQty <= 1 && (
                   <span className="absolute top-4 right-4 px-3 py-1.5 bg-red-500 text-white text-sm font-bold rounded">เหลือชิ้นสุดท้าย!</span>
                 )}
               </div>
@@ -260,7 +318,9 @@ export default async function ProductDetail({
                   {hasPrice ? (
                     <>
                       <p className="text-4xl md:text-5xl font-bold text-green-600">฿{product.price.toLocaleString()}</p>
-                      {typeof product.stock === 'number' && <p className="text-sm text-gray-500 mb-2">มี {product.stock} ชิ้น</p>}
+                      {liveQty != null && (liveQty > 0
+                        ? <p className="text-sm text-gray-500 mb-2">มี {liveQty} ชิ้น</p>
+                        : <p className="text-sm font-semibold text-red-600 mb-2">⛔ ของหมด</p>)}
                     </>
                   ) : (
                     <p className="text-xl font-semibold text-gray-700">สอบถามราคาทาง LINE</p>
@@ -271,8 +331,19 @@ export default async function ProductDetail({
                 )}
               </div>
 
-              {/* Add to Cart */}
-              {hasPrice && <div className="mb-6"><AddToCartButton product={product} /></div>}
+              {/* Add to Cart — ของหมด (liveQty=0) → สลับเป็นปุ่มสอบถาม LINE */}
+              {hasPrice && (
+                <div className="mb-6">
+                  {liveQty === 0 ? (
+                    <a href={lineLink(product)} target="_blank" rel="noopener noreferrer"
+                      className="block text-center px-6 py-4 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl transition shadow-md">
+                      ⛔ ของหมด — สอบถาม/สั่งจองทาง LINE
+                    </a>
+                  ) : (
+                    <AddToCartButton product={product} />
+                  )}
+                </div>
+              )}
 
               {/* (B) แจ้งสอบถามสถานะก่อนตัดสินใจ — เด่นเหนือปุ่มติดต่อ */}
               <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-sm text-amber-900">
