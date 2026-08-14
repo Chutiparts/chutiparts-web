@@ -43,7 +43,7 @@ const FLAG_TH: Record<string, string> = {
   vat_mismatch: 'VAT ผิดปกติ', invalid_tax_id: 'เลขภาษีผิด', future_date: 'วันที่อนาคต',
   arithmetic_mismatch: 'ตัวเลขไม่ลงตัว', name_missing: 'ไม่มีชื่อ', name_uncertain: 'ชื่ออ่านไม่ชัด',
   qty_missing: 'ไม่มีจำนวน', price_missing: 'ไม่มีราคา', total_mismatch: 'ยอดไม่ตรง', name_review: 'ควรตรวจชื่อ',
-  possible_duplicate: 'อาจซ้ำ',
+  possible_duplicate: 'อาจซ้ำ', qty_defaulted: 'จำนวนเดา (1)', unit_price_derived: 'ต้นทุนคำนวณจากยอดรวม',
 }
 
 const AGO = (iso: string) => {

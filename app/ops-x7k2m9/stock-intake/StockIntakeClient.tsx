@@ -28,7 +28,7 @@ const STATE: Record<string, { th: string; bg: string; fg: string }> = {
 const FLAG_TH: Record<string, string> = {
   arithmetic_mismatch: 'ตัวเลขไม่ลงตัว', name_missing: 'ไม่มีชื่อ', name_uncertain: 'ชื่ออ่านไม่ชัด',
   qty_missing: 'ไม่มีจำนวน', price_missing: 'ไม่มีราคา', total_mismatch: 'ยอดรวมไม่ตรง', name_review: 'ควรตรวจชื่อ',
-  possible_duplicate: 'อาจซ้ำ',
+  possible_duplicate: 'อาจซ้ำ', qty_defaulted: 'จำนวนเดา (1)', unit_price_derived: 'ต้นทุนคำนวณจากยอดรวม',
 }
 
 const inp: React.CSSProperties = { width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, boxSizing: 'border-box' }

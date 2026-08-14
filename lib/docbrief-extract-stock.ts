@@ -32,8 +32,13 @@ const SYSTEM_PROMPT = `คุณคือผู้ช่วยคีย์ "ใ�
 - ดึงเฉพาะบรรทัดที่ "มีของจริง" — ข้ามบรรทัดว่าง
 - ห้ามเดา ห้ามเติมของที่ไม่มีในเอกสาร ถ้าอ่านช่องไหนไม่ออกให้ใส่ null (null ดีกว่าเดาผิด)
 - ตัวเลข: ตัด comma/฿/บาท ออก คืนเป็นเลขล้วน (15,000 → 15000)
-- part_name: คัดลอกตามที่เขียนเป๊ะ ๆ รวมรุ่นรถถ้ามี (เช่น "กระจังหน้า W140")
-- car_model: ถ้าเห็นรหัสรุ่น (W140, W124, W126 ...) ในบรรทัด ให้แยกออกมาด้วย ถ้าไม่มีใส่ null
+- part_name: อ่านชื่ออะไหล่แล้ว "แปล/ทับศัพท์เป็นชื่ออะไหล่ภาษาไทยมาตรฐานที่ช่างไทยใช้" (คลังชื่อในระบบเป็นไทย ต้องแมตช์ได้)
+  · ตัวอย่างจีน→ไทย: 空氣流量計→"วัดอากาศ (มาตรวัดอากาศ)" · 節氣門→"ลิ้นปีกผีเสื้อ" · 拉手/把手→"มือจับ" · 尾灯/尾燈→"ไฟท้าย" · 大燈/頭燈→"ไฟหน้า" · 風箱→"ตู้แอร์" · 儀表板→"เรือนไมล์" · 出風口→"ช่องแอร์"
+  · ต้นฉบับเป็นไทยอยู่แล้ว → คงไว้ (แปลเฉพาะเมื่อเป็นจีน/อังกฤษ)
+  · เอาเฉพาะ "ชื่ออะไหล่" — ห้ามใส่รหัสรุ่น (W140/S600/R129) นำหน้า (รหัสรุ่นไปที่ car_model)
+  · อ่านจีนออกแต่ไม่มั่นใจว่าแปลตรง → ใส่คำแปลที่เดาได้ + ตั้ง confidence ต่ำ (ห้ามทิ้ง null ถ้าพออ่านออก)
+  · "แปล" ≠ "แต่ง" — ห้ามเติมของที่ไม่มีในเอกสาร (แปลเฉพาะสิ่งที่เขียนไว้จริง)
+- car_model: ถ้าเห็นรหัสรุ่น (W140, W124, W126 ...) ในบรรทัด ให้แยกออกมาที่นี่ ถ้าไม่มีใส่ null
 - ลายมือ: อ่านเท่าที่มั่นใจ ให้ confidence ต่ำถ้าเดา — อย่าแต่งชื่อให้สวยเกินจริง
 - header: date_raw = วันที่ตามที่เขียน, date_iso = ค.ศ. YYYY-MM-DD (พ.ศ.−543), grand_total = ยอดรวมล่างสุด
 - ห้ามคำนวณ amount แทนเอกสาร — ถ้าช่องจำนวนเงินว่าง ให้ amount = null (ระบบจะคำนวณเองทีหลัง)`
@@ -56,7 +61,7 @@ const SCHEMA = {
         required: ['qty', 'part_name', 'unit_price', 'amount', 'car_model', 'confidence'],
         properties: {
           qty: { anyOf: [{ type: 'number' }, { type: 'null' }], description: 'จำนวน' },
-          part_name: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'ชื่ออะไหล่ตามที่เขียน' },
+          part_name: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'ชื่ออะไหล่ แปลเป็นไทยมาตรฐานช่าง (ไม่รวมรหัสรุ่น — รุ่นไปที่ car_model)' },
           unit_price: { anyOf: [{ type: 'number' }, { type: 'null' }], description: 'ราคาต่อชิ้น (หน่วยละ)' },
           amount: { anyOf: [{ type: 'number' }, { type: 'null' }], description: 'จำนวนเงินรวมบรรทัด' },
           car_model: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'รหัสรุ่นรถถ้ามี' },
@@ -112,18 +117,28 @@ function assessLine(raw: {
   amount: number | null; car_model: string | null; confidence: number
 }): StockLine {
   const flags: string[] = []
-  let arithmeticOk = false
 
-  if (raw.qty != null && raw.unit_price != null && raw.amount != null) {
-    if (Math.abs(raw.qty * raw.unit_price - raw.amount) <= LINE_ARITH_TOL) arithmeticOk = true
+  // Fix B: เติมค่าที่ขาดแบบ deterministic (โน้ตลอตเขียน "ราคาเดียว/บรรทัด" ไม่มีจำนวน)
+  //   — ติด flag ทุกครั้งเพื่อความโปร่งใส (คนต้องรู้ว่าเป็นค่าเดา ไม่ใช่จากเอกสาร) · ไม่แตะ amount
+  let qty = raw.qty
+  let unit_price = raw.unit_price
+  if (qty == null) { qty = 1; flags.push('qty_defaulted') }
+  if (unit_price == null && raw.amount != null && qty > 0) { // qty>0 กันหารศูนย์ (เผื่อ AI อ่าน qty=0)
+    unit_price = Math.round((raw.amount / qty) * 100) / 100 // ปัด 2 ตำแหน่ง
+    flags.push('unit_price_derived')
+  }
+
+  let arithmeticOk = false
+  if (qty != null && unit_price != null && raw.amount != null) {
+    if (Math.abs(qty * unit_price - raw.amount) <= LINE_ARITH_TOL) arithmeticOk = true
     else flags.push('arithmetic_mismatch')
   }
   if (!raw.part_name || !raw.part_name.trim()) flags.push('name_missing')
   else if ((raw.confidence ?? 0) < 0.6) flags.push('name_uncertain')
-  if (raw.qty == null) flags.push('qty_missing')
-  if (raw.unit_price == null && raw.amount == null) flags.push('price_missing')
+  // ราคาว่างจริง (ไม่มีทั้งต้นทุน/ยอดรวม ให้คำนวณ) → คงธงเดิม · qty_missing ถูกแทนด้วย qty_defaulted แล้ว
+  if (unit_price == null && raw.amount == null) flags.push('price_missing')
 
-  return { ...raw, arithmetic_ok: arithmeticOk, review_flags: flags }
+  return { ...raw, qty, unit_price, arithmetic_ok: arithmeticOk, review_flags: flags }
 }
 
 /**
