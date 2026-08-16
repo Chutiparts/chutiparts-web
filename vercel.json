@@ -3,10 +3,6 @@
     {
       "path": "/api/sync-stock",
       "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/radar-daily",
-      "schedule": "0 1 * * *"
     }
   ]
 }
