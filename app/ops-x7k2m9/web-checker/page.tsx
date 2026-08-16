@@ -119,6 +119,21 @@ async function runChecks() {
     } catch (e) { push({ key: 'products_read', label: 'products query อ่านได้', status: 'FAIL', detail: (e as Error)?.message || 'error', ms: Date.now() - t0 }) }
   }
 
+  // 7b) สินค้าขึ้นเว็บมีรูป+ราคาครบ (สำคัญก่อน launch — ของโชว์บนเว็บต้องไม่ว่าง)
+  {
+    const t0 = Date.now()
+    try {
+      const db = svc()
+      const [noImg, noPrice] = await Promise.all([
+        db.from('products').select('id', { count: 'exact', head: true }).eq('is_published', true).is('image_url', null),
+        db.from('products').select('id', { count: 'exact', head: true }).eq('is_published', true).or('price.is.null,price.eq.0'),
+      ])
+      const ni = noImg.count ?? 0
+      const np = noPrice.count ?? 0
+      push({ key: 'products_complete', label: 'สินค้าขึ้นเว็บมีรูป+ราคาครบ', status: ni + np === 0 ? 'PASS' : 'WARN', detail: ni + np === 0 ? 'ครบทุกชิ้น' : `ไม่มีรูป ${ni} · ไม่มีราคา ${np} ชิ้น`, ms: Date.now() - t0 })
+    } catch (e) { push({ key: 'products_complete', label: 'สินค้าขึ้นเว็บมีรูป+ราคาครบ', status: 'FAIL', detail: (e as Error)?.message || 'error', ms: Date.now() - t0 }) }
+  }
+
   // 8) contact lead submit ได้ (DRY-RUN: insert test record → ลบทันที · ไม่แจ้งลูกค้า/ทีม)
   {
     const t0 = Date.now()

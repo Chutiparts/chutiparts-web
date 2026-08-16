@@ -109,7 +109,9 @@ async function computeItems(): Promise<Item[]> {
     const had = r.had_results === true || r.had_results === 'true'
     if (had) continue
     const q = norm(r.query_text)
-    if (!q) continue
+    if (!q || q.length < 2) continue
+    const raw = String(r.query_text ?? '').trim()
+    if (/^\d{2,3}-?\d{0,3}$/.test(raw)) continue // ข้ามคำค้นที่เป็นรหัส SKU (noise จากทดสอบ/ภายใน · ลูกค้าค้นด้วยชื่อ)
     if (!sBy[q]) sBy[q] = { q: String(r.query_text ?? q), nf: 0 }
     sBy[q].nf++
   }
