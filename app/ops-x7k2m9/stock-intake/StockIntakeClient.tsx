@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState, useTransition, useActionState, useMemo } from 'react'
 import { nameSimilarity } from '@/lib/docbrief-name-match'
-import { PARTS_CATEGORIES } from '@/lib/constants'
+import { STOCK_CATEGORIES } from '@/lib/docbrief-stock-categories'
 
 type Line = {
   id: string; document_id: string; line_no: number
@@ -361,7 +361,7 @@ function LineForm({ line, warn, saveLine, pending, start, nameOptions, locationO
         <div>
           <label style={lbl}>หมวดหมู่</label>
           <input name="category" defaultValue={line.category ?? ''} list={`cats-${line.id}`} style={inp} placeholder="เลือก/พิมพ์หมวด" />
-          <datalist id={`cats-${line.id}`}>{PARTS_CATEGORIES.map((c) => <option key={c.value} value={c.label} />)}</datalist>
+          <datalist id={`cats-${line.id}`}>{STOCK_CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
         </div>
         <div>
           <label style={lbl}>สภาพ</label>
