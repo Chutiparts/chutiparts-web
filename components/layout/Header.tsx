@@ -12,7 +12,7 @@ import { CONTACT, primaryChannel } from "@/lib/contact-routing";
 const NAV = [
   { href: "/", key: "nav_home" },
   { href: "/ebooks", key: "nav_ebooks" },
-  { href: "/vin-check", key: "nav_vin" },
+  // { href: "/vin-check", key: "nav_vin" },  // ซ่อนเมนู VIN ชั่วคราว (หน้ายังอยู่ที่ /vin-check · เอา // ออกเพื่อเปิดคืน)
   { href: "/articles", key: "nav_knowledge" },
   { href: "/businesses", key: "nav_shops" },
   { href: "/about", key: "nav_about" },

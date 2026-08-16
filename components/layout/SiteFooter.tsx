@@ -22,7 +22,7 @@ export default function SiteFooter() {
               <h4>{t("ft_explore")}</h4>
               <Link href="/search">{t("nav_browse")}</Link>
               <Link href="/ebooks">{t("nav_ebooks")}</Link>
-              <Link href="/vin-check">{t("nav_vin")}</Link>
+              {/* <Link href="/vin-check">{t("nav_vin")}</Link> */}  {/* ซ่อน VIN ชั่วคราว (หน้ายังอยู่) */}
               <Link href="/articles">{t("nav_knowledge")}</Link>
             </div>
             <div>
