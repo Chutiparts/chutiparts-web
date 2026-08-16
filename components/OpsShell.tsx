@@ -21,6 +21,7 @@ const SECTIONS: Section[] = [
   // บนสุด (ไม่มี header)
   { entries: [
     { href: `${BASE}/daily-brief`, label: 'Daily Brief', icon: '☀️', ownerOnly: true },
+    { href: `${BASE}/radar`, label: 'Demand Radar', icon: '🛰️', ownerOnly: true },
   ] },
   { header: 'ลูกค้า & งาน', entries: [
     { href: `${BASE}/parts-desk`, label: 'Leads & Follow-up', icon: '📇', badgeKey: 'tasks' }, // รวม Leads+Tasks (Tasks = แท็บในหน้า)
