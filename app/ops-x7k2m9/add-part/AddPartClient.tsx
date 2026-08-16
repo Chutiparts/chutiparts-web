@@ -1,5 +1,6 @@
 'use client'
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 
 const GREEN = '#17301F'
 const inp: React.CSSProperties = { width: '100%', padding: '11px 12px', border: '1px solid #ddd', borderRadius: 8, fontSize: 15, marginTop: 4 }
@@ -29,6 +30,7 @@ export default function AddPartClient({ addProduct, nextSku }: Props) {
   const [modelAuto, setModelAuto] = useState(false)
   const [suggesting, setSuggesting] = useState(false)
   const [res, setRes] = useState<Result | null>(null)
+  const router = useRouter()
 
   function onSku(v: string) {
     setF((p) => {
@@ -74,6 +76,7 @@ export default function AddPartClient({ addProduct, nextSku }: Props) {
       const r = await addProduct(fd)
       setRes(r)
       if (r.ok) { setF({ sku: '', name: '', model: '', price: '', oem: '' }); setModelAuto(false) }
+      if ((r.ok || r.exists) && r.sku) router.push(`/ops-x7k2m9/photo?sku=${encodeURIComponent(r.sku)}&flow=1`)
     })
   }
 
@@ -135,7 +138,7 @@ export default function AddPartClient({ addProduct, nextSku }: Props) {
                 <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>ขั้นต่อไป: อัพรูป — ก๊อป SKU นี้ไปค้นในหน้าอัพรูป</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <code style={{ background: '#fff', border: '1px dashed #999', borderRadius: 6, padding: '6px 12px', fontSize: 15, fontWeight: 700, color: GREEN, userSelect: 'all' }}>{res.sku}</code>
-                  <a href="/ops-x7k2m9/photo" style={{ display: 'inline-block', background: GREEN, color: '#fff', textDecoration: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 700 }}>📷 ไปหน้าอัพรูป →</a>
+                  <a href={`/ops-x7k2m9/photo?sku=${encodeURIComponent(res.sku)}&flow=1`} style={{ display: 'inline-block', background: GREEN, color: '#fff', textDecoration: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 700 }}>📷 ไปหน้าอัพรูป →</a>
                 </div>
               </div>
             )}

@@ -28,7 +28,7 @@ async function loginOps(formData: FormData) {
   revalidatePath(PATH)
 }
 
-export default async function PhotoUploadPage() {
+export default async function PhotoUploadPage({ searchParams }: { searchParams: Promise<{ sku?: string; flow?: string }> }) {
   if (!(await authed())) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#17301F' }}>
@@ -43,5 +43,6 @@ export default async function PhotoUploadPage() {
     )
   }
 
-  return <PhotoUploadClient />
+  const sp = await searchParams
+  return <PhotoUploadClient initialSku={(sp.sku ?? '').trim()} flow={sp.flow === '1'} />
 }

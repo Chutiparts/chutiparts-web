@@ -42,6 +42,7 @@ const SECTIONS: Section[] = [
     { key: 'goods', label: 'สินค้า', icon: '🏷️', items: [
       { href: `${BASE}/add-part`, label: 'เพิ่มสินค้า', icon: '➕' },
       { href: `${BASE}/photo`, label: 'อัพรูป', icon: '📷' },
+      { href: `${BASE}/stock-in`, label: 'รับเข้า+ขึ้นเว็บ', icon: '🚚', ownerOnly: true },
       { href: `${BASE}/sync-now`, label: 'Sync ขึ้นเว็บ', icon: '🔄', ownerOnly: true },
     ] },
   ] },

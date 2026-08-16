@@ -1,7 +1,7 @@
 'use client'
 // app/ops-x7k2m9/photo/PhotoUploadClient.tsx — Phase 1 อัพรูปอะไหล่ (ChutiBenz)
 // 2026-08-04 · มือถือเป็นหลัก · ปุ่มใหญ่ · ย่อรูปในเครื่องก่อนส่ง · ภาษาไทย
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 const GREEN = '#17301F'
 const strip = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '')
@@ -42,8 +42,8 @@ async function resizeImage(file: File, maxDim = 1600, quality = 0.82): Promise<B
   }
 }
 
-export default function PhotoUploadClient() {
-  const [sku, setSku] = useState('')
+export default function PhotoUploadClient({ initialSku = '', flow = false }: { initialSku?: string; flow?: boolean }) {
+  const [sku, setSku] = useState(initialSku)
   const [lookup, setLookup] = useState<Lookup>({ status: 'idle' })
   const [preview, setPreview] = useState<string | null>(null)
   const [blob, setBlob] = useState<Blob | null>(null)
@@ -68,6 +68,11 @@ export default function PhotoUploadClient() {
       setLookup({ status: 'notfound' })
     }
   }, [sku])
+
+  useEffect(() => {
+    if (initialSku.trim()) doLookup()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const onPick = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -182,6 +187,13 @@ export default function PhotoUploadClient() {
         }}>
           {msg.text}
         </div>
+      )}
+
+      {flow && msg?.type === 'ok' && lookup.status === 'found' && (
+        <a href={`/ops-x7k2m9/stock-in?sku=${encodeURIComponent(lookup.part_number)}`}
+          style={{ display: 'block', textAlign: 'center', marginTop: 14, background: '#0F6E56', color: '#fff', textDecoration: 'none', borderRadius: 12, padding: '15px', fontSize: 16, fontWeight: 700 }}>
+          ถัดไป: รับเข้าสต็อก → 🚚
+        </a>
       )}
     </div>
   )
