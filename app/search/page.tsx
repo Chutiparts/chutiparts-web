@@ -1,5 +1,6 @@
 // app/search/page.tsx — Full search page
 import { createClient } from '@/utils/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import SearchClient from './SearchClient'
 import { resolveAliases } from '@/lib/search-utils'
 
@@ -18,6 +19,12 @@ export default async function SearchPage({
 }) {
   const params = await searchParams
   const supabase = await createClient()
+  // service role: events ถูก revoke จาก anon (20260809_anon_lockdown) → analytics ต้องเขียนผ่าน service key
+  const svc = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)!,
+    { auth: { persistSession: false } },
+  )
   const q = (params.q || '').trim()
   const model = params.model
   const cat = params.cat
@@ -120,7 +127,7 @@ export default async function SearchPage({
 
   // Log analytics (เดิม)
   if (q) {
-    await supabase.from('events').insert({
+    await svc.from('events').insert({
       event_name: 'search_query',
       event_data: { q, resolved: searchQuery, model, cat },
     }).then(() => {})
@@ -130,7 +137,7 @@ export default async function SearchPage({
   // graceful: ถ้าตารางยังไม่ถูกสร้าง insert จะ error แต่ถูกกลืน ไม่กระทบผลค้นหา
   if (q) {
     const productCount = productsRes.data?.length || 0
-    await supabase.from('search_queries').insert({
+    await svc.from('search_queries').insert({
       query_text: q,
       resolved: searchQuery,
       model: model || null,
