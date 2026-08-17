@@ -48,6 +48,7 @@ const T = {
   cbOk: { th: "รับเรื่องแล้ว เดี๋ยวติดต่อกลับครับ 🙏", en: "Got it — we'll contact you soon 🙏" },
   cbErr: { th: "ส่งไม่สำเร็จ ลองใหม่ หรือทัก LINE ครับ", en: "Couldn't send — try again or use LINE." },
   soldHint: { th: "· สอบถามสถานะก่อนสั่ง", en: "· ask availability first" },
+  askPrice: { th: "สอบถามราคา", en: "Ask for price" },
 };
 
 export default function SalesChat() {
@@ -198,7 +199,7 @@ export default function SalesChat() {
                         borderRadius: 10, padding: "8px 10px", marginBottom: 6, textDecoration: "none", color: "#1a1a1a" }}>
                         <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>{pname(p)}</div>
                         <div style={{ fontSize: 13, color: GREEN, fontWeight: 700, marginTop: 2 }}>
-                          {p.price != null ? `฿${p.price.toLocaleString()}` : ""}
+                          {p.price != null && p.price > 0 ? `฿${p.price.toLocaleString()}` : <span style={{ color: BRASS }}>{t("askPrice")}</span>}
                           {p.stock != null && p.stock <= 1 ? <span style={{ color: "#8a8a8a", fontWeight: 400 }}> {t("soldHint")}</span> : null}
                           <span style={{ color: BRASS, float: "right" }}>{t("view")} →</span>
                         </div>
