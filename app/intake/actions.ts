@@ -1,6 +1,5 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { IntakeSchema, type IntakeData } from '@/lib/intake-schema'
 import { MODEL_INFO, INTAKE_TYPES, buildLineOAMessageUrl } from '@/lib/constants'
@@ -22,7 +21,12 @@ export async function submitIntake(input: IntakeData) {
   // 1. Validate
   const parsed = IntakeSchema.parse(input)
 
-  const supabase = await createClient()
+  // service role: cases/events ถูก revoke จาก anon (20260809_anon_lockdown) → เขียนฝั่ง server ต้องใช้ service key
+  const supabase = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)!,
+    { auth: { persistSession: false } },
+  )
 
   // 2. Create or get vehicle
   // (No user_id since this is anonymous intake)
