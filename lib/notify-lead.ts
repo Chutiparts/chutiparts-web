@@ -65,3 +65,66 @@ export async function notifyNewLead(l: LeadNotify): Promise<void> {
     console.error('[notify] LINE push error:', (e as Error)?.message)
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// P0 · แจ้งเตือน "ของเข้าสต็อก → ลูกค้าที่เคยถามหา" (restock notify)
+// เรียกจาก receiveOne (server) แบบ best-effort · ไม่ throw
+// จับคู่แบบแม่นยำ: contact_leads.part_number = SKU (เริ่มแบบ precision สูง · ขยายทีหลังตามข้อมูล)
+// ─────────────────────────────────────────────────────────────
+export type RestockLead = {
+  id: string
+  name?: string | null
+  phone?: string | null
+  line_id?: string | null
+  part_wanted?: string | null
+  created_at?: string | null
+  status?: string | null
+}
+
+export async function notifyRestock(p: {
+  sku: string
+  partName?: string | null
+  carModel?: string | null
+  qty?: number | null
+  leads: RestockLead[]
+}): Promise<void> {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN
+  const to = process.env.LINE_ADMIN_TO
+  if (!token || !to) { console.error('[notify] missing LINE env (restock)'); return }
+  if (!p.leads?.length) return
+
+  const when = new Date().toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' })
+  const head = [
+    '📦 ของเข้าสต็อก — มีลูกค้าเคยถามหา!',
+    `${p.partName || p.sku}${p.carModel ? ` · ${p.carModel}` : ''} (${p.sku})`,
+    p.qty ? `รับเข้า: ${p.qty} ชิ้น` : null,
+    `ลูกค้าที่เคยถาม: ${p.leads.length} ราย — ทักกลับได้เลย 👇`,
+    '',
+  ].filter(Boolean) as string[]
+  const body = p.leads.slice(0, 10).map((l, i) => {
+    const contact = l.line_id ? `LINE ${l.line_id}` : (l.phone ? `โทร ${l.phone}` : 'ไม่มีช่องติดต่อ')
+    const nm = l.name || '(ไม่ระบุชื่อ)'
+    const want = l.part_wanted ? ` · "${l.part_wanted.slice(0, 40)}"` : ''
+    return `${i + 1}. ${nm} · ${contact}${want}`
+  })
+  const tail = ['', `ดูรายละเอียด: ${ADMIN_LEADS_URL}`, `เวลา: ${when}`]
+  const text = [...head, ...body, ...tail].join('\n')
+
+  try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 5000)
+    const res = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ to, messages: [{ type: 'text', text }] }),
+      signal: ctrl.signal,
+    })
+    clearTimeout(timer)
+    if (!res.ok) {
+      const b = await res.text().catch(() => '')
+      console.error('[notify] restock push failed:', res.status, b.slice(0, 300))
+    }
+  } catch (e) {
+    console.error('[notify] restock push error:', (e as Error)?.message)
+  }
+}

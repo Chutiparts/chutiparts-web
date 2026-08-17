@@ -4,8 +4,8 @@
 // CSS namespace ใต้ .shx กันชนกับ ops หน้าอื่น
 import { useState, useEffect } from 'react'
 
-type Row = { date: string; part: string; pn: string; src: string; link: string; price: string; ship: string; cond: string; sup: string; note: string }
-const EMPTY: Row = { date: '', part: '', pn: '', src: '', link: '', price: '', ship: '', cond: '', sup: '', note: '' }
+type Row = { date: string; part: string; pn: string; src: string; link: string; price: string; ship: string; cond: string; sup: string; note: string; outcome: string }
+const EMPTY: Row = { date: '', part: '', pn: '', src: '', link: '', price: '', ship: '', cond: '', sup: '', note: '', outcome: 'not_found' }
 
 const CSS = `
 .shx{--green:#17301F;--brass:#B8895A;--cream:#F4EFE4;--line:#e2ddcf;--red:#A32D2D;background:var(--cream);min-height:100vh;font-family:-apple-system,"Segoe UI","Noto Sans Thai",sans-serif;color:#1a1a1a;line-height:1.5}
@@ -49,13 +49,14 @@ const CSS = `
 
 const enc = (s: string) => encodeURIComponent((s || '').trim())
 
-export default function SourcingClient({ role = 'owner' }: { role?: string }) {
+export default function SourcingClient({ role = 'owner', logSourcing }: { role?: string; logSourcing?: (p: Record<string, unknown>) => Promise<{ ok: boolean; message: string }> }) {
   const isOwner = role === 'owner'
   const [q, setQ] = useState('')
   const [model, setModel] = useState('')
   const [pn, setPn] = useState('')
   const [rows, setRows] = useState<Row[]>([])
   const [f, setF] = useState<Row>(EMPTY)
+  const [fx, setFx] = useState({ cur: '', amt: '', fx: '' })
   const [toast, setToast] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
   // P1 · Landed Cost Simulation (owner-only · คำนวณล้วน · ไม่บันทึก/ไม่เขียน DB · ephemeral)
@@ -88,16 +89,36 @@ export default function SourcingClient({ role = 'owner' }: { role?: string }) {
 
   const setField = (k: keyof Row, v: string) => setF((p) => ({ ...p, [k]: v }))
   const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
-  const addRow = () => {
+  const numv = (x: string) => { const n = Number((x || '').replace(/,/g, '').trim()); return Number.isFinite(n) && x.trim() !== '' ? n : null }
+  const addRow = async () => {
     if (!f.part.trim() && !f.pn.trim()) { flash('ใส่ชื่อชิ้นหรือ Part Number ก่อน'); return }
-    persist([...rows, { ...f, date: today() }])
-    setF(EMPTY); flash('เพิ่มแล้ว')
+    const rec: Row = { ...f, date: today() }
+    let dbMsg = ''
+    if (logSourcing) {
+      try {
+        const priceThb = numv(f.price)
+        const shipThb = numv(f.ship)
+        const amt = numv(fx.amt)
+        const rate = numv(fx.fx)
+        const computedThb = (amt != null && rate != null) ? Math.round(amt * rate) : priceThb
+        const landed = (computedThb != null || shipThb != null) ? (computedThb || 0) + (shipThb || 0) : null
+        const r = await logSourcing({
+          query_text: f.part, part_number: f.pn, car_model: model, outcome: f.outcome,
+          source: f.src, supplier: f.sup, condition: f.cond, link: f.link, note: f.note,
+          currency: fx.cur, amount: amt, fx_rate: rate,
+          price_thb: computedThb, shipping_tax_thb: shipThb, landed_thb: landed,
+        })
+        dbMsg = r.ok ? ' · เข้าระบบ ✓' : ' · (DB: ' + r.message + ')'
+      } catch { dbMsg = ' · (DB error — เก็บในเครื่องแล้ว)' }
+    }
+    persist([...rows, rec])
+    setF(EMPTY); setFx({ cur: '', amt: '', fx: '' }); flash('บันทึกแล้ว' + dbMsg)
   }
   const del = (i: number) => persist(rows.filter((_, idx) => idx !== i))
   const clearAll = () => { if (confirm('ล้างรายการทั้งหมด?')) persist([]) }
   const copyTSV = () => {
     if (!rows.length) { flash('ยังไม่มีรายการ'); return }
-    const tsv = rows.map((r) => [r.date, r.part, r.pn, r.src, r.link, r.price, r.ship, r.sup, r.cond, r.note].join('\t')).join('\n')
+    const tsv = rows.map((r) => [r.date, r.outcome, r.part, r.pn, r.src, r.link, r.price, r.ship, r.sup, r.cond, r.note].join('\t')).join('\n')
     navigator.clipboard?.writeText(tsv).then(() => flash('คัดลอกแล้ว — วางในชีต ประวัติการหา ได้เลย'), () => flash('คัดลอกไม่สำเร็จ'))
   }
 
@@ -136,6 +157,11 @@ export default function SourcingClient({ role = 'owner' }: { role?: string }) {
 
         <div className="card">
           <h2>② บันทึกผลที่เจอ → คัดลอกลง KB</h2>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <button type="button" className={'btn' + (f.outcome === 'not_found' ? '' : ' ghost')} style={{ flex: 1, background: f.outcome === 'not_found' ? '#A32D2D' : undefined }} onClick={() => setField('outcome', 'not_found')}>❌ หาไม่เจอ</button>
+            <button type="button" className={'btn' + (f.outcome === 'found' ? '' : ' ghost')} style={{ flex: 1 }} onClick={() => setField('outcome', 'found')}>✅ หาเจอ</button>
+          </div>
+          <div className="muted" style={{ marginBottom: 8 }}>เลือกผลก่อน — “หาไม่เจอ” = ลิสต์ทำเงิน (ควรสต็อก) · “หาเจอ” = กรอกราคา/แหล่งด้านล่าง</div>
           <div className="row">
             <div><label>ชิ้น</label><input value={f.part} onChange={(ev) => setField('part', ev.target.value)} placeholder="ไฟท้าย W140 ขวา" /></div>
             <div><label>Part Number</label><input value={f.pn} onChange={(ev) => setField('pn', ev.target.value)} placeholder="140 820 ..." /></div>
@@ -147,26 +173,32 @@ export default function SourcingClient({ role = 'owner' }: { role?: string }) {
             <div><label>สภาพ</label><input value={f.cond} onChange={(ev) => setField('cond', ev.target.value)} placeholder="used ดี / NOS" /></div>
           </div>
           <div className="row">
+            <div><label>สกุลเงิน (ถ้าซื้อนอก)</label><input value={fx.cur} onChange={(ev) => setFx((p) => ({ ...p, cur: ev.target.value }))} placeholder="GBP / JPY / USD" /></div>
+            <div><label>ยอดดิบ (สกุลนั้น)</label><input value={fx.amt} onChange={(ev) => setFx((p) => ({ ...p, amt: ev.target.value }))} placeholder="80" /></div>
+            <div><label>อัตราแลก→บาท (fx)</label><input value={fx.fx} onChange={(ev) => setFx((p) => ({ ...p, fx: ev.target.value }))} placeholder="44.5" /></div>
+          </div>
+          <div className="muted" style={{ marginTop: 4 }}>💱 กรอก 3 ช่องนี้ = ระบบคิด “ราคาของ(บาท)” = ยอดดิบ × fx ให้ + เก็บ fx ไว้ (ย้อนแก้ไม่ได้) · ซื้อในไทยข้ามได้ ใช้ช่อง “ราคาของ” ตรงๆ</div>
+          <div className="row">
             <div style={{ flex: 2 }}><label>ลิงก์</label><input value={f.link} onChange={(ev) => setField('link', ev.target.value)} placeholder="วางลิงก์ประกาศ" /></div>
             <div style={{ flex: 2 }}><label>ซัพพลายเออร์/ผู้ขาย</label><input value={f.sup} onChange={(ev) => setField('sup', ev.target.value)} placeholder="seller_xxx (DE)" /></div>
           </div>
           <div><label>โน้ต</label><input value={f.note} onChange={(ev) => setField('note', ev.target.value)} placeholder="ส่ง 10-14 วัน / ต้องยืนยันรหัส" /></div>
           <div className="actions">
-            <button className="btn" onClick={addRow}>➕ เพิ่มลงรายการ</button>
+            <button className="btn" onClick={addRow}>💾 บันทึกเข้าระบบ</button>
             <button className="btn brass" onClick={copyTSV}>📋 คัดลอกเป็นตาราง (วางใน KB → ประวัติการหา)</button>
             <button className="btn ghost" onClick={clearAll}>ล้างรายการ</button>
           </div>
           <table><thead><tr>
-            <th>วันที่</th><th>ชิ้น</th><th>PN</th><th>แหล่ง</th><th>ราคา</th><th>ส่ง+ภาษี</th><th>สภาพ</th><th>ซัพพลายเออร์</th><th>โน้ต</th><th></th>
+            <th>วันที่</th><th>ผล</th><th>ชิ้น</th><th>PN</th><th>แหล่ง</th><th>ราคา</th><th>ส่ง+ภาษี</th><th>สภาพ</th><th>ซัพพลายเออร์</th><th>โน้ต</th><th></th>
           </tr></thead><tbody>
             {rows.map((r, i) => (
               <tr key={i}>
-                <td>{r.date}</td><td>{r.part}</td><td>{r.pn}</td><td>{r.src}</td><td>{r.price}</td><td>{r.ship}</td><td>{r.cond}</td><td>{r.sup}</td><td>{r.note}</td>
+                <td>{r.date}</td><td>{r.outcome === 'found' ? '✅' : '❌'}</td><td>{r.part}</td><td>{r.pn}</td><td>{r.src}</td><td>{r.price}</td><td>{r.ship}</td><td>{r.cond}</td><td>{r.sup}</td><td>{r.note}</td>
                 <td><span className="del" onClick={() => del(i)}>✕</span></td>
               </tr>
             ))}
           </tbody></table>
-          <div className="muted" style={{ marginTop: 6 }}>รายการเก็บในเบราว์เซอร์นี้ (localStorage) · กด &quot;คัดลอกเป็นตาราง&quot; แล้ววางในชีต <b>ประวัติการหา</b> ได้เลย</div>
+          <div className="muted" style={{ marginTop: 6 }}>บันทึกแล้วเข้า <b>ระบบ (DB)</b> = ฐานของ Demand Radar + เก็บสำเนาในเครื่องนี้ด้วย · &quot;คัดลอกเป็นตาราง&quot; ไว้วางในชีตได้</div>
         </div>
 
         {isOwner && (() => {

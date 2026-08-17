@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@supabase/supabase-js'
 import StockInClient from './StockInClient'
+import { notifyRestock } from '@/lib/notify-lead'
 
 export const dynamic = 'force-dynamic'
 const COOKIE = 'ops_admin'
@@ -104,6 +105,24 @@ async function receiveOne(_prev: unknown, formData: FormData): Promise<{ ok: boo
     actor: 'owner', note: 'รับเข้าเพิ่ม (flow เพิ่มสินค้า)',
   })
   if (mvErr) return { ok: false, message: `รับเข้าไม่สำเร็จ: ${mvErr.message}` }
+
+  // P0 · แจ้งเตือน LINE: ของเข้า → ลูกค้าที่เคยถามหา SKU นี้ (best-effort · ไม่กระทบผลรับเข้า)
+  try {
+    const { data: leads } = await db.from('contact_leads')
+      .select('id, name, phone, line_id, part_wanted, created_at, status')
+      .eq('part_number', sku)
+      .neq('status', 'won')
+      .neq('status', 'lost')
+      .order('created_at', { ascending: true })
+      .limit(10)
+    if (leads && leads.length) {
+      const carModel = Array.isArray(prod?.compatible_models) ? (prod?.compatible_models[0] ?? null) : null
+      await notifyRestock({ sku, partName: prod?.name ?? null, carModel, qty, leads })
+    }
+  } catch (e) {
+    console.error('[stock-in] restock notify error:', (e as Error)?.message)
+  }
+
   revalidatePath(PATH)
   return { ok: true, message: `รับเข้าสต็อก ${qty} ชิ้นแล้ว ✓ (SKU ${sku})` }
 }
