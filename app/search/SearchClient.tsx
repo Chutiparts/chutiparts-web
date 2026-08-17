@@ -434,6 +434,8 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
   const tr = L[lang]
   const [added, setAdded] = useState(false)
   const placeholder = isPlaceholderPrice(p)
+  const hasRealPrice = typeof p.price === 'number' && p.price > 0
+  const askPrice = placeholder || !hasRealPrice
   const stock = p.stock ?? 0
   const inStock = stock > 0
   const chassis = p.compatible_models?.[0]
@@ -510,7 +512,7 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
           <h3 className="font-bold text-sm line-clamp-2 mb-2 flex-1">{highlightTerm(p.name, highlight)}</h3>
 
           {/* Price */}
-          {placeholder ? (
+          {askPrice ? (
             <div className="mt-auto">
               <p className="text-amber-600 font-bold text-sm">{tr.price_tbc}</p>
               <p className="text-[11px] text-gray-500">{tr.price_line}</p>
@@ -522,7 +524,7 @@ function ProductCard({ p, highlight }: { p: any; highlight: string }) {
           )}
 
           {/* Add to cart (in stock only) */}
-          {inStock && (
+          {inStock && !askPrice && (
             <button
               type="button"
               onClick={handleAdd}
