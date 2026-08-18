@@ -45,17 +45,47 @@ async function confirmOrder(formData: FormData) {
   const id = String(formData.get('id') || '')
   if (!id) return
   const supa = svc()
-  const { data: order } = await supa.from('orders').select('id,status,items,stock_deducted').eq('id', id).single()
+  const { data: order } = await supa.from('orders').select('id,status,items,stock_deducted,customer_name,customer_contact').eq('id', id).single()
   if (!order) return
   if (order.status === 'pending' && !order.stock_deducted) {
+    const customer = [order.customer_name, order.customer_contact].filter(Boolean).join(' · ').slice(0, 200) || null
     for (const it of (order.items as any[]) || []) {
       const pid = it?.id
       const qty = Math.max(0, Math.trunc(Number(it?.qty) || 0))
-      if (pid == null || qty <= 0) continue
-      const { data: prod } = await supa.from('products').select('stock').eq('id', pid).single()
-      if (prod) {
-        const newStock = Math.max(0, (Number(prod.stock) || 0) - qty)
-        await supa.from('products').update({ stock: newStock }).eq('id', pid)
+      if (qty <= 0) continue
+      // หา SKU ของสินค้า (จาก product id หรือ code ในตะกร้า)
+      let sku: string | null = it?.code ? String(it.code) : null
+      let pname: string | null = it?.name ? String(it.name) : null
+      let pmodels: unknown = null
+      if (pid != null) {
+        const { data: prod } = await supa.from('products').select('part_number, name, compatible_models').eq('id', pid).maybeSingle()
+        if (prod?.part_number) sku = String(prod.part_number)
+        if (prod?.name) pname = String(prod.name)
+        pmodels = prod?.compatible_models ?? null
+      }
+      if (!sku) continue
+      // หา stock_records (active) ของ SKU นี้
+      const { data: stRows } = await supa.from('stock_records').select('id, set_price, cost, car_model').eq('sku', sku).is('deleted_at', null)
+      const st = stRows?.[0] as { id: string; set_price?: number | null; cost?: number | null; car_model?: string | null } | undefined
+      if (!st) continue // ไม่มี stock row → ไม่ได้ track สต็อก ข้ามการตัด (ไม่ให้ล่ม)
+      const unitPrice = Number(it?.price) || Number(st.set_price) || 0
+      const unitCost = st.cost != null ? Number(st.cost) : null
+      const carModel = st.car_model || (Array.isArray(pmodels) ? (pmodels[0] as string) : null) || null
+      // 1) บันทึกการขาย (sales_records) — ช่องทาง web-order
+      const { data: sale } = await supa.from('sales_records').insert({
+        sku, part_sold: pname, car_model: carModel,
+        sale_date: new Date().toISOString().slice(0, 10),
+        sale_price: unitPrice * qty,
+        cost: unitCost != null ? unitCost * qty : null,
+        qty, sold_by: 'web-order', customer,
+        payment_status: 'paid', delivery_status: 'delivered',
+      }).select('id').single()
+      // 2) ตัด stock_records ผ่าน RPC เดียวกับหน้า Sell (แหล่งจริง)
+      if (sale?.id) {
+        await supa.rpc('record_stock_issue', {
+          p_stock_record_id: st.id, p_qty: qty, p_sale_id: sale.id,
+          p_actor: 'web-order', p_unit_cost: unitCost,
+        })
       }
     }
     await supa.from('orders').update({ status: 'confirmed', stock_deducted: true }).eq('id', id)
