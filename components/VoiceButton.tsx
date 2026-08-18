@@ -1,20 +1,22 @@
 'use client'
 // components/VoiceButton.tsx — ปุ่มลอย "คุยกับ AI" (Voice Pilot)
-// gate: NEXT_PUBLIC_VOICE_ENABLED !== 'true' → ไม่ render อะไรเลย (บน prod มองไม่เห็นจนกว่าจะเปิด env)
-// ทำงานได้ทันที: ตรวจ LINE in-app browser (ตอนกดเปิด) + ปุ่มโทร (tel:) + ปุ่มแชท LINE
-// TODO (เมื่อ agent worker + /api/agent/token พร้อม): เปลี่ยน startVoice() ให้ต่อ LiveKit จริง
-import { useState, type CSSProperties } from 'react'
+// gate: NEXT_PUBLIC_VOICE_ENABLED !== 'true' → ไม่ render อะไรเลย
+// เสียง: ขอ token จาก /api/agent/token → ต่อ LiveKit → agent worker ถูก dispatch เข้าห้องเดียวกัน
+// fallback: ตรวจ LINE in-app browser + ปุ่มโทร (tel:) + แชท LINE
+import { useState, useRef, type CSSProperties } from 'react'
 
 const GREEN = '#17301F'
 const GOLD = '#C9A961'
 const PHONE_TEL = 'tel:0818285855'
 const LINE_URL = 'https://line.me/R/ti/p/%40440ifncj'
 
+type Phase = 'idle' | 'connecting' | 'live' | 'error'
+
 function btn(bg: string, fg: string, border?: string): CSSProperties {
   return {
     display: 'block', textAlign: 'center', padding: '10px 12px', borderRadius: 10,
     background: bg, color: fg, border: border ? `1px solid ${border}` : 'none',
-    fontSize: 14, fontWeight: 600, cursor: 'pointer', textDecoration: 'none',
+    fontSize: 14, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', width: '100%',
   }
 }
 
@@ -22,21 +24,53 @@ export default function VoiceButton() {
   const enabled = process.env.NEXT_PUBLIC_VOICE_ENABLED === 'true'
   const [open, setOpen] = useState(false)
   const [lineInApp, setLineInApp] = useState(false)
-  const [voiceMsg, setVoiceMsg] = useState('')
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [msg, setMsg] = useState('')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const roomRef = useRef<any>(null)
 
   if (!enabled) return null
 
-  // ตรวจ LINE in-app ตอนกดเปิด panel (ใน event handler — ไม่ใช่ effect · ไม่มี hydration mismatch)
   const toggle = () => {
-    if (!open && typeof navigator !== 'undefined') {
-      setLineInApp(/Line/i.test(navigator.userAgent))
-    }
+    if (!open && typeof navigator !== 'undefined') setLineInApp(/Line/i.test(navigator.userAgent))
     setOpen((v) => !v)
   }
 
-  const startVoice = () => {
-    // TODO: ขอ token จาก /api/agent/token แล้ว connect LiveKit เข้าห้องเดียวกับ agent worker
-    setVoiceMsg('ระบบเสียงกำลังเปิดให้บริการเร็ว ๆ นี้ครับ ระหว่างนี้โทรหรือแชท LINE ได้เลย')
+  const startVoice = async () => {
+    if (phase === 'connecting' || phase === 'live') return
+    setPhase('connecting')
+    setMsg('กำลังเชื่อมต่อ…')
+    try {
+      const res = await fetch('/api/agent/token', { method: 'POST' })
+      if (!res.ok) throw new Error('token_failed')
+      const { token, url } = await res.json()
+      const { Room, RoomEvent } = await import('livekit-client')
+      const room = new Room()
+      roomRef.current = room
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      room.on(RoomEvent.TrackSubscribed, (track: any) => {
+        if (track.kind === 'audio') {
+          const el = track.attach()
+          el.style.display = 'none'
+          document.body.appendChild(el)
+        }
+      })
+      room.on(RoomEvent.Disconnected, () => { setPhase('idle'); setMsg('') })
+      await room.connect(url, token)
+      await room.localParticipant.setMicrophoneEnabled(true)
+      setPhase('live')
+      setMsg('กำลังคุยกับ AI — พูดได้เลยครับ')
+    } catch {
+      setPhase('error')
+      setMsg('เชื่อมต่อเสียงไม่สำเร็จ ลองใหม่ หรือโทร/แชท LINE ได้เลยครับ')
+    }
+  }
+
+  const endVoice = async () => {
+    try { await roomRef.current?.disconnect() } catch { /* ignore */ }
+    roomRef.current = null
+    setPhase('idle')
+    setMsg('')
   }
 
   return (
@@ -53,11 +87,15 @@ export default function VoiceButton() {
                 เปิดหน้านี้ใน Safari หรือ Chrome เพื่อคุยด้วยเสียงได้ครับ (เบราว์เซอร์ใน LINE ใช้ไมค์ไม่ได้)
               </div>
             )}
-            <button type="button" onClick={startVoice} disabled={lineInApp}
-              style={{ ...btn(GREEN, GOLD), opacity: lineInApp ? .5 : 1, border: `1px solid ${GOLD}` }}>
-              🎙️ คุยด้วยเสียง (beta)
-            </button>
-            {voiceMsg && <div style={{ fontSize: 12, color: GREEN }}>{voiceMsg}</div>}
+            {phase === 'live' ? (
+              <button type="button" onClick={endVoice} style={btn('#c0392b', '#fff')}>🔴 วางสาย</button>
+            ) : (
+              <button type="button" onClick={startVoice} disabled={lineInApp || phase === 'connecting'}
+                style={{ ...btn(GREEN, GOLD, GOLD), opacity: (lineInApp || phase === 'connecting') ? .5 : 1 }}>
+                🎙️ {phase === 'connecting' ? 'กำลังเชื่อมต่อ…' : 'คุยด้วยเสียง'}
+              </button>
+            )}
+            {msg && <div style={{ fontSize: 12, color: phase === 'error' ? '#c0392b' : GREEN }}>{msg}</div>}
             <a href={PHONE_TEL} style={btn('#fff', GREEN, GOLD)}>📞 โทรหาร้าน 081-828-5855</a>
             <a href={LINE_URL} target="_blank" rel="noopener noreferrer" style={btn('#06C755', '#fff')}>💬 แชทผ่าน LINE</a>
           </div>
