@@ -75,8 +75,17 @@ async function receiveOne(_prev: unknown, formData: FormData): Promise<{ ok: boo
 
   // หา active stock_records ที่ SKU ตรง
   const { data: existing } = await db.from('stock_records')
-    .select('id').eq('sku', sku).is('deleted_at', null)
+    .select('id, part_name').eq('sku', sku).is('deleted_at', null)
   if ((existing?.length ?? 0) > 1) return { ok: false, message: `SKU "${sku}" มี stock หลายรายการ active — เลือกไม่ได้ ต้องแก้ให้เหลือรายการเดียวก่อน` }
+
+  // 🛡️ ยามกันปน: SKU มีสต็อกอยู่แล้ว แต่ชื่อไม่ตรงกับสินค้าใน products → หยุด (กันบวกทับของคนละตัวเงียบๆ)
+  const existingRow = existing?.[0] as { id: string; part_name?: string | null } | undefined
+  if (existingRow && prod?.name && existingRow.part_name) {
+    const norm = (x: unknown) => String(x ?? '').toLowerCase().replace(/ซ้าย|ขวา|\s+/g, '')
+    if (norm(existingRow.part_name) !== norm(prod.name)) {
+      return { ok: false, message: `⚠️ กันปน: SKU "${sku}" มีสต็อกชื่อ "${existingRow.part_name}" อยู่แล้ว แต่สินค้าในระบบคือ "${prod.name}" — ชื่อไม่ตรงกัน อาจเป็น SKU ซ้ำ/ปน · แก้ชื่อให้ตรงกันก่อนรับเข้า (กันบวกทับผิดตัว)` }
+    }
+  }
 
   let targetId = existing?.[0]?.id as string | undefined
   if (!targetId) {
