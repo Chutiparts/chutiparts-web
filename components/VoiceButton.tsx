@@ -21,7 +21,11 @@ function btn(bg: string, fg: string, border?: string): CSSProperties {
 }
 
 export default function VoiceButton() {
-  const enabled = process.env.NEXT_PUBLIC_VOICE_ENABLED === 'true'
+  // เปิดปุ่มเมื่อ: env เปิด (เปิดให้ทุกคน) หรือมี ?voice ใน URL (เทสส่วนตัว ลูกค้าทั่วไปไม่เห็น)
+  const [enabled] = useState(() =>
+    process.env.NEXT_PUBLIC_VOICE_ENABLED === 'true' ||
+    (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('voice')),
+  )
   const [open, setOpen] = useState(false)
   const [lineInApp, setLineInApp] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
@@ -60,9 +64,13 @@ export default function VoiceButton() {
       await room.localParticipant.setMicrophoneEnabled(true)
       setPhase('live')
       setMsg('กำลังคุยกับ AI — พูดได้เลยครับ')
-    } catch {
+    } catch (e) {
       setPhase('error')
-      setMsg('เชื่อมต่อเสียงไม่สำเร็จ ลองใหม่ หรือโทร/แชท LINE ได้เลยครับ')
+      const noMic = e instanceof Error && e.name === 'NotFoundError'
+      setMsg(noMic
+        ? 'ไม่พบไมโครโฟนในเครื่องนี้ — ลองใช้มือถือ หรือโทร/แชท LINE ได้เลยครับ'
+        : 'เชื่อมต่อเสียงไม่สำเร็จ ลองใหม่ หรือโทร/แชท LINE ได้เลยครับ')
+      console.error('[voice] startVoice failed:', e)
     }
   }
 
