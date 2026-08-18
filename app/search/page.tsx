@@ -147,13 +147,30 @@ export default async function SearchPage({
     }).then(() => {}, () => {})
   }
 
+  // 🔴 สต็อกสด: อ่าน on-hand จริงจาก stock_records แทน products.stock ที่ค้าง (badge มีของ/หมด ให้ตรงจริง · sync กับการขาย)
+  const _prodList = (productsRes.data || []) as Array<Record<string, unknown>>
+  const _skus = _prodList.map((p) => String(p.part_number ?? '')).filter(Boolean)
+  const _liveBySku = new Map<string, number>()
+  if (_skus.length) {
+    const { data: _srows } = await svc
+      .from('stock_records').select('sku, qty').in('sku', _skus).is('deleted_at', null)
+    for (const r of (_srows || []) as Array<{ sku?: string; qty?: number }>) {
+      const k = String(r.sku ?? '')
+      if (k) _liveBySku.set(k, (_liveBySku.get(k) || 0) + (Number(r.qty) || 0))
+    }
+  }
+  const productsLive = _prodList.map((p) => ({
+    ...p,
+    stock: _liveBySku.has(String(p.part_number ?? '')) ? _liveBySku.get(String(p.part_number ?? '')) : p.stock,
+  }))
+
   return (
     <SearchClient
       initialQuery={q}
       initialModel={model || ''}
       initialCategory={cat || ''}
       initialType={type}
-      products={productsRes.data || []}
+      products={productsLive}
       articles={articlesRes.data || []}
       businesses={bizRes.data || []}
       resolved={resolvedQuery}
