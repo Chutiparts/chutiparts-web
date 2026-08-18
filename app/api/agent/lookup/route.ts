@@ -117,22 +117,40 @@ export async function GET(req: NextRequest) {
   // ---------- โหมดคำพูด: alias + ค้นชื่อ (แบบเดียวกับหน้า /search) ----------
   if (!q) return j({ status: 'not_found', query: '', note: 'ต้องส่ง ?sku= หรือ ?q=' })
 
-  const resolved = await resolveAliases(q, sb)          // ปลาวาฬ → W140, headlight → ไฟหน้า
+  const resolved = await resolveAliases(q, sb)          // ทั้งประโยค: ปลาวาฬ → W140
   const searchQuery = resolved.canonical || q
-  const safe = clean(searchQuery)
-  const qNorm = searchQuery.replace(/[^a-zA-Z0-9]/g, '')
-  const orParts = [
-    `name.ilike.%${safe}%`,
-    `description.ilike.%${safe}%`,
-    `part_number.ilike.%${safe}%`,
-    `oem_number.ilike.%${safe}%`,
-  ]
-  if (qNorm) orParts.push(`part_number_norm.ilike.%${qNorm}%`, `oem_number_norm.ilike.%${qNorm}%`)
+  // แยก alias ทีละคำเหมือนหน้า /search: "ไฟท้าย ปลาวาฬ" → ["ไฟท้าย","W140"] (เจอตั้งแต่รอบแรก)
+  const rawTokens = searchQuery.split(/\s+/).filter((t) => t.length >= 2)
+  let tokens = rawTokens
+  if (rawTokens.length >= 2) {
+    const { data: tokenAliases } = await sb
+      .from('search_aliases').select('alias, canonical').eq('active', true)
+      .in('alias', rawTokens.map((t) => t.toLowerCase()))
+    const aliasMap: Record<string, string> = {}
+    for (const r of (tokenAliases || []) as Array<{ alias: string; canonical: string }>) {
+      aliasMap[String(r.alias).toLowerCase()] = String(r.canonical)
+    }
+    tokens = rawTokens.map((t) => aliasMap[t.toLowerCase()] || t)
+  }
 
-  const { data } = await sb
-    .from('products').select('*').eq('is_published', true)
-    .or(orParts.join(','))
-    .limit(20)
+  let pq = sb.from('products').select('*').eq('is_published', true).limit(20)
+  if (tokens.length >= 2) {
+    // ทุกคำต้องเจอ (AND) — .or() ที่เรียกซ้ำ = AND ระหว่างกลุ่ม (แบบเดียวกับหน้า /search)
+    for (const tok of tokens) {
+      const t = clean(tok)
+      const tNorm = tok.replace(/[^a-zA-Z0-9]/g, '')
+      const parts = [`name.ilike.%${t}%`, `description.ilike.%${t}%`, `part_number.ilike.%${t}%`, `oem_number.ilike.%${t}%`]
+      if (tNorm) parts.push(`part_number_norm.ilike.%${tNorm}%`, `oem_number_norm.ilike.%${tNorm}%`)
+      pq = pq.or(parts.join(','))
+    }
+  } else {
+    const safe = clean(searchQuery)
+    const qNorm = searchQuery.replace(/[^a-zA-Z0-9]/g, '')
+    const orParts = [`name.ilike.%${safe}%`, `description.ilike.%${safe}%`, `part_number.ilike.%${safe}%`, `oem_number.ilike.%${safe}%`]
+    if (qNorm) orParts.push(`part_number_norm.ilike.%${qNorm}%`, `oem_number_norm.ilike.%${qNorm}%`)
+    pq = pq.or(orParts.join(','))
+  }
+  const { data } = await pq
   let rows = (data || []) as Product[]
 
   if (!rows.length) { await logQuery(sb, q, searchQuery, 0); return j({ status: 'not_found', query: q }) }
