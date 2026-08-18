@@ -7,6 +7,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { SiteHeader, SiteChromeBottom } from '@/components/layout/SiteChrome'
+import VoiceButton from '@/components/VoiceButton'
 import { CartProvider } from './context/CartContext'
 import { LanguageProvider } from './context/LanguageContext'
 import { FlagsProvider } from './context/FlagsContext'
@@ -111,6 +112,7 @@ export default function RootLayout({
             <GoogleAnalytics gaId="G-D2J142YWNM" />
             <SpeedInsights />
             <SiteChromeBottom />
+            <VoiceButton />
           </CartProvider>           </FlagsProvider>
         </LanguageProvider>
       </body>
