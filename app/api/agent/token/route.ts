@@ -8,6 +8,7 @@ import { rateLimit, clientIp } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const preferredRegion = 'sin1' // co-locate กับ Supabase ap-southeast-1 (Singapore) — ลด latency query
 const noStore = { 'Cache-Control': 'no-store' as const }
 
 export async function POST(req: NextRequest) {
