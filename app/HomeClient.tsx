@@ -1,4 +1,5 @@
 'use client'
+import { priceLabel } from '@/lib/price'
 
 import { useMemo, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
@@ -260,7 +261,7 @@ function HomeClientInner({ products }: { products: Product[] }) {
                       <div>
                         <p className="text-xs text-gray-500">ราคา</p>
                         <p className="text-2xl font-bold text-green-600">
-                          ฿{product.price.toLocaleString()}
+                          {priceLabel(product.price)}
                         </p>
                       </div>
                       <div className="text-right">

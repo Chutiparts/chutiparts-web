@@ -35,7 +35,7 @@ export default function EmptyState({ onClear, hasFilters }: Props) {
         <p className="text-sm text-gray-700">
           💬 ทักทาย Line:{' '}
           <a
-            href="https://line.me/R/ti/p/~mr.chuti5988"
+            href="https://line.me/R/ti/p/%40440ifncj"
             target="_blank"
             rel="noopener noreferrer"
             className="font-bold text-yellow-700 underline"

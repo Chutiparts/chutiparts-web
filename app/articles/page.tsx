@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { CHASSIS_MODELS } from '@/lib/constants'
 
 export const metadata = {
+  alternates: { canonical: 'https://chutibenz.com/articles' },
   title: 'บทความความรู้ Mercedes-Benz',
   description: 'อ่านบทความเกี่ยวกับการดูแล Mercedes-Benz รุ่นเก่า W124, W126, W140, W201, W202, W210',
 }

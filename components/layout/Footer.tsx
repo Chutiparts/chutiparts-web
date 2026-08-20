@@ -31,7 +31,7 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-bold text-white mb-3">ติดต่อเรา</h3>
             <ul className="space-y-2 text-sm">
-              <li><a href={LINE_OA_URL} target="_blank" rel="noopener noreferrer" className="hover:text-green-400">💬 Line: mr.chuti5988</a></li>
+              <li><a href={LINE_OA_URL} target="_blank" rel="noopener noreferrer" className="hover:text-green-400">💬 Line: @440ifncj</a></li>
               <li><a href={PHONE_TEL} className="hover:text-blue-400">📞 {PHONE}</a></li>
               <li>📍 ส่งทั่วประเทศไทย</li>
             </ul>

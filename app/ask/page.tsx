@@ -4,6 +4,7 @@ import PartsIntakeForm from '@/components/PartsIntakeForm'
 import AskQuickContact from '@/components/AskQuickContact'
 
 export const metadata: Metadata = {
+  alternates: { canonical: 'https://chutibenz.com/ask' },
   title: 'ฝากคำถามหาอะไหล่ | ChutiBenz',
   description: 'ฝากคำถามหาอะไหล่ Mercedes-Benz แจ้งรุ่นรถ ชิ้นอะไหล่ที่ต้องการ และช่องทางติดต่อกลับ ทีมงานจะตรวจสอบและติดต่อกลับให้',
 }

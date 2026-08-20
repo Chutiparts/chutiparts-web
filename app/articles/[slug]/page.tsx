@@ -6,17 +6,23 @@ import { LINE_OA_URL } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
+import { priceLabel } from '@/lib/price'
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const supabase = await createClient()
   const { data } = await supabase.from('content').select('title, excerpt, meta_title, meta_description, cover_image').eq('slug', slug).single()
   if (!data) return { title: 'ไม่พบบทความ' }
+  const url = `https://chutibenz.com/articles/${slug}`
+  const title = data.meta_title || data.title
+  const description = data.meta_description || data.excerpt
+  const images = data.cover_image ? [data.cover_image] : undefined
   return {
-    title: data.meta_title || data.title,
-    description: data.meta_description || data.excerpt,
-    openGraph: {
-      images: data.cover_image ? [data.cover_image] : undefined,
-    },
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, url, images },
+    twitter: { card: 'summary_large_image', title, description, images },
   }
 }
 
@@ -30,9 +36,10 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
   supabase.from('content').update({ views_count: (article.views_count || 0) + 1 }).eq('id', article.id).then(() => {})
 
   // Related products
+  // แนะนำเฉพาะสินค้าที่ curate ไว้ (related_parts) — เลิกจับคู่ด้วยรุ่นอย่างเดียว กันแนะผิดบริบท (เช่น พวงมาลัยในบทความสนิม) · ไม่มี = ซ่อนกล่อง
   const related = article.related_parts && article.related_parts.length > 0
-    ? await supabase.from('products').select('*').in('id', article.related_parts).limit(6)
-    : await supabase.from('products').select('*').contains('compatible_models', article.related_models || []).eq('is_published', true).limit(6)
+    ? await supabase.from('products').select('*').in('id', article.related_parts).eq('is_published', true).limit(6)
+    : null
 
   return (
     <article className="max-w-3xl mx-auto px-4 py-6">
@@ -71,14 +78,14 @@ export default async function ArticleDetailPage({ params }: { params: Promise<{ 
         <section className="mt-12 pt-8 border-t border-gray-200">
           <h2 className="text-xl font-bold mb-4">🛒 อะไหล่ที่เกี่ยวข้อง</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {related.data.map((p: any) => (
+            {related.data.map((p: { id: string; slug: string; image_url?: string | null; name: string; price?: number | null }) => (
               <Link key={p.id} href={`/products/${p.slug}`} className="block bg-white rounded-lg border border-gray-100 hover:shadow-md transition p-3">
                 {p.image_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={p.image_url} alt={p.name} className="w-full aspect-square object-cover rounded mb-2" />
                 )}
                 <h3 className="font-semibold text-sm line-clamp-2">{p.name}</h3>
-                <p className="text-green-600 font-bold text-sm mt-1">฿{p.price?.toLocaleString()}</p>
+                <p className="text-green-600 font-bold text-sm mt-1">{priceLabel(p.price)}</p>
               </Link>
             ))}
           </div>
