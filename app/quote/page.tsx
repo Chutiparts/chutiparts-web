@@ -93,7 +93,7 @@ export default function QuotePage() {
           rel="noopener noreferrer"
           className="text-[#C9A961] hover:underline font-medium"
         >
-          💬 LINE mr.chuti5988
+          💬 LINE @440ifncj
         </a>
         {' · '}
         <Link href="/" className="text-[#C9A961] hover:underline">

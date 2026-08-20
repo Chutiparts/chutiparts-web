@@ -1,9 +1,9 @@
 // lib/contact-config.ts — ศูนย์รวมช่องทางติดต่อ ChutiBenz (แก้ที่เดียว ใช้ทั้งเว็บ)
 
 export const CONTACT = {
-  lineId: 'mr.chuti5988',
+  lineId: '@440ifncj',
   // ลิงก์เปิดแชต LINE — ปรับเป็น LINE OA link จริงได้ถ้าต่างจากนี้
-  lineUrl: 'https://line.me/R/ti/p/@mr.chuti5988',
+  lineUrl: 'https://line.me/R/ti/p/%40440ifncj',
   tel: '0818285855',
   telDisplay: '081-828-5855',
   // TODO(owner): ใส่เบอร์ WhatsApp รูปแบบสากล เช่น '66818285855' (เว้นว่าง = ซ่อนปุ่ม WhatsApp)

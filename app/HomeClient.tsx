@@ -134,12 +134,12 @@ function HomeClientInner({ products }: { products: Product[] }) {
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <a
-                href="https://line.me/ti/p/~mr.chuti5988"
+                href="https://line.me/R/ti/p/%40440ifncj"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition text-center"
               >
-                💬 Line: mr.chuti5988
+                💬 Line: @440ifncj
               </a>
               <a
                 href="tel:0818285855"
@@ -296,7 +296,7 @@ function HomeClientInner({ products }: { products: Product[] }) {
             <div>
               <h3 className="text-lg font-bold text-white mb-3">ติดต่อเรา</h3>
               <ul className="space-y-2 text-sm">
-                <li>💬 Line: mr.chuti5988</li>
+                <li>💬 Line: @440ifncj</li>
                 <li>📞 081-828-5855</li>
                 <li>🚚 จัดส่งทั่วประเทศ</li>
               </ul>

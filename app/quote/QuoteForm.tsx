@@ -114,7 +114,7 @@ export default function QuoteForm() {
       }
     } catch (err) {
       setStatus('error')
-      setMessage('เกิดข้อผิดพลาด — ลองอีกครั้ง หรือทักไลน์ mr.chuti5988')
+      setMessage('เกิดข้อผิดพลาด — ลองอีกครั้ง หรือทักไลน์ @440ifncj')
     }
   }
 

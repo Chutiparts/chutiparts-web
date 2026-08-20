@@ -5,10 +5,10 @@
 export const SHOP_CONFIG = {
   name: 'ChutiBenz',
   tagline: 'อะไหล่ Mercedes-Benz มือสอง',
-  lineId: 'mr.chuti5988',
+  lineId: '@440ifncj',
   lineUrl: {
-    mobile: 'line://ti/p/~mr.chuti5988',
-    desktop: 'https://line.me/ti/p/~mr.chuti5988',
+    mobile: 'https://line.me/R/ti/p/%40440ifncj',
+    desktop: 'https://line.me/R/ti/p/%40440ifncj',
   },
   phone: '',
 } as const

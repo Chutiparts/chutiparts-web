@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // ⚠️ ใช้ชื่อ env แยกเฉพาะบอต ChutiBenz Ops (@311vbzok) — ไม่ชนกับ LINE_CHANNEL_ACCESS_TOKEN
-// ของเว็บหลัก mr.chuti5988 (@440ifncj) ที่ใช้แจ้งเตือน lead อยู่แล้ว
+// ของเว็บหลัก LINE OA @440ifncj ที่ใช้แจ้งเตือน lead อยู่แล้ว
 const SECRET = process.env.LINE_OPS_CHANNEL_SECRET || ''
 const TOKEN = process.env.LINE_OPS_CHANNEL_ACCESS_TOKEN || ''
 const ADMIN_TO = process.env.LINE_ADMIN_TO || '' // กลุ่ม/แชทภายในทีม (forward ข้อความลูกค้าเข้ามาให้ทีมเห็น)

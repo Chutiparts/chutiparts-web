@@ -4,7 +4,7 @@ export type Lang = 'th' | 'en'
 export type Channel = 'line' | 'wa'
 
 export const CONTACT: Record<Channel, { href: string; label: string; labelFull: string; color: string }> = {
-  line: { href: 'https://line.me/R/ti/p/%40440ifncj', label: 'LINE',     labelFull: 'LINE: mr.chuti5988',        color: '#06C755' },
+  line: { href: 'https://line.me/R/ti/p/%40440ifncj', label: 'LINE',     labelFull: 'LINE: @440ifncj',        color: '#06C755' },
   wa:   { href: 'https://wa.me/66818285855',          label: 'WhatsApp', labelFull: 'WhatsApp: +66 81-828-5855', color: '#25D366' },
 }
 
