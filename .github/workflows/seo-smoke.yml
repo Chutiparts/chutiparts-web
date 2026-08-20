@@ -1,0 +1,29 @@
+name: SEO smoke test (production)
+
+# รันเทส scripts/seo-smoke.sh กับ production โดยอัตโนมัติ
+#  1) หลัง Vercel deploy production สำเร็จ (deployment_status = success)
+#  2) กดรันมือได้ (workflow_dispatch)
+#  3) ทุกเช้า 08:00 เวลาไทย เป็น safety net (เผื่อข้อมูลใน DB เปลี่ยนทำให้หน้าเพี้ยน)
+on:
+  deployment_status:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *'   # 01:00 UTC = 08:00 Asia/Bangkok
+
+jobs:
+  smoke:
+    # เงื่อนไข: ถ้าเป็น event deploy → รันเฉพาะ production ที่สำเร็จเท่านั้น
+    # ถ้าเป็น manual/schedule → ผ่านเข้ามาได้เสมอ
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       contains(github.event.deployment_status.environment, 'Production'))
+    runs-on: ubuntu-latest
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run SEO smoke test against chutibenz.com
+        run: bash scripts/seo-smoke.sh https://chutibenz.com
