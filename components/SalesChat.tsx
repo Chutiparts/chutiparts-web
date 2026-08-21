@@ -47,6 +47,7 @@ const T = {
   cbSend: { th: "ส่ง", en: "Send" },
   cbOk: { th: "รับเรื่องแล้ว เดี๋ยวติดต่อกลับครับ 🙏", en: "Got it — we'll contact you soon 🙏" },
   cbErr: { th: "ส่งไม่สำเร็จ ลองใหม่ หรือทัก LINE ครับ", en: "Couldn't send — try again or use LINE." },
+  cbPhone: { th: "เบอร์โทรไม่ถูกต้อง ตรวจสอบอีกครั้งครับ (เช่น 0891234567)", en: "That phone number looks wrong — please check it." },
   soldHint: { th: "· สอบถามสถานะก่อนสั่ง", en: "· ask availability first" },
   askPrice: { th: "สอบถามราคา", en: "Ask for price" },
 };
@@ -145,7 +146,8 @@ export default function SalesChat() {
         }),
       });
       const j = await r.json();
-      setFormMsg(j?.ok ? t("cbOk") : t("cbErr"));
+      const bad = j?.error === "invalid_phone" || j?.error === "shop_phone";
+      setFormMsg(j?.ok ? t("cbOk") : bad ? t("cbPhone") : t("cbErr"));
       if (j?.ok) { setShowForm(false); setForm({ name: "", contact: "", consent: false }); }
     } catch {
       setFormMsg(t("cbErr"));

@@ -79,6 +79,8 @@ export default function ContactHub() {
       const j = await r.json().catch(() => ({}))
       if (j?.ok) { setRef(j.ref || ''); setView('done') }
       else if (j?.error === 'missing_contact') setErr('กรุณากรอกเบอร์โทร หรือ LINE ID')
+      else if (j?.error === 'invalid_phone') setErr('เบอร์โทรไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง (เช่น 0891234567)')
+      else if (j?.error === 'shop_phone') setErr('เบอร์นี้เป็นเบอร์ของร้าน กรุณากรอกเบอร์ติดต่อกลับของคุณ')
       else if (j?.error === 'consent_required') setErr('กรุณายินยอมให้ทีมงานติดต่อกลับก่อนส่ง')
       else setErr('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง หรือทักไลน์เราโดยตรง')
     } catch {

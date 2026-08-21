@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { notifyNewLead } from '@/lib/notify-lead'
 import { rateLimit, clientIp } from '@/lib/rate-limit'
+import { checkLeadPhone } from '@/lib/phone'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,11 @@ const SOURCES = ['facebook_page', 'facebook_group', 'instagram', 'google', 'qr',
 
 const s = (v: unknown, max: number): string =>
   typeof v === 'string' ? v.trim().slice(0, max) : ''
+
+// ── [C] ตรวจเบอร์ฝั่ง server (2026-08-21) ──────────────────────────────────
+// ตรรกะตรวจเบอร์อยู่ที่ `lib/phone.ts` (เทสที่ `lib/phone.test.ts`) เพราะ Next.js
+// ไม่ยอมให้ route file export อะไรนอกจาก handler → เทสตรง ๆ ในไฟล์นี้ไม่ได้
+const SHOP_PHONE = process.env.SHOP_PHONE || '081-828-5855'
 
 export async function POST(req: NextRequest) {
   // rate-limit: 5 ครั้ง / 10 นาที / IP (กันสคริปต์ยิงถล่ม → LINE เด้งรัว)
@@ -47,6 +53,12 @@ export async function POST(req: NextRequest) {
   const line_id = s(body?.line_id, MAX.line)
   if (!phone && !line_id) {
     return NextResponse.json({ ok: false, error: 'missing_contact' }, { status: 400 })
+  }
+
+  // ตรวจ "เฉพาะเบอร์ที่มีค่า" — lead ที่ให้มาแค่ LINE/อีเมลต้องผ่านตามเดิม (checkLeadPhone คืน null)
+  const phoneErr = checkLeadPhone(phone, SHOP_PHONE)
+  if (phoneErr) {
+    return NextResponse.json({ ok: false, error: phoneErr }, { status: 400 })
   }
 
   const topicRaw = s(body?.topic, 30)

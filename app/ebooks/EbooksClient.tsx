@@ -113,6 +113,8 @@ export default function EbooksClient() {
       })
       const j = await r.json().catch(() => ({}))
       if (j?.ok) { setRef(j.ref || ''); setDone(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+      else if (j?.error === 'invalid_phone') setErr('เบอร์โทรไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง (เช่น 0891234567)')
+      else if (j?.error === 'shop_phone') setErr('เบอร์นี้เป็นเบอร์ของร้าน กรุณากรอกเบอร์ติดต่อกลับของคุณ')
       else setErr('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง หรือทักไลน์เราโดยตรง')
     } catch {
       setErr('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง หรือทักไลน์เราโดยตรง')

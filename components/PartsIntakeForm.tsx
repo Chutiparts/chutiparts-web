@@ -44,6 +44,7 @@ const T = {
   errContact: { th: "กรอกเบอร์หรือ LINE อย่างน้อย 1 ช่อง", en: "Please add a phone or LINE ID" },
   errReq: { th: "กรุณากรอกข้อมูลที่มี *", en: "Please fill the required (*) fields" },
   errSend: { th: "ส่งไม่สำเร็จ ลองใหม่ หรือทัก LINE", en: "Couldn't send — try again or use LINE" },
+  errPhone: { th: "เบอร์โทรไม่ถูกต้อง ตรวจสอบอีกครั้ง (เช่น 0891234567)", en: "That phone number looks wrong — please check it" },
 };
 
 const GREEN = "#17301F", BRASS = "#B8895A", CREAM = "#F4EFE4";
@@ -91,6 +92,7 @@ export default function PartsIntakeForm() {
       });
       const j = await r.json();
       if (j?.ok) setDone({ ref: j.ref || "" });
+      else if (j?.error === "invalid_phone" || j?.error === "shop_phone") setErr(t("errPhone"));
       else setErr(t("errSend"));
     } catch { setErr(t("errSend")); }
     finally { setBusy(false); }
