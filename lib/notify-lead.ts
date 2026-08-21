@@ -15,6 +15,20 @@ export type LeadNotify = {
 
 const ADMIN_LEADS_URL = 'https://chutibenz.com/ops-x7k2m9/leads'
 
+// ── PDPA (2026-08-21) ────────────────────────────────────────
+// LINE_ADMIN_TO เป็น "กลุ่มทีม" (ยืนยันแล้ว) ข้อความ push จึงถึงทุกคนในกลุ่ม และค้างใน
+// ประวัติแชตถาวร — คนที่ถูกเพิ่มเข้ากลุ่มทีหลังเลื่อนขึ้นไปอ่านของเก่าได้หมด
+// จึงห้ามใส่ PII เต็มลงในข้อความ: เบอร์ให้มาสก์ · LINE id/อีเมล ตัดออก (ยังเก็บครบใน DB)
+// รูปแบบมาสก์เก็บ 4 ตัวท้าย ให้ตรงกับ agent.py:75 (0899999999 -> xxx-xxx-9999)
+// หมายเหตุ: ai-tools.ts:201 maskPhone ใช้ 3 ตัวหน้า+2 ตัวท้าย (089****99) = คนละ convention
+// ไม่แก้ตัวนั้นเพราะ /api/ai/v1/* ใช้อยู่ (นอกขอบเขตงานนี้)
+function maskPhoneTail4(v?: string | null): string | null {
+  if (!v) return null
+  const digits = String(v).replace(/\D/g, '')
+  if (digits.length < 4) return '***'
+  return `xxx-xxx-${digits.slice(-4)}`
+}
+
 function buildMessage(l: LeadNotify): string {
   const ref = String(l.id).slice(0, 8).toUpperCase()
   const when = new Date().toLocaleString('th-TH', {
@@ -26,15 +40,17 @@ function buildMessage(l: LeadNotify): string {
     '🔔 มี lead ใหม่จากเว็บ ChutiBenz',
     `Ref: ${ref}`,
     l.name ? `ชื่อ: ${l.name}` : null,
-    l.phone ? `โทร: ${l.phone}` : null,
-    l.line_id ? `LINE: ${l.line_id}` : null,
-    l.email ? `Email: ${l.email}` : null,
+    // เบอร์มาสก์ — เบอร์เต็มดูได้ที่หน้า ops (cookie auth) เท่านั้น
+    l.phone ? `โทร: ${maskPhoneTail4(l.phone)}` : null,
+    // ไม่มีเบอร์ = ติดต่อทาง LINE/อีเมล · บอกแค่ช่องทาง ไม่ปล่อยค่าจริงลงกลุ่ม
+    !l.phone && l.line_id ? 'ช่องทาง: LINE (เปิดในระบบเพื่อดู)' : null,
+    !l.phone && !l.line_id && l.email ? 'ช่องทาง: อีเมล (เปิดในระบบเพื่อดู)' : null,
     `เรื่อง: ${topic}`,
     `มาจาก: ${source}`,
     l.detail ? `รายละเอียด: ${l.detail.slice(0, 300)}` : null,
     `เวลา: ${when}`,
     '',
-    `ดูทั้งหมด: ${ADMIN_LEADS_URL}`,
+    `เปิดดูเบอร์เต็ม/ติดต่อ (ค้นหา #${ref}): ${ADMIN_LEADS_URL}`,
   ].filter(Boolean) as string[]
   return lines.join('\n')
 }
@@ -102,12 +118,14 @@ export async function notifyRestock(p: {
     '',
   ].filter(Boolean) as string[]
   const body = p.leads.slice(0, 10).map((l, i) => {
-    const contact = l.line_id ? `LINE ${l.line_id}` : (l.phone ? `โทร ${l.phone}` : 'ไม่มีช่องติดต่อ')
+    // มาสก์เหมือน buildMessage — ข้อความนี้ push เข้ากลุ่มเดียวกัน
+    const contact = l.phone ? `โทร ${maskPhoneTail4(l.phone)}`
+      : (l.line_id ? 'LINE (เปิดในระบบเพื่อดู)' : 'ไม่มีช่องติดต่อ')
     const nm = l.name || '(ไม่ระบุชื่อ)'
     const want = l.part_wanted ? ` · "${l.part_wanted.slice(0, 40)}"` : ''
     return `${i + 1}. ${nm} · ${contact}${want}`
   })
-  const tail = ['', `ดูรายละเอียด: ${ADMIN_LEADS_URL}`, `เวลา: ${when}`]
+  const tail = ['', `เปิดดูเบอร์เต็ม/ติดต่อ: ${ADMIN_LEADS_URL}`, `เวลา: ${when}`]
   const text = [...head, ...body, ...tail].join('\n')
 
   try {
