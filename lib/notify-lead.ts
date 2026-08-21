@@ -29,6 +29,25 @@ function maskPhoneTail4(v?: string | null): string | null {
   return `xxx-xxx-${digits.slice(-4)}`
 }
 
+// ฟิลด์ที่เป็น free text (detail, name, part_wanted) มาสก์ระดับฟิลด์ไม่พอ — ของพวกนี้
+// LLM เป็นคนเขียน (`agent.py:365` ประกอบ detail จาก note ของ LLM ล้วน ๆ) ถ้ามันเผลอ
+// เขียนเบอร์ลูกค้าลงไป เบอร์เต็มจะทะลุเข้ากลุ่มทั้งที่ฟิลด์ phone มาสก์แล้ว
+// ⚠️ ไม่ได้ใช้ regex ของ `agent.py:69` ตรง ๆ — ตัวนั้นคือ /(?:\+66|0)[\d\-\s]{7,12}\d/
+// ซึ่งพังในประโยคเต็ม: "ไฟท้าย W140 140-033" จะ match ตั้งแต่ 0 ของ W140 ยาวไปกิน
+// รหัสอะไหล่ กลายเป็น "W14xxx-xxx-0033" (เทสยืนยันแล้ว) · "210-820-03-56" ก็โดน
+// ตัวนี้รัดกุมขึ้น 3 จุด:
+//   (?<![\dA-Za-z]) ต้องไม่มีเลข/ตัวอักษรนำหน้า → ไม่กิน 0 ที่อยู่กลาง W140 / A0004660101
+//   นับหลักให้ตรงเบอร์ไทยจริง 9-10 หลัก (มือถือ 10 · บ้าน 9) ไม่ใช่ช่วงกว้าง ๆ
+//   (?![\d-]) ห้ามมีเลข/ขีดต่อท้าย → ไม่ match แค่บางส่วนของรหัสยาว ๆ
+// ครอบ: 0891234567 · 081-828-5855 · 02-123-4567 · +66891234567
+// ไม่แตะ: 140-033 · 210-820-03-56 · W210 · A0004660101
+const PHONE_RE = /(?<![\dA-Za-z])(?:\+66[-\s]?|0)\d(?:[-\s]?\d){7,8}(?![\d-])/g
+
+function scrubPhones(v?: string | null): string | null {
+  if (!v) return null
+  return String(v).replace(PHONE_RE, (m) => maskPhoneTail4(m) ?? 'xxx')
+}
+
 function buildMessage(l: LeadNotify): string {
   const ref = String(l.id).slice(0, 8).toUpperCase()
   const when = new Date().toLocaleString('th-TH', {
@@ -39,7 +58,7 @@ function buildMessage(l: LeadNotify): string {
   const lines = [
     '🔔 มี lead ใหม่จากเว็บ ChutiBenz',
     `Ref: ${ref}`,
-    l.name ? `ชื่อ: ${l.name}` : null,
+    l.name ? `ชื่อ: ${scrubPhones(l.name)}` : null,
     // เบอร์มาสก์ — เบอร์เต็มดูได้ที่หน้า ops (cookie auth) เท่านั้น
     l.phone ? `โทร: ${maskPhoneTail4(l.phone)}` : null,
     // ไม่มีเบอร์ = ติดต่อทาง LINE/อีเมล · บอกแค่ช่องทาง ไม่ปล่อยค่าจริงลงกลุ่ม
@@ -47,7 +66,8 @@ function buildMessage(l: LeadNotify): string {
     !l.phone && !l.line_id && l.email ? 'ช่องทาง: อีเมล (เปิดในระบบเพื่อดู)' : null,
     `เรื่อง: ${topic}`,
     `มาจาก: ${source}`,
-    l.detail ? `รายละเอียด: ${l.detail.slice(0, 300)}` : null,
+    // scrub ก่อน slice — ถ้า slice ก่อนอาจตัดเบอร์ครึ่งตัวจน regex จับไม่ติด
+    l.detail ? `รายละเอียด: ${scrubPhones(l.detail)?.slice(0, 300)}` : null,
     `เวลา: ${when}`,
     '',
     `เปิดดูเบอร์เต็ม/ติดต่อ (ค้นหา #${ref}): ${ADMIN_LEADS_URL}`,
@@ -121,8 +141,9 @@ export async function notifyRestock(p: {
     // มาสก์เหมือน buildMessage — ข้อความนี้ push เข้ากลุ่มเดียวกัน
     const contact = l.phone ? `โทร ${maskPhoneTail4(l.phone)}`
       : (l.line_id ? 'LINE (เปิดในระบบเพื่อดู)' : 'ไม่มีช่องติดต่อ')
-    const nm = l.name || '(ไม่ระบุชื่อ)'
-    const want = l.part_wanted ? ` · "${l.part_wanted.slice(0, 40)}"` : ''
+    const nm = scrubPhones(l.name) || '(ไม่ระบุชื่อ)'
+    // part_wanted ลูกค้าพิมพ์เอง/LLM สรุป = free text ชุดเดียวกับ detail
+    const want = l.part_wanted ? ` · "${scrubPhones(l.part_wanted)?.slice(0, 40)}"` : ''
     return `${i + 1}. ${nm} · ${contact}${want}`
   })
   const tail = ['', `เปิดดูเบอร์เต็ม/ติดต่อ: ${ADMIN_LEADS_URL}`, `เวลา: ${when}`]
