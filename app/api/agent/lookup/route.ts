@@ -102,14 +102,21 @@ export async function GET(req: NextRequest) {
     const skuNorm = sku.replace(/[^a-zA-Z0-9]/g, '')
     const { data } = await sb
       .from('products').select('*').eq('is_published', true)
-      .or(`part_number.ilike.%${clean(sku)}%${skuNorm ? `,part_number_norm.ilike.%${skuNorm}%` : ''}`)
+      // ต้องครอบคลุม 3 อย่าง ไม่ใช่แค่ SKU ปัจจุบัน: (1) SKU ร้าน (2) เลข OEM ที่ปั๊มบนตัวของ
+      // ซึ่งลูกค้าอ่านให้ทางโทรศัพท์ (3) รหัสเดิมของชิ้นที่เคยเปลี่ยน SKU (alt_part_numbers)
+      .or(
+        `part_number.ilike.%${clean(sku)}%` +
+        (skuNorm ? `,part_number_norm.ilike.%${skuNorm}%,oem_number_norm.ilike.%${skuNorm}%` : '') +
+        `,alt_part_numbers.cs.{"${clean(sku)}"}`,
+      )
       .limit(5)
     const rows = (data || []) as Product[]
     if (!rows.length) { await logQuery(sb, sku, sku, 0); return j({ status: 'not_found', query: sku }) }
     const qtyMap = await liveQty(sb, rows.map((r) => String(r.part_number ?? '')))
-    const exact = rows.find(
-      (r) => String(r.part_number ?? '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === skuNorm.toLowerCase(),
-    )
+    const nrm = (v: unknown) => String(v ?? '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+    const exact =
+      rows.find((r) => nrm(r.part_number) === skuNorm.toLowerCase()) ||
+      rows.find((r) => nrm((r as { oem_number?: string }).oem_number) === skuNorm.toLowerCase())
     const pick = exact || rows[0]
     await logQuery(sb, sku, sku, 1)
     return j({ status: 'found', query: sku, result: shape(pick, qtyMap.get(String(pick.part_number ?? '')) || 0) })
