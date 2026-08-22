@@ -77,6 +77,12 @@ export const metadata: Metadata = {
       'wnRBO1fGy6YJPXBKmm5bS5mhTiOF45wEEbJ53d3N97Q',
       '8ajqV-H5cbszbcCwvwHQ7Cxs-r7Gt4jpPa3IYSuyDFA',
     ],
+    // Meta Business Suite → Brand safety → Domains → chutibenz.com → "Add a meta-tag"
+    // เอาค่า content จากหน้านั้นมาใส่เป็น env var แล้ว redeploy — ไม่ต้องแก้โค้ดซ้ำ
+    // ถ้าไม่ตั้ง env นี้ จะไม่มี tag เรนเดอร์ออกมาเลย (ไม่มี tag เปล่าค้างไว้)
+    ...(process.env.NEXT_PUBLIC_FB_DOMAIN_VERIFICATION
+      ? { other: { 'facebook-domain-verification': process.env.NEXT_PUBLIC_FB_DOMAIN_VERIFICATION } }
+      : {}),
   },
   viewport: {
     width: 'device-width',
