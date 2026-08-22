@@ -122,7 +122,7 @@ begin
              -- ถ้าไม่มีบรรทัดนี้ พนักงาน/บิลเก่า/โพสต์เก่าที่ยังใช้รหัสเดิมจะได้คำตอบว่า "ไม่มีของ"
              or (v_sku_norm <> '' and exists (
                    select 1 from unnest(coalesce(p.alt_part_numbers, array[]::text[])) as alt
-                    where regexp_replace(alt, '[^a-zA-Z0-9]', '', 'g') ilike '%'||v_sku_norm||'%'))
+                    where regexp_replace(alt, '[^a-zA-Z0-9]', '', 'g') ilike '%'||v_sku_norm||'%')))
       order by is_exact desc
       limit 5
     ) s
