@@ -17,11 +17,18 @@
 | `security/20260809_anon_lockdown.sql` | 🟡 น่าจะรันแล้ว | ~2026-08-09 | `stock_records` ตอบ 401 code 42501 ด้วย anon key — **ตรวจแค่ตารางเดียวจาก 15 object ที่ไฟล์ครอบ** ที่เหลือยังไม่ได้ไล่ |
 | `security/20260821_leads_anon_lockdown.sql` | ✅ รันแล้ว | ~2026-08-21 | `contact_leads` + `search_queries` ตอบ 401 code 42501 ทั้งคู่ (ก่อนรันเคยเป็น 200 `[]`) · `products` ยัง 200 มีข้อมูล = storefront ไม่พัง |
 | `data/20260822_tuner_sku_scheme.sql` | ✅ รันแล้ว | 2026-08-22 | `products` คืน `AMG-001/002/003` + `VIC-001` · `oem_number='1244405147'` · `alt_part_numbers` มีรหัสเดิม · `part_number_norm` ถูกเขียนค่า · ค้น SKU เดิมทั้ง 4 ไม่เจอแล้ว |
-| `agent/agent_lookup_fn.sql` | ⚠️ รันแล้ว แต่ **ไม่ตรงกับไฟล์ใน repo** | 2026-08-22 | RPC `agent_lookup` หาเจอครบ 9/9 (รวมเลข OEM + รหัสเดิม) · regression 7/7 ผ่าน — **แต่** `md5(prosrc)` บน DB = `47387bcc7a0587a72eb3b206dc3f6a29` (5896 ตัวอักษร) ส่วนไฟล์ `1babe42` = `52af4574699a2f2528922443ccfda09f` (5791) ต่างกัน 105 ตัวอักษร = คอมเมนต์ที่เจ้าของร้านเติมตอนแก้มือ · **ค้าง: รันไฟล์ `1babe42` ทับให้ DB=repo** |
+| `agent/agent_lookup_fn.sql` | ✅ รันแล้ว · **DB = repo เป๊ะ** | 2026-08-22 | `md5(prosrc)` บน DB = `52af4574699a2f2528922443ccfda09f` · `length` = `5791` — ตรงกับไฟล์ `1babe42` ทุกตัวอักษร (ตรวจด้วย `db/drift_manifest.py`) · RPC ยืนยันหลังรันทับอีกรอบ: sku 9/9 หาเจอ (รวมเลข OEM `1244405147` + รหัสเดิม `VIC-DB3`/`SW-AMG01`/`124-AMGV3`) · `ZZQQXX999` → not_found (ไม่ over-match) · `q=W140` → multiple count=20 ตัดเหลือ 3 · sku ชนะ q · control `140-004` qty=5 / `140-019` qty=6 / `202-009` qty=1 |
 | `security/anon-exposure-sweep.sql` | ⬜ ไม่ใช่ migration | — | เป็นคิวรีไว้ตรวจ ไม่ได้เปลี่ยนอะไร รันได้ตลอด |
 | `docs/docbrief/*.sql` (m1-m7, m10, m11) | ❓ ไม่ทราบ | — | ยังไม่ได้ไล่ตรวจ อย่าเดา |
 | `docs/garage-directory/*.sql` | ❓ ไม่ทราบ | — | ยังไม่ได้ไล่ตรวจ อย่าเดา |
 | `docs/sourcing/sourcing-queries-schema.sql` | ❓ ไม่ทราบ | — | ยังไม่ได้ไล่ตรวจ อย่าเดา |
+
+## ค้างอยู่
+
+- [ ] `db/drift_baseline.tsv` — ต้องได้ผลจาก prod ก่อน: วาง `db/check_drift.sql` ลง
+      SQL Editor → Run → เอาผลมา commit เป็น baseline ตัวแรก จากนั้นการเช็คครั้งถัด ๆ ไป
+      คือเทียบกับไฟล์นี้
+- [ ] `docs/**/*.sql` 7 ไฟล์ — ยังไม่ได้ไล่ว่ารันไปแล้วหรือยัง
 
 ## ก่อนรันไฟล์ใหม่ทุกครั้ง
 
