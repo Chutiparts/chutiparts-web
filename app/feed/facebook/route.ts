@@ -114,6 +114,29 @@ function metaCondition(raw: string): 'new' | 'refurbished' | 'used' {
   return 'used' // ค่า default ปลอดภัยที่สุด — อะไหล่มือสองห้ามติด new เด็ดขาด
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// สคีม SKU ของ "อะไหล่แต่ง" (ตกลงกัน 2026-08-22) — {แบรนด์3ตัว}-{ลำดับ3หลัก}
+//   AMG-001  BRB-001 (Brabus)  LOR-001 (Lorinser)  VIC-001 (Victor)
+// ของแต่งมักใส่ได้หลายรุ่น จึงไม่ผูกรุ่นรถไว้ใน SKU (ต่างจากอะไหล่ปกติ 140-004)
+// เลข OEM ของเบนซ์ห้ามเอามาใส่ช่อง part_number — ที่ของมันคือ oem_number แล้วจะไปโผล่เป็น <g:mpn>
+const TUNER_BRANDS: Record<string, string> = {
+  AMG: 'AMG',
+  BRB: 'Brabus',
+  LOR: 'Lorinser',
+  VIC: 'Victor',
+  CAR: 'Carlsson',
+  REN: 'Renntech',
+}
+
+/** แบรนด์แต่งของชิ้นนี้ (ถ้ามี) → custom_label_2 ใช้ทำคอลเลกชัน "ของแต่ง" ใน Commerce Manager */
+function tunerBrand(pn: string, name: string): string {
+  const pre = /^([A-Z]{3})-/.exec(pn.toUpperCase())
+  if (pre && TUNER_BRANDS[pre[1]]) return TUNER_BRANDS[pre[1]]
+  // สินค้าที่ยังไม่ได้ย้ายมาสคีมใหม่ — เดาจากชื่อไว้ก่อน ไม่ให้หลุดคอลเลกชัน
+  const m = /\b(AMG|Brabus|Lorinser|Carlsson|Renntech)\b/i.exec(name)
+  return m ? (TUNER_BRANDS[m[1].slice(0, 3).toUpperCase()] || m[1]) : ''
+}
+
 type Row = {
   part_number: string | null
   name: string | null
@@ -179,6 +202,7 @@ export async function GET(req: Request) {
       continue
     }
 
+    const tuner = tunerBrand(pn, name)
     const models = Array.isArray(p.compatible_models) ? p.compatible_models.filter(Boolean) : []
     const model = models.length ? String(models[0]) : ''
     const link = `${SITE}/products/${encodeURIComponent(slug)}`
@@ -214,6 +238,7 @@ export async function GET(req: Request) {
       '      <g:google_product_category>Vehicles &amp; Parts &gt; Vehicle Parts &amp; Accessories</g:google_product_category>\n' +
       (model ? `      <g:custom_label_0>${esc(model)}</g:custom_label_0>\n` : '') +
       (models.length > 1 ? `      <g:custom_label_1>${esc(models.join(' '))}</g:custom_label_1>\n` : '') +
+      (tuner ? `      <g:custom_label_2>${esc(tuner)}</g:custom_label_2>\n` : '') +
       '    </item>',
     )
   }
